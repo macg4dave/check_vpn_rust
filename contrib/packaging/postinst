@@ -1,0 +1,32 @@
+#!/bin/sh
+# Maintainer post-install script for packages
+# Arguments: <package> <version>
+
+set -e
+
+# Create service user if it doesn't exist
+if ! id -u checkvpn >/dev/null 2>&1; then
+  if command -v useradd >/dev/null 2>&1; then
+    useradd --system --no-create-home --shell /usr/sbin/nologin checkvpn || true
+  fi
+fi
+
+# Create directories and set ownership
+mkdir -p /etc/check_vpn
+mkdir -p /var/log/check_vpn
+chown -R checkvpn:checkvpn /etc/check_vpn || true
+chown -R checkvpn:checkvpn /var/log/check_vpn || true
+
+# Install systemd unit and reload
+if [ -f /lib/systemd/system/check_vpn.service ] || [ -f /etc/systemd/system/check_vpn.service ]; then
+  systemctl daemon-reload || true
+  systemctl enable --now check_vpn.service || true
+fi
+
+# SELinux: ensure contexts are set (if semanage available)
+if command -v semanage >/dev/null 2>&1; then
+  semanage fcontext -a -t var_log_t "/var/log/check_vpn(/.*)?" || true
+  restorecon -Rv /var/log/check_vpn || true
+fi
+
+exit 0
