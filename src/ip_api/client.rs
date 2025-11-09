@@ -34,7 +34,7 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
         let resp = client.get(url).send();
 
         match resp {
-            Ok(mut r) => {
+            Ok(r) => {
                 let status = r.status();
                 // debug prints removed; keep logic compact
                 if !status.is_success() {
@@ -67,10 +67,11 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
                 }
 
                 // Enforce max content-length when provided
-                if let Some(len) = r.content_length() {
-                    if (len as usize) > max_bytes {
+                match r.content_length() {
+                    Some(len) if (len as usize) > max_bytes => {
                         return Err(anyhow::anyhow!("response too large: {} bytes", len));
                     }
+                    _ => {}
                 }
 
                 // Read response body with a cap to avoid unbounded allocations

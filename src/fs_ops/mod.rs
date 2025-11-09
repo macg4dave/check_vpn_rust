@@ -46,6 +46,7 @@ pub fn metadata<P: AsRef<Path>>(path: P, kind: &str) -> Result<std::fs::Metadata
 
 /// Ensure the parent directory for `path` exists, creating it (and parents)
 /// if necessary. Provides contextual error messages mentioning `kind`.
+#[allow(clippy::collapsible_if)]
 pub fn ensure_parent_dir_exists<P: AsRef<Path>>(path: P, kind: &str) -> Result<()> {
     let p = path.as_ref();
     if let Some(parent) = p.parent() {

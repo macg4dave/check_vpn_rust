@@ -1,5 +1,4 @@
-use anyhow::{Context, Result};
-use log::{error, info, warn};
+use log::{error, warn};
 
 pub mod runner;
 use runner::{ActionRunner, RealActionRunner};
@@ -17,7 +16,7 @@ pub enum Action {
 /// - "reboot" -> `Action::Reboot`
 /// - "restart-unit" -> `Action::RestartUnit(arg)`
 /// - "command" -> `Action::Command(arg)`
-/// Any other value will be logged as a warning and treated as a `Command` fallback.
+///   Any other value will be logged as a warning and treated as a `Command` fallback.
 pub fn parse_action(action_type: &str, arg: &str) -> Action {
     match action_type {
         "reboot" => Action::Reboot,

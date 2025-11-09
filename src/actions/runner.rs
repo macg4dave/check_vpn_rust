@@ -19,6 +19,8 @@ impl RealActionRunner {
     pub fn new() -> Self {
         RealActionRunner {}
     }
+    // A Default impl is convenient for callers/tests that want the zero-config
+    // runner without calling `new` explicitly. Clippy suggests adding this.
 
     fn do_reboot(&self, dry_run: bool) -> Result<()> {
         if dry_run {
@@ -83,6 +85,12 @@ impl RealActionRunner {
                 Err(e).context("failed to spawn command")
             }
         }
+    }
+}
+
+impl Default for RealActionRunner {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

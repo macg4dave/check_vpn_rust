@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::{debug, error, info, warn};
+use log::{debug, error, info};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::sleep;
@@ -7,8 +7,7 @@ use std::time::Duration;
 
 use crate::actions;
 use crate::cli::Args;
-use crate::config::{Config, EffectiveConfig};
-use crate::networking;
+use crate::config::Config;
 use crate::ip_api;
 use std::net::TcpStream;
 
@@ -49,7 +48,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
 
     // If run_once requested, perform single check and exit. Use perform_check directly (testable).
     if eff.run_once {
-        perform_check(&eff, || ip_api::get_isp(), |a, d| actions::run_action(a, d))?;
+        perform_check(&eff, ip_api::get_isp, actions::run_action)?;
         return Ok(());
     }
 
@@ -108,7 +107,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         }
 
         // Execute the single check using the current effective configuration.
-        perform_check(&eff, || ip_api::get_isp(), |a, d| actions::run_action(a, d))?;
+                perform_check(&eff, ip_api::get_isp, actions::run_action)?;
 
         // Sleep but wake earlier if we are asked to stop; use the possibly-updated interval.
         let mut slept = 0u64;

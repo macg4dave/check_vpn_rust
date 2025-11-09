@@ -1,9 +1,9 @@
-use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::Duration;
 use std::thread::sleep;
-use std::fmt;
-use std::error::Error;
 use log::{debug, trace};
+mod connect;
+mod error;
+pub use error::NetworkingError;
 
 /// Default timeout (seconds) for connectivity checks.
 pub const DEFAULT_TIMEOUT_SECS: u64 = 2;
@@ -16,32 +16,12 @@ pub const DEFAULT_PORTS: [u16; 3] = [443u16, 53u16, 80u16];
 
 /// Check whether any of the provided endpoints are reachable using a TCP connect
 /// as a lightweight "ping" (avoids raw socket privileges).
-///
 /// Backwards-compatible simple API: `is_online(endpoints, timeout_secs)` uses
 /// `DEFAULT_PORTS` for addresses without an explicit port.
-/// Networking-specific errors returned from connectivity checks.
-#[derive(Debug)]
-pub enum NetworkingError {
-    /// DNS or name resolution failed for the provided address (original error string)
-    DnsResolve(String),
-    /// Generic I/O error (propagated from underlying socket ops)
-    Io(String),
-}
-
-impl fmt::Display for NetworkingError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NetworkingError::DnsResolve(s) => write!(f, "DNS resolution failed: {}", s),
-            NetworkingError::Io(s) => write!(f, "I/O error: {}", s),
-        }
-    }
-}
-
-impl Error for NetworkingError {}
-
-/// Backwards-compatible simple API: `is_online(endpoints, timeout_secs)` uses
-/// `DEFAULT_PORTS` for addresses without an explicit port.
-pub fn is_online<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64) -> std::result::Result<bool, NetworkingError> {
+// Networking-specific errors are defined in `networking::error` and
+// re-exported above as `networking::NetworkingError` for backwards
+// compatibility. See `src/networking/error.rs` for details.
+pub fn is_online<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64) -> Result<bool, NetworkingError> {
     // Backwards-compatible: single attempt (no retries)
     is_online_with_retries(endpoints, timeout_secs, &DEFAULT_PORTS, 1)
 }
@@ -49,86 +29,59 @@ pub fn is_online<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64) -> std::resu
 /// More flexible API which accepts a slice of ports to try when an endpoint
 /// doesn't include a port. Use this when you need to tighten or change the
 /// port list at runtime.
-pub fn is_online_with_ports<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16]) -> std::result::Result<bool, NetworkingError> {
+pub fn is_online_with_ports<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16]) -> Result<bool, NetworkingError> {
     is_online_with_retries(endpoints, timeout_secs, ports, 1)
 }
 
 /// Like `is_online_with_ports` but retry `retries` times with a small backoff
 /// between attempts. This helps against transient network races or services
 /// that appear shortly after the check begins.
-pub fn is_online_with_retries<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16], retries: usize) -> std::result::Result<bool, NetworkingError> {
+pub fn is_online_with_retries<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16], retries: usize) -> Result<bool, NetworkingError> {
     let timeout = Duration::from_secs(timeout_secs);
+    // Ensure at least one attempt is performed; keeps loop logic simple.
+    let attempts = retries.max(1);
 
+    // For each endpoint, produce the candidate address strings to try.
+    // If the endpoint already contains a port ("host:port"), use it directly;
+    // otherwise map it against the supplied ports slice.
     for ep in endpoints {
         let s = ep.as_ref();
 
-        // If s already contains a port, try to connect directly.
-        if s.contains(":") {
-            for attempt in 0..retries.max(1) {
-                debug!("Attempting connect to {} (attempt {}/{})", s, attempt + 1, retries.max(1));
-                match try_connect(s, timeout) {
+        let candidates = if s.contains(':') {
+            // Already contains a port
+            vec![s.to_string()]
+        } else {
+            ports.iter().map(|p| format!("{}:{}", s, p)).collect()
+        };
+
+        // Try each candidate address; each may be attempted `attempts` times
+        // to allow transient failures to recover.
+        for addr in candidates {
+            for attempt in 1..=attempts {
+                debug!("Attempting connect to {} (attempt {}/{})", addr, attempt, attempts);
+                match connect::try_connect(&addr, timeout) {
                     Ok(true) => return Ok(true),
                     Ok(false) => {
-                        // connection attempt failed; will retry if configured
+                        // not reachable right now; try again if attempts remain
                     }
-                    Err(e) => return Err(e),
-                }
-
-                if attempt + 1 < retries {
-                    // Backoff (linear): 200ms * (attempt+1)
-                    sleep(Duration::from_millis(200 * (attempt as u64 + 1)));
-                }
-            }
-            continue;
-        }
-
-        // Try configured ports when no port specified.
-        for &port in ports {
-            let addr = format!("{}:{}", s, port);
-            for attempt in 0..retries.max(1) {
-                debug!("Attempting connect to {} (attempt {}/{})", addr, attempt + 1, retries.max(1));
-                match try_connect(&addr, timeout) {
-                    Ok(true) => return Ok(true),
-                    Ok(false) => {
-                        // not reachable on this attempt/port
+                    Err(e) => {
+                        // Name resolution or other networking error: treat as an
+                        // immediate failure per crate semantics (bubble up).
+                        return Err(e);
                     }
-                    Err(e) => return Err(e),
                 }
 
-                if attempt + 1 < retries {
-                    sleep(Duration::from_millis(200 * (attempt as u64 + 1)));
+                if attempt < attempts {
+                    // Linear backoff: 200ms * attempt_index (1-based)
+                    let backoff_ms = 200u64 * (attempt as u64);
+                    trace!("backoff {}ms before next attempt", backoff_ms);
+                    sleep(Duration::from_millis(backoff_ms));
                 }
             }
         }
     }
 
+    // No endpoint accepted a connection within given attempts/timeouts.
     Ok(false)
 }
 
-fn try_connect(addr: &str, timeout: Duration) -> std::result::Result<bool, NetworkingError> {
-    // Resolve the address (may return multiple socket addrs) and try each.
-    match addr.to_socket_addrs() {
-        Ok(addrs) => {
-            let mut any_success = false;
-            for socket in addrs {
-                trace!("Resolved {} -> {}", addr, socket);
-                if try_connect_addr(&socket, timeout) {
-                    any_success = true;
-                    break;
-                }
-            }
-            Ok(any_success)
-        }
-        Err(e) => Err(NetworkingError::DnsResolve(e.to_string())),
-    }
-}
-
-fn try_connect_addr(socket: &SocketAddr, timeout: Duration) -> bool {
-    match TcpStream::connect_timeout(socket, timeout) {
-        Ok(_) => true,
-        Err(e) => {
-            trace!("connect to {} failed: {}", socket, e);
-            false
-        }
-    }
-}

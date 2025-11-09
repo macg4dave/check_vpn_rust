@@ -1,10 +1,8 @@
 /// JSON I/O helpers.
-///
 /// This module provides a small, well-documented set of helpers for reading
 /// and writing JSON using either in-memory strings, streaming readers/writers,
 /// or filesystem paths. The implementation is split into focused submodules
 /// to make testing and reuse easier.
-
 pub mod fs;
 pub mod stream;
 

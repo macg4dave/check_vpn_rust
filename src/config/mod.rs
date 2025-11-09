@@ -147,6 +147,7 @@ impl Config {
     ///
     /// Kept as an associated function for compatibility with call sites that
     /// expect `Config::validate_values(...)`.
+    #[allow(clippy::too_many_arguments)]
     pub fn validate_values(
         interval: u64,
         isp: &str,
@@ -192,7 +193,7 @@ impl Config {
     /// 1. `CHECK_VPN_CONFIG` env var path
     /// 2. `./check_vpn.xml`
     /// 3. `/etc/check_vpn/config.xml`
-    /// If no file is found, returns the default config.
+    ///    If no file is found, returns the default config.
     pub fn load() -> Result<Self> {
         if let Ok(path) = std::env::var("CHECK_VPN_CONFIG") {
             return crate::xml_io::read_xml(&path).context("failed to read config via xml_io");

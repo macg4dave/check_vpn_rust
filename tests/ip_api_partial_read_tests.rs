@@ -1,4 +1,4 @@
-use std::net::{TcpListener, TcpStream};
+use std::net::TcpListener;
 use std::io::{Read, Write};
 use std::thread;
 use std::time::Duration;

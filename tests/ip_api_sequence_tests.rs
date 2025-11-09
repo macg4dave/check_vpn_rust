@@ -11,7 +11,6 @@ struct SequenceServer {
     url: String,
     stop: Arc<AtomicBool>,
     handle: thread::JoinHandle<()>,
-    ready: Arc<AtomicBool>,
 }
 
 impl SequenceServer {
@@ -78,7 +77,7 @@ impl SequenceServer {
         while !ready.load(Ordering::SeqCst) && start.elapsed() < Duration::from_millis(500) {
             thread::sleep(Duration::from_millis(5));
         }
-        SequenceServer { url, stop, handle, ready }
+    SequenceServer { url, stop, handle }
     }
 
     fn url(&self) -> &str { &self.url }

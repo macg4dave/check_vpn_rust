@@ -45,7 +45,7 @@ fn transient_listener_becomes_available() {
 
     // Use the retries-enabled API; allow multiple attempts so the transient
     // listener has time to appear.
-    let endpoints = [format!("127.0.0.1"); 1];
+    let endpoints = ["127.0.0.1".to_string(); 1];
     let ok = check_vpn::networking::is_online_with_retries(&endpoints, 1, &[port], 8).expect("is_online failed");
     assert!(ok, "expected transient listener to be detected by retries");
 }

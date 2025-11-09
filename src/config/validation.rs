@@ -13,6 +13,7 @@ impl fmt::Display for ValidationErrors {
 impl std::error::Error for ValidationErrors {}
 
 /// Validate effective configuration values. Returns Ok(()) if valid or Err(errors).
+#[allow(clippy::too_many_arguments)]
 pub fn validate_values(
     interval: u64,
     isp: &str,
