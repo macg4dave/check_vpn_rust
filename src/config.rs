@@ -11,11 +11,35 @@ pub struct Config {
     pub vpn_lost_action_type: Option<String>,
     pub vpn_lost_action_arg: Option<String>,
     pub dry_run: Option<bool>,
+    /// If true, exit with non-zero codes on networking/ISP errors even in long-running mode
+    pub exit_on_error: Option<bool>,
     // Connectivity-related configuration
     pub connectivity_endpoints: Option<Vec<String>>,
     pub connectivity_ports: Option<Vec<u16>>,
     pub connectivity_timeout_secs: Option<u64>,
+    pub connectivity_retries: Option<usize>,
 }
+
+/// ValidationErrors represents one or more config validation problems.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ValidationErrors(pub Vec<String>);
+
+impl std::fmt::Display for ValidationErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.join("; "))
+    }
+}
+
+impl std::error::Error for ValidationErrors {}
+
+/// Exit codes used by the application for specific error classes.
+pub const EXIT_INVALID_CONFIG: i32 = 2;
+/// DNS or name-resolution failure while attempting connectivity checks
+pub const EXIT_CONNECTIVITY_DNS: i32 = 3;
+/// Generic connectivity failure (unreachable/timeouts) when considered fatal
+pub const EXIT_CONNECTIVITY_FAILURE: i32 = 4;
+/// Failed to determine ISP (IP API) when considered fatal
+pub const EXIT_ISP_FAILURE: i32 = 5;
 
 /// Effective configuration after merging CLI args and XML config/defaults.
 #[derive(Debug, Clone)]
@@ -28,7 +52,9 @@ pub struct EffectiveConfig {
     pub connectivity_endpoints: Vec<String>,
     pub connectivity_ports: Vec<u16>,
     pub connectivity_timeout_secs: u64,
+    pub connectivity_retries: usize,
     pub run_once: bool,
+    pub exit_on_error: bool,
 }
 
 impl Config {
@@ -72,6 +98,13 @@ impl Config {
             .or(self.connectivity_timeout_secs)
             .unwrap_or(crate::networking::DEFAULT_TIMEOUT_SECS);
 
+        let connectivity_retries = args
+            .connectivity_retries
+            .or(self.connectivity_retries)
+            .unwrap_or(crate::networking::DEFAULT_RETRIES);
+
+        let exit_on_error = if args.exit_on_error { true } else { self.exit_on_error.unwrap_or(false) };
+
         let run_once = args.run_once;
 
         EffectiveConfig {
@@ -83,7 +116,9 @@ impl Config {
             connectivity_endpoints,
             connectivity_ports,
             connectivity_timeout_secs,
+            connectivity_retries,
             run_once,
+            exit_on_error,
         }
     }
 }
@@ -99,6 +134,8 @@ impl Default for Config {
             connectivity_endpoints: Some(vec!["8.8.8.8".to_string(), "google.com".to_string()]),
             connectivity_ports: Some(vec![crate::networking::DEFAULT_PORTS[0], crate::networking::DEFAULT_PORTS[1], crate::networking::DEFAULT_PORTS[2]]),
             connectivity_timeout_secs: Some(crate::networking::DEFAULT_TIMEOUT_SECS),
+            connectivity_retries: Some(crate::networking::DEFAULT_RETRIES),
+            exit_on_error: Some(false),
         }
     }
 }
@@ -134,8 +171,17 @@ impl Config {
         Ok(c)
     }
 
-    /// Validate effective configuration values. Returns Ok(()) if valid or Err(vec_of_errors).
-    pub fn validate_values(interval: u64, isp: &str, action_type: &str, action_arg: &str) -> Result<()> {
+    /// Validate effective configuration values. Returns Ok(()) if valid or Err(errors).
+    pub fn validate_values(
+        interval: u64,
+        isp: &str,
+        action_type: &str,
+        action_arg: &str,
+        connectivity_endpoints: &[String],
+        connectivity_ports: &[u16],
+        connectivity_timeout_secs: u64,
+        connectivity_retries: usize,
+    ) -> std::result::Result<(), ValidationErrors> {
         let mut errors: Vec<String> = Vec::new();
 
         if interval == 0 {
@@ -156,10 +202,29 @@ impl Config {
             errors.push("vpn_lost_action_arg must be provided for restart-unit and command action types".to_string());
         }
 
+        // Connectivity checks: endpoints and ports must be present and timeout/retries sensible
+        if connectivity_endpoints.is_empty() {
+            errors.push("connectivity_endpoints must include at least one endpoint".to_string());
+        } else if connectivity_endpoints.iter().any(|s| s.trim().is_empty()) {
+            errors.push("connectivity_endpoints contains an empty string".to_string());
+        }
+
+        if connectivity_ports.is_empty() {
+            errors.push("connectivity_ports must include at least one port".to_string());
+        }
+
+        if connectivity_timeout_secs == 0 {
+            errors.push("connectivity_timeout_secs must be greater than zero".to_string());
+        }
+
+        if connectivity_retries == 0 {
+            errors.push("connectivity_retries must be at least 1".to_string());
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
-            Err(anyhow::anyhow!(errors.join("; ")))
+            Err(ValidationErrors(errors))
         }
     }
 }

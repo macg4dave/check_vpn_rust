@@ -36,9 +36,17 @@ pub struct Args {
     #[arg(long = "connectivity-timeout")]
     pub connectivity_timeout_secs: Option<u64>,
 
+    /// Number of retries for connectivity checks (overrides config)
+    #[arg(long = "connectivity-retries")]
+    pub connectivity_retries: Option<usize>,
+
     /// Run only a single iteration and exit (useful for testing)
     #[arg(long = "run-once", action = clap::ArgAction::SetTrue)]
     pub run_once: bool,
+
+    /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
+    #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
+    pub exit_on_error: bool,
 }
 
 impl Args {

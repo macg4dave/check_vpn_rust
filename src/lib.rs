@@ -13,3 +13,4 @@ pub use actions::Action;
 pub use actions::parse_action;
 pub use ip_api::get_isp;
 pub use timer::{start_timer, TimerHandle};
+pub use networking::NetworkingError;

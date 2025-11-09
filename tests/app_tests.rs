@@ -26,7 +26,9 @@ fn perform_check_runs_action_when_isp_matches() {
         connectivity_endpoints: vec!["127.0.0.1".to_string()],
         connectivity_ports: vec![port],
         connectivity_timeout_secs: 1,
+        connectivity_retries: 1,
         run_once: true,
+        exit_on_error: false,
     };
 
     let called = Arc::new(AtomicBool::new(false));
@@ -63,7 +65,9 @@ fn perform_check_does_not_run_action_when_isp_differs() {
         connectivity_endpoints: vec!["127.0.0.1".to_string()],
         connectivity_ports: vec![port],
         connectivity_timeout_secs: 1,
+        connectivity_retries: 1,
         run_once: true,
+        exit_on_error: false,
     };
 
     let called = Arc::new(AtomicBool::new(false));

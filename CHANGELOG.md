@@ -1,0 +1,11 @@
+# Changelog
+
+## Unreleased
+
+- Add config validation with detailed, user-friendly error messages. Validation now reports multiple problems at once and the service exits with a specific exit code on startup when configuration is invalid.
+- Add `connectivity_retries` configuration (defaults to 1) and CLI option `--connectivity-retries` to control how many times connectivity checks are retried.
+- Wire retries into connectivity checks so transient failures are tolerated when configured.
+- Update tests and docs to reflect new validation and retry behavior.
+ - Add explicit exit codes for connectivity and ISP failures (DNS failure, connectivity failure, ISP lookup failure).
+ - Add CLI flag `--exit-on-error` to force non-zero exit codes on errors even in long-running mode (useful for health checks).
+ - Re-export `NetworkingError` from crate root for easier error handling by embedders.
