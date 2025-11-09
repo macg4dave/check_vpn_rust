@@ -209,6 +209,7 @@ Refactor notes (recent)
 - The CLI argument handling has been reorganized into `src/cli/mod.rs` with the same public type `crate::cli::Args` kept for compatibility. This makes it easier to extend the CLI module with helpers and submodules.
 - The negative connectivity test that previously used a remote/unroutable address has been replaced with a deterministic local simulation against a high loopback port (65000) to avoid flaky CI behavior.
 - A small cleanup removed an intermediate legacy file and tidied module layout.
+ - The `networking` code has been reorganized into a module folder for clarity: `src/networking/mod.rs` now contains the public API (`is_online`, `is_online_with_retries`, constants, etc.), with helper modules alongside it at `src/networking/connect.rs` (connection logic) and `src/networking/error.rs` (error types). Callers continue to use `crate::networking::...` with no API changes.
 
 How to run tests (recap)
 -----------------------
