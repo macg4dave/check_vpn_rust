@@ -4,7 +4,13 @@
 // `crate::cli::Args` and the public API expected by the rest of the crate.
 pub mod cli;
 pub mod networking;
-pub mod ip_api;
+// The ip_api module is included inline to avoid ambiguity during a
+// transitional refactor when both `src/ip_api.rs` and
+// `src/ip_api/mod.rs` might exist. This ensures the crate compiles
+// and doc-tests run while we finalize the directory-style layout.
+pub mod ip_api {
+	include!("ip_api/mod.rs");
+}
 pub mod metrics;
 // The `app` module is implemented in `src/app.rs` and may contain submodules
 // in `src/app/*.rs`. To avoid ambiguity between `src/app.rs` and
