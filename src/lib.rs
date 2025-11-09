@@ -19,7 +19,12 @@ pub mod app {
 	include!("app.rs");
 }
 pub mod xml_io;
-pub mod json_io;
+// Inline-include the `json_io` module during the refactor to avoid
+// duplicate-module doc-test errors when both `src/json_io.rs` and
+// `src/json_io/mod.rs` may exist temporarily.
+pub mod json_io {
+	include!("json_io/mod.rs");
+}
 // Canonical actions module (refactored into `src/actions`)
 pub mod actions;
 pub mod logging;

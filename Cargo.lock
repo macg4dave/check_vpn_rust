@@ -326,6 +326,7 @@ dependencies = [
  "serde-xml-rs",
  "serde_json",
  "serial_test",
+ "tempfile",
  "tokio",
  "tracing",
  "wiremock",
