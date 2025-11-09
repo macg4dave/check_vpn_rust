@@ -1,0 +1,23 @@
+[package]
+name = "check_vpn"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4.3", features = ["derive"] }
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+env_logger = "0.10"
+ctrlc = "3.2"
+
+# Pure-Rust ICMP ping (requires raw socket privileges on most OSes)
+
+# D-Bus integration for systemd/logind actions
+zbus = { version = "3.13", features = ["blocking"] }
+anyhow = "1.0"
+serde-xml-rs = "0.5"
+
+[dev-dependencies]
+httpmock = "0.6"
