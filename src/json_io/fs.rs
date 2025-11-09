@@ -1,8 +1,6 @@
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::fs;
-use std::fs::File;
 use std::path::Path;
 use std::time::Instant;
 
@@ -12,8 +10,7 @@ use std::time::Instant;
 pub fn read_json<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
     let path_ref = path.as_ref();
     let started = Instant::now();
-    let contents = fs::read_to_string(path_ref)
-        .with_context(|| format!("failed to read json file: {}", path_ref.display()))?;
+    let contents = crate::fs_ops::read_to_string(path_ref, "json")?;
 
     log::debug!(
         "json_io::read_json reading path={} bytes={}",
@@ -46,7 +43,7 @@ pub fn write_json<T: Serialize, P: AsRef<Path>>(value: &T, path: P) -> Result<()
     #[cfg(not(feature = "json_pretty"))]
     let json = serde_json::to_string(value).context("failed to serialize to json")?;
 
-    fs::write(path_ref, &json).with_context(|| format!("failed to write json file: {}", path_ref.display()))?;
+    crate::fs_ops::write_string(path_ref, &json, "json")?;
     log::debug!(
         "json_io::write_json wrote path={} bytes={} in {:?}",
         path_ref.display(),
@@ -59,13 +56,13 @@ pub fn write_json<T: Serialize, P: AsRef<Path>>(value: &T, path: P) -> Result<()
 /// Read a value from a file using streaming deserialization.
 pub fn read_json_from_file<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
     let path_ref = path.as_ref();
-    let f = File::open(path_ref).with_context(|| format!("failed to open json file: {}", path_ref.display()))?;
+    let f = crate::fs_ops::open_file_for_read(path_ref, "json")?;
     crate::json_io::stream::read_json_from_reader(f)
 }
 
 /// Write a value to a file using streaming serialization (overwrites existing file).
 pub fn write_json_to_file<T: Serialize, P: AsRef<Path>>(value: &T, path: P) -> Result<()> {
     let path_ref = path.as_ref();
-    let f = File::create(path_ref).with_context(|| format!("failed to create json file: {}", path_ref.display()))?;
+    let f = crate::fs_ops::create_file_for_write(path_ref, "json")?;
     crate::json_io::stream::write_json_to_writer(value, f)
 }

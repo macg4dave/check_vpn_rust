@@ -18,13 +18,20 @@ pub mod metrics;
 pub mod app {
 	include!("app.rs");
 }
-pub mod xml_io;
+// Inline-include the `xml_io` module during the refactor to avoid
+// duplicate-module doc-test errors when both `src/xml_io.rs` and
+// `src/xml_io/mod.rs` may exist temporarily.
+pub mod xml_io {
+	include!("xml_io/mod.rs");
+}
 // Inline-include the `json_io` module during the refactor to avoid
 // duplicate-module doc-test errors when both `src/json_io.rs` and
 // `src/json_io/mod.rs` may exist temporarily.
 pub mod json_io {
 	include!("json_io/mod.rs");
 }
+// Shared filesystem helpers used by multiple IO modules.
+pub mod fs_ops;
 // Canonical actions module (refactored into `src/actions`)
 pub mod actions;
 pub mod logging;
