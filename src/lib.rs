@@ -1,46 +1,64 @@
-// The CLI module is defined inline here via `include!` to avoid ambiguity
-// when both `src/cli.rs` and `src/cli/mod.rs` exist in the tree during a
-// transitional refactor. The included file continues to provide
-// `crate::cli::Args` and the public API expected by the rest of the crate.
+//! check_vpn — small CLI tool and library to verify external IP / ISP and
+//! optionally run actions when the public IP changes (useful for VPN checks).
+//!
+//! This crate exposes both a binary (`check_vpn` in `src/main.rs`) and a
+//! library surface for testing and embedding. The public API is intentionally
+//! small and centered around:
+//! - `check_vpn::app::perform_check` — perform a single connectivity/ISP check
+//! - `check_vpn::config::Config` — load/merge/validate configuration
+//! - `check_vpn::timer::start_timer` and `TimerHandle` — a tiny recurring timer
+//! - `check_vpn::actions` — action parsing and execution helpers
+//!
+//! Example (ignored):
+//! ```ignore
+//! // The primary workflow is exercised in the tests; this example is for
+//! // documentation only and is not compiled as a doctest.
+//! use check_vpn::{app::perform_check, ip_api::get_isp, actions::run_action};
+//! // Construct an `EffectiveConfig` via merging CLI args and `Config` in real
+//! // programs. For docs we only show the call site:
+//! // perform_check(&effective_config, get_isp, run_action).unwrap();
+//! ```
+
+// Core modules. Some modules are inline-included to avoid duplicate-module
+// compilation issues during an ongoing directory-style refactor — the
+// include! usage is deliberate and safe. Prefer directory modules where the
+// layout is stable.
 pub mod cli;
 pub mod networking;
-// The ip_api module is included inline to avoid ambiguity during a
-// transitional refactor when both `src/ip_api.rs` and
-// `src/ip_api/mod.rs` might exist. This ensures the crate compiles
-// and doc-tests run while we finalize the directory-style layout.
+
 pub mod ip_api {
 	include!("ip_api/mod.rs");
 }
+
 pub mod metrics;
-// The `app` module is implemented in `src/app.rs` and may contain submodules
-// in `src/app/*.rs`. To avoid ambiguity between `src/app.rs` and
-// `src/app/mod.rs` on some filesystems, include the file here explicitly.
+
 pub mod app {
 	include!("app.rs");
 }
-// Inline-include the `xml_io` module during the refactor to avoid
-// duplicate-module doc-test errors when both `src/xml_io.rs` and
-// `src/xml_io/mod.rs` may exist temporarily.
+
 pub mod xml_io {
 	include!("xml_io/mod.rs");
 }
-// Inline-include the `json_io` module during the refactor to avoid
-// duplicate-module doc-test errors when both `src/json_io.rs` and
-// `src/json_io/mod.rs` may exist temporarily.
+
 pub mod json_io {
 	include!("json_io/mod.rs");
 }
-// Shared filesystem helpers used by multiple IO modules.
+
+// Shared helpers and modules
 pub mod fs_ops;
-// Canonical actions module (refactored into `src/actions`)
 pub mod actions;
 pub mod logging;
 pub mod config;
-pub mod timer;
+pub mod timer {
+	include!("timer.rs");
+}
 
-// Re-export commonly used items for tests and external use
+// Convenience re-exports for common items used throughout tests and the
+// examples in README. Keeping these re-exports stable makes the top-level
+// crate more ergonomic to use.
 pub use actions::Action;
 pub use actions::parse_action;
 pub use ip_api::get_isp;
 pub use timer::{start_timer, TimerHandle};
 pub use networking::NetworkingError;
+pub use config::Config;

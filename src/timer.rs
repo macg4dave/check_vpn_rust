@@ -2,58 +2,71 @@ use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-/// A simple cross-platform recurring timer.
+/// A simple recurring background timer.
 ///
-/// `start_timer` spawns a background thread that executes `task` every `interval_ms` milliseconds
-/// until the returned `TimerHandle` is stopped (consumes the handle).
+/// The timer executes the provided `task` closure, then waits approximately
+/// `interval_ms` milliseconds before repeating. The returned `TimerHandle`
+/// owns the background thread; consuming the handle with `stop()` signals the
+/// thread to exit and blocks until it joins. Dropping the handle will also
+/// attempt a graceful stop and join the thread.
 pub struct TimerHandle {
     stop: Arc<AtomicBool>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl TimerHandle {
-    /// Stop the timer and join the background thread.
-    /// Consumes the handle.
+    /// Stop the timer and join the background thread. This consumes the
+    /// handle and blocks until the background thread exits.
     pub fn stop(mut self) {
         self.stop.store(true, Ordering::SeqCst);
         if let Some(t) = self.thread.take() {
             let _ = t.join();
         }
     }
+
+    /// Internal constructor used by `start_timer`.
+    fn new(stop: Arc<AtomicBool>, thread: JoinHandle<()>) -> Self {
+        Self { stop, thread: Some(thread) }
+    }
 }
 
 /// Spawn a background timer which calls `task` every `interval_ms` milliseconds.
 ///
-/// The task must be `Send + 'static` so it can run in the thread. Returns a `TimerHandle`
-/// which can be used to stop the timer.
+/// The `task` closure must be `Send + 'static` because it runs on a worker
+/// thread. To keep `stop()` responsive the implementation sleeps in small
+/// chunks (10ms) between invocations and checks the stop flag between chunks.
 pub fn start_timer(interval_ms: u64, mut task: impl FnMut() + Send + 'static) -> TimerHandle {
     let stop = Arc::new(AtomicBool::new(false));
-    let s = stop.clone();
+    let stop_clone = stop.clone();
 
-    // Ensure min interval of 1ms to avoid zero-sleep busy-loop.
+    // Normalize zero to a sane minimum interval (1ms) to prevent tight spins.
     let interval = if interval_ms == 0 { 1 } else { interval_ms };
+    const CHUNK_MS: u64 = 10;
 
-    let handle = thread::spawn(move || {
-        while !s.load(Ordering::SeqCst) {
+    let thread = thread::spawn(move || {
+        while !stop_clone.load(Ordering::SeqCst) {
+            // Execute task first; this preserves the previous behaviour and
+            // makes the timer 'fire immediately' on start.
             task();
 
-            // Sleep in small chunks so stop() is responsive.
+            // Sleep in small increments so a stop signal is noticed quickly.
             let mut slept = 0u64;
-            let chunk = 10u64; // ms
-            while slept < interval && !s.load(Ordering::SeqCst) {
-                let to_sleep = std::cmp::min(chunk, interval - slept);
+            while slept < interval && !stop_clone.load(Ordering::SeqCst) {
+                let to_sleep = std::cmp::min(CHUNK_MS, interval - slept);
                 thread::sleep(Duration::from_millis(to_sleep));
                 slept += to_sleep;
             }
         }
     });
 
-    TimerHandle { stop, thread: Some(handle) }
+    TimerHandle::new(stop, thread)
 }
 
 impl Drop for TimerHandle {
     fn drop(&mut self) {
-        // If the handle is dropped without explicit stop, signal the thread to exit and detach.
+        // Ensure the worker thread is signalled to stop and joined when the
+        // handle is dropped. We ignore panics in the worker thread when
+        // joining; there's little we can do from Drop.
         self.stop.store(true, Ordering::SeqCst);
         if let Some(t) = self.thread.take() {
             let _ = t.join();

@@ -21,12 +21,15 @@ pub fn level_from_verbosity(verbosity: u8) -> &'static str {
 
 /// Set `RUST_LOG` to `level` but only if it's not already present.
 ///
-/// `std::env::set_var` is wrapped in an `unsafe` block because some
-/// cross-compilation targets surface it as an `unsafe` operation. Using
-/// `unsafe` here keeps tests and platforms consistent with the rest of the
-/// codebase.
+/// Historically some unusual targets exposed environment helpers as `unsafe`.
+/// In current stable Rust `std::env::set_var` and `remove_var` are safe. We
+/// therefore use the safe API here so callers (including tests) don't need to
+/// rely on `unsafe` blocks.
 fn set_rust_log_if_unset(level: &str) {
     if std::env::var_os("RUST_LOG").is_none() {
+        // Some cross-compilation targets or older toolchains expose
+        // environment mutation as `unsafe`. Keep this call inside an
+        // `unsafe` block so the module remains compatible across targets.
         unsafe { std::env::set_var("RUST_LOG", level); }
     }
 }
