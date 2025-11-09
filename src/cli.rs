@@ -44,6 +44,18 @@ pub struct Args {
     #[arg(long = "run-once", action = clap::ArgAction::SetTrue)]
     pub run_once: bool,
 
+    /// Increase logging verbosity. May be repeated (-v, -vv) to reach debug/trace levels.
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
+    pub verbose: u8,
+
+    /// Enable a simple HTTP health/metrics endpoint (useful for container deployments)
+    #[arg(long = "enable-metrics", action = clap::ArgAction::SetTrue)]
+    pub enable_metrics: bool,
+
+    /// Address to bind the health/metrics endpoint (default: 0.0.0.0:9090)
+    #[arg(long = "metrics-addr", default_value = "0.0.0.0:9090")]
+    pub metrics_addr: String,
+
     /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
     pub exit_on_error: bool,

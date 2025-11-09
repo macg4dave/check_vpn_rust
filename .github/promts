@@ -19,6 +19,7 @@ Purpose: These instructions help an automated coding agent implement features an
 5. Have real network test and mock network tests separate
 6. Keep promts and instructions file upto date with any requested changes
 7. If it does something then write a test for it
+8. Keep CHANGELOG.md upto date
 
 ## Error handling and exit codes
 

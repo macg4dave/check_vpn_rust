@@ -10,6 +10,8 @@ use crate::cli::Args;
 use crate::config::{Config, EffectiveConfig};
 use crate::networking;
 use crate::ip_api;
+use std::net::{TcpListener, TcpStream};
+use std::io::{Read, Write};
 
 /// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
 pub fn run(args: Args, cfg: Config) -> Result<()> {
@@ -52,6 +54,56 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         kr.store(false, Ordering::SeqCst);
         info!("Received termination signal, shutting down...");
     })?;
+
+    // Optionally start a tiny HTTP server to serve health and basic metrics.
+    // This is intentionally minimal to avoid adding a heavy HTTP dependency.
+    let mut metrics_handle: Option<std::thread::JoinHandle<()>> = None;
+    if args.enable_metrics {
+        let kr_clone = keep_running.clone();
+        let addr = args.metrics_addr.clone();
+        metrics_handle = Some(std::thread::spawn(move || {
+            let listener = match TcpListener::bind(&addr) {
+                Ok(l) => l,
+                Err(e) => {
+                    log::error!("metrics server failed to bind {}: {}", addr, e);
+                    return;
+                }
+            };
+            // Non-blocking accept loop so we can check shutdown flag periodically.
+            listener.set_nonblocking(true).ok();
+            log::info!("metrics server listening on {}", addr);
+
+            while kr_clone.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((mut stream, _peer)) => {
+                        // Read up to 2KB of request; it's fine for simple GET requests.
+                        let mut buf = [0u8; 2048];
+                        if let Ok(n) = stream.read(&mut buf) {
+                            let req = String::from_utf8_lossy(&buf[..n]);
+                            if req.starts_with("GET /health") {
+                                let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok";
+                                let _ = stream.write_all(resp.as_bytes());
+                            } else if req.starts_with("GET /metrics") {
+                                // A tiny Prometheus-friendly metric
+                                let body = "# HELP check_vpn_up 1 if the service is up\n# TYPE check_vpn_up gauge\ncheck_vpn_up 1\n";
+                                let resp = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body);
+                                let _ = stream.write_all(resp.as_bytes());
+                            } else {
+                                let resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+                                let _ = stream.write_all(resp.as_bytes());
+                            }
+                        }
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(50));
+                        continue;
+                    }
+                    Err(_) => break,
+                }
+            }
+            log::info!("metrics server at {} shutting down", addr);
+        }));
+    }
 
     // Main loop: cross-platform timer/polling. On each iteration we attempt to reload
     // the XML config and merge with CLI args so users can change timing/config without
@@ -107,6 +159,13 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
     }
 
     info!("Exiting check_vpn run loop");
+
+    // Ensure metrics server exits cleanly if present.
+    if let Some(h) = metrics_handle {
+        // Wake the listener in case it's blocked in accept
+        let _ = TcpStream::connect(args.metrics_addr.replace("http://", ""));
+        let _ = h.join();
+    }
     Ok(())
 }
 

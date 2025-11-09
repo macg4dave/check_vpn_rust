@@ -11,6 +11,7 @@ struct SequenceServer {
     url: String,
     stop: Arc<AtomicBool>,
     handle: thread::JoinHandle<()>,
+    ready: Arc<AtomicBool>,
 }
 
 impl SequenceServer {
@@ -23,10 +24,14 @@ impl SequenceServer {
 
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = Arc::clone(&counter);
-        let stop = Arc::new(AtomicBool::new(false));
-        let stop_clone = Arc::clone(&stop);
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_clone = Arc::clone(&stop);
+    let ready = Arc::new(AtomicBool::new(false));
+    let ready_clone = Arc::clone(&ready);
 
         let handle = thread::spawn(move || {
+            // Signal that the server thread has started and is ready to accept.
+            ready_clone.store(true, Ordering::SeqCst);
             // Accept in a loop with non-blocking accept and short sleeps so we
             // can observe the shutdown flag promptly.
             loop {
@@ -68,11 +73,12 @@ impl SequenceServer {
             }
         });
 
-        // Give the thread a tiny moment to enter its accept loop to avoid
-        // races where the client immediately attempts to connect before the
-        // server is polling.
-        thread::sleep(Duration::from_millis(20));
-        SequenceServer { url, stop, handle }
+        // Wait for the server thread to signal readiness (avoid races)
+        let start = std::time::Instant::now();
+        while !ready.load(Ordering::SeqCst) && start.elapsed() < Duration::from_millis(500) {
+            thread::sleep(Duration::from_millis(5));
+        }
+        SequenceServer { url, stop, handle, ready }
     }
 
     fn url(&self) -> &str { &self.url }
