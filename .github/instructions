@@ -62,14 +62,7 @@ cargo test --test timer_tests
 
 ## Files of interest
 
-- `src/main.rs` — minimal launcher, initializing logging and handing off to `app::run`.
-- `src/app.rs` — main application loop, config merging, polling logic, and `perform_check` (test seam).
-- `src/config.rs` — `Config` struct, defaults, validation, and `EffectiveConfig` merge logic.
-- `src/networking.rs` — connectivity checks (TCP connect).
-- `src/ip_api.rs` — ISP HTTP lookup.
-- `src/actions.rs` — parse and run configured actions (D-Bus or command fallback).
-- `src/xml_io.rs` — XML read/write helpers.
-- `src/timer.rs` — small cross-platform timer utility (start/stop).
+- `src/main.rs` — minimal launcher, initializing logging and handing off to 
 - `tests/` — unit and integration tests. New test files should live here.
 
 ## Testing and quality gates

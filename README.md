@@ -169,3 +169,36 @@ Notes and safety
 - Use `-- --ignored` to execute ignored tests; use `cargo test <pattern>` to run a single test or file.
 
 If you want, I can add the GitHub Actions workflow file to the repository and/or a Dockerfile under `contrib/` so you can run the containerized tests easily.
+
+## Metrics endpoint & testing seam
+
+Metrics endpoint
+- When enabled via configuration or CLI the program starts a small HTTP server bound to the configured address. It exposes two simple endpoints useful for monitoring and health checks:
+	- `/health` — returns HTTP 200 when the process is running; suitable for container liveness/readiness probes.
+	- `/metrics` — returns a small plain-text metrics payload intended for scraping by Prometheus or simple monitoring tools (contains basic runtime/check information).
+
+Example (when metrics are configured to bind to `127.0.0.1:9090`):
+
+- Health: `http://127.0.0.1:9090/health`
+- Metrics: `http://127.0.0.1:9090/metrics`
+
+Testing seam: `perform_check`
+- The single-iteration check logic is implemented in a test-friendly function re-exported as `check_vpn::app::perform_check`.
+- `perform_check` is designed for dependency injection: in tests you can pass closures or mocks for the ISP lookup and the action runner so tests avoid real network calls and external side effects.
+
+Example unit-test sketch:
+
+```rust
+let mut action_ran = false;
+let cfg = /* build a minimal Config for the check */;
+let get_isp = || -> Result<String, _> { Ok("SomeISP".to_string()) };
+let run_action = |_: &str| -> Result<(), _> { action_ran = true; Ok(()) };
+
+// Call the test seam. The exact signature is dependency-injected; this sketch shows the intent.
+check_vpn::app::perform_check(&cfg, &get_isp, &run_action).unwrap();
+assert!(action_ran);
+```
+
+Notes
+- Prefer unit tests that inject mocks for `get_isp` and `run_action` (fast and deterministic).
+- Real-network integration tests are available under `tests/*real.rs` and are ignored by default; run them explicitly with `cargo test -- --ignored` when needed.

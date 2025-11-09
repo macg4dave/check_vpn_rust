@@ -10,8 +10,13 @@ use crate::cli::Args;
 use crate::config::{Config, EffectiveConfig};
 use crate::networking;
 use crate::ip_api;
-use std::net::{TcpListener, TcpStream};
-use std::io::{Read, Write};
+use std::net::TcpStream;
+
+mod check {
+    include!("app/check.rs");
+}
+
+pub use check::perform_check;
 
 /// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
 pub fn run(args: Args, cfg: Config) -> Result<()> {
@@ -55,54 +60,10 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         info!("Received termination signal, shutting down...");
     })?;
 
-    // Optionally start a tiny HTTP server to serve health and basic metrics.
-    // This is intentionally minimal to avoid adding a heavy HTTP dependency.
+    // Optional metrics server (moved to `src/metrics.rs`).
     let mut metrics_handle: Option<std::thread::JoinHandle<()>> = None;
     if args.enable_metrics {
-        let kr_clone = keep_running.clone();
-        let addr = args.metrics_addr.clone();
-        metrics_handle = Some(std::thread::spawn(move || {
-            let listener = match TcpListener::bind(&addr) {
-                Ok(l) => l,
-                Err(e) => {
-                    log::error!("metrics server failed to bind {}: {}", addr, e);
-                    return;
-                }
-            };
-            // Non-blocking accept loop so we can check shutdown flag periodically.
-            listener.set_nonblocking(true).ok();
-            log::info!("metrics server listening on {}", addr);
-
-            while kr_clone.load(Ordering::SeqCst) {
-                match listener.accept() {
-                    Ok((mut stream, _peer)) => {
-                        // Read up to 2KB of request; it's fine for simple GET requests.
-                        let mut buf = [0u8; 2048];
-                        if let Ok(n) = stream.read(&mut buf) {
-                            let req = String::from_utf8_lossy(&buf[..n]);
-                            if req.starts_with("GET /health") {
-                                let resp = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok";
-                                let _ = stream.write_all(resp.as_bytes());
-                            } else if req.starts_with("GET /metrics") {
-                                // A tiny Prometheus-friendly metric
-                                let body = "# HELP check_vpn_up 1 if the service is up\n# TYPE check_vpn_up gauge\ncheck_vpn_up 1\n";
-                                let resp = format!("HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body);
-                                let _ = stream.write_all(resp.as_bytes());
-                            } else {
-                                let resp = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
-                                let _ = stream.write_all(resp.as_bytes());
-                            }
-                        }
-                    }
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        std::thread::sleep(Duration::from_millis(50));
-                        continue;
-                    }
-                    Err(_) => break,
-                }
-            }
-            log::info!("metrics server at {} shutting down", addr);
-        }));
+        metrics_handle = crate::metrics::start_metrics_server(&args.metrics_addr, keep_running.clone());
     }
 
     // Main loop: cross-platform timer/polling. On each iteration we attempt to reload
@@ -169,64 +130,4 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
     Ok(())
 }
 
-/// Perform a single connectivity+ISP check using injected dependencies. This is small and
-/// easy to unit-test by providing mock closures for `get_isp` and `run_action_fn`.
-pub fn perform_check<FGet, FRun>(
-    eff: &EffectiveConfig,
-    get_isp_fn: FGet,
-    run_action_fn: FRun,
-) -> Result<()>
-where
-    FGet: Fn() -> Result<String>,
-    FRun: Fn(&actions::Action, bool),
-{
-    // Convert endpoints into Vec<&str> for call
-    let endpoints_ref: Vec<&str> = eff.connectivity_endpoints.iter().map(|s| s.as_str()).collect();
-
-    match networking::is_online_with_retries(&endpoints_ref, eff.connectivity_timeout_secs, &eff.connectivity_ports, eff.connectivity_retries) {
-        Ok(true) => {
-            match get_isp_fn() {
-                Ok(isp) => {
-                    if isp == eff.isp_to_check {
-                        warn!("VPN Lost (ISP: {})", isp);
-                        let action = actions::parse_action(&eff.action_type, &eff.action_arg);
-                        run_action_fn(&action, eff.dry_run);
-                    } else {
-                        info!("VPN active (ISP: {})", isp);
-                    }
-                }
-                Err(e) => {
-                    error!("Failed to determine ISP: {}", e);
-                    // If this was a single-run invocation or the user requested exit-on-error,
-                    // make the failure visible to scripts
-                    if eff.run_once || eff.exit_on_error {
-                        std::process::exit(crate::config::EXIT_ISP_FAILURE);
-                    }
-                }
-            }
-        }
-        Ok(false) => {
-            error!("Internet appears to be down (connectivity checks failed)");
-            if eff.run_once || eff.exit_on_error {
-                std::process::exit(crate::config::EXIT_CONNECTIVITY_FAILURE);
-            }
-        }
-        Err(e) => {
-            error!("Connectivity check failed: {}", e);
-            // If DNS resolution or other networking error occurs and this was a single-run
-            // invocation, exit with a specific code to help scripts distinguish failures.
-            if eff.run_once || eff.exit_on_error {
-                match e {
-                    crate::networking::NetworkingError::DnsResolve(_) => {
-                        std::process::exit(crate::config::EXIT_CONNECTIVITY_DNS);
-                    }
-                    _ => {
-                        std::process::exit(crate::config::EXIT_CONNECTIVITY_FAILURE);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(())
-}
+// perform_check has been moved to `src/app_check.rs` and is re-exported above.

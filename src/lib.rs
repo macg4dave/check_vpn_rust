@@ -1,9 +1,16 @@
 pub mod cli;
 pub mod networking;
 pub mod ip_api;
-pub mod app;
+pub mod metrics;
+// The `app` module is implemented in `src/app.rs` and may contain submodules
+// in `src/app/*.rs`. To avoid ambiguity between `src/app.rs` and
+// `src/app/mod.rs` on some filesystems, include the file here explicitly.
+pub mod app {
+	include!("app.rs");
+}
 pub mod xml_io;
 pub mod json_io;
+// Canonical actions module (refactored into `src/actions`)
 pub mod actions;
 pub mod logging;
 pub mod config;

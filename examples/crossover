@@ -1,0 +1,8 @@
+For this file:
+Split or reorganize the code into logical modules if it makes sense.
+Move reusable logic into separate files or modules as appropriate.
+Add or update tests where needed to ensure good coverage.
+Remove any dead, redundant, or unused code.
+Improve and expand comments to clearly explain logic, intent, and edge cases.
+Refactor for clean, idiomatic, modern Rust style — use traits, pattern matching, and expressive syntax where suitable.
+Keep the code efficient, safe, and easy to read.

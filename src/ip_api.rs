@@ -2,6 +2,13 @@ use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::time::Duration;
 use std::thread::sleep;
+use std::io::Read;
+use reqwest::header::RETRY_AFTER;
+
+/// Default maximum response body size in bytes before we reject the response.
+const DEFAULT_MAX_RESPONSE_BYTES: usize = 5 * 1024 * 1024; // 5MB
+/// Maximum Retry-After seconds to respect (clamp large values)
+const MAX_RETRY_AFTER_SECS: u64 = 60;
 
 #[derive(Deserialize, Debug)]
 struct IpApiResponse {
@@ -23,16 +30,41 @@ pub fn get_isp_with_client_and_url(
     }
 
     let mut last_err: Option<anyhow::Error> = None;
+    // Allow tests to override max response bytes via env var
+    let max_bytes: usize = std::env::var("CHECK_VPN_MAX_RESPONSE_BYTES")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(DEFAULT_MAX_RESPONSE_BYTES);
     for attempt in 0..retries {
-        let resp = client.get(url).send();
+    let resp = client.get(url).send();
 
         match resp {
-            Ok(r) => {
+            Ok(mut r) => {
                 if !r.status().is_success() {
-                    // Retry on server errors and 429; for other client errors bail out.
-                    if r.status().is_server_error() || r.status().as_u16() == 429 {
+                    // Handle 429 (Too Many Requests) specially if Retry-After header present
+                    if r.status().as_u16() == 429 {
                         last_err = Some(anyhow::anyhow!("non-success status: {}", r.status()));
-                        // small backoff before retrying
+                        if attempt + 1 < retries {
+                            // Try to respect Retry-After header if present (numeric seconds)
+                            if let Some(ra) = r.headers().get(RETRY_AFTER) {
+                                if let Ok(s) = ra.to_str() {
+                                    if let Ok(secs) = s.parse::<u64>() {
+                                        let secs = std::cmp::min(secs, MAX_RETRY_AFTER_SECS);
+                                        sleep(Duration::from_secs(secs));
+                                        continue;
+                                    }
+                                }
+                            }
+                            // fallback linear backoff
+                            sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
+                            continue;
+                        }
+                        return Err(anyhow::anyhow!("non-success status: {}", r.status()));
+                    }
+
+                    // Retry on server errors; other client errors bail out immediately.
+                    if r.status().is_server_error() {
+                        last_err = Some(anyhow::anyhow!("non-success status: {}", r.status()));
                         if attempt + 1 < retries {
                             sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
                             continue;
@@ -43,7 +75,24 @@ pub fn get_isp_with_client_and_url(
                     }
                 }
 
-                let parsed: IpApiResponse = r.json().context("failed to parse json")?;
+                // Read response body with an enforced maximum size to avoid OOM on large responses.
+                if let Some(len) = r.content_length() {
+                    if len > max_bytes as u64 {
+                        return Err(anyhow::anyhow!("response too large: {} bytes", len));
+                    }
+                }
+
+                let mut buf: Vec<u8> = Vec::new();
+                // r implements Read for blocking client; use take to cap bytes read
+                let mut reader = r.take((max_bytes as u64) + 1);
+                reader
+                    .read_to_end(&mut buf)
+                    .context("failed to read response body")?;
+                if buf.len() > max_bytes {
+                    return Err(anyhow::anyhow!("response too large (>{} bytes)", max_bytes));
+                }
+
+                let parsed: IpApiResponse = serde_json::from_slice(&buf).context("failed to parse json")?;
                 return match parsed.isp {
                     Some(s) => Ok(s),
                     None => Err(anyhow::anyhow!("isp field missing in response")),
