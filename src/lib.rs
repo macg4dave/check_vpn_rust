@@ -1,3 +1,7 @@
+// The CLI module is defined inline here via `include!` to avoid ambiguity
+// when both `src/cli.rs` and `src/cli/mod.rs` exist in the tree during a
+// transitional refactor. The included file continues to provide
+// `crate::cli::Args` and the public API expected by the rest of the crate.
 pub mod cli;
 pub mod networking;
 pub mod ip_api;

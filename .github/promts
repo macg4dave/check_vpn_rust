@@ -5,9 +5,6 @@ Purpose: These instructions help an automated coding agent implement features an
 ## Project quick facts
 
 - Crate: `check_vpn`
-- Edition: Rust 2021
-- Style: blocking I/O (reqwest blocking client), `log` for logging
-- Config format: XML (quick-xml), merged with CLI (clap v4)
 - Tests: unit and integration under `tests/`
 
 
@@ -20,6 +17,7 @@ Purpose: These instructions help an automated coding agent implement features an
 6. Keep promts and instructions file upto date with any requested changes
 7. If it does something then write a test for it
 8. Keep CHANGELOG.md upto date
+9. Linux and Macos Compatible
 
 ## Error handling and exit codes
 

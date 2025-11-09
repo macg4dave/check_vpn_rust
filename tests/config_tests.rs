@@ -93,10 +93,11 @@ fn env_var_config_override() {
     let path_str = path.to_str().unwrap();
     fs::write(path_str, xml).expect("write temp xml");
 
-    env::set_var("CHECK_VPN_CONFIG", path_str);
+    // Some targets mark `set_var` as unsafe; use an unsafe block for portability.
+    unsafe { env::set_var("CHECK_VPN_CONFIG", path_str); }
     let cfg = Config::load().expect("Config::load should succeed when pointed to temp file");
     // cleanup
-    env::remove_var("CHECK_VPN_CONFIG");
+    unsafe { env::remove_var("CHECK_VPN_CONFIG"); }
     let _ = fs::remove_file(path_str);
 
     assert_eq!(cfg.interval, Some(77));

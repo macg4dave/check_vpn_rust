@@ -202,3 +202,27 @@ assert!(action_ran);
 Notes
 - Prefer unit tests that inject mocks for `get_isp` and `run_action` (fast and deterministic).
 - Real-network integration tests are available under `tests/*real.rs` and are ignored by default; run them explicitly with `cargo test -- --ignored` when needed.
+
+Refactor notes (recent)
+-----------------------
+
+- The CLI argument handling has been reorganized into `src/cli/mod.rs` with the same public type `crate::cli::Args` kept for compatibility. This makes it easier to extend the CLI module with helpers and submodules.
+- The negative connectivity test that previously used a remote/unroutable address has been replaced with a deterministic local simulation against a high loopback port (65000) to avoid flaky CI behavior.
+- A small cleanup removed an intermediate legacy file and tidied module layout.
+
+How to run tests (recap)
+-----------------------
+
+- Run all default tests (fast, mocked, unit):
+
+```sh
+cargo test
+```
+
+- Run ignored tests (real-network/integration tests) explicitly:
+
+```sh
+cargo test -- --ignored
+```
+
+If you'd like, I can add a small `contrib/` or CI job that runs the ignored integration tests on a schedule.

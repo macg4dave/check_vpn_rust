@@ -9,7 +9,9 @@ pub fn init_with_verbosity(verbosity: u8) {
             1 => "debug",
             _ => "trace",
         };
-        std::env::set_var("RUST_LOG", level);
+    // `set_var` may be marked unsafe on some target environments; wrap in
+    // an `unsafe` block to satisfy targets that flag this as unsafe.
+    unsafe { std::env::set_var("RUST_LOG", level); }
     }
     env_logger::init();
 }

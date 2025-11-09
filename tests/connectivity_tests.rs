@@ -17,10 +17,13 @@ fn local_tcp_listener_is_detected() {
 
 #[test]
 fn unreachable_host_returns_false() {
-    // Use the TEST-NET address which should not be routable in tests; short timeout
-    let endpoints = ["192.0.2.1".to_string()];
+    // Deterministic local simulation of an unreachable endpoint:
+    // Use loopback with a high port that is extremely unlikely to have a
+    // listener in typical CI/dev environments (65000). This avoids relying
+    // on external networks and keeps the test deterministic.
+    let endpoints = ["127.0.0.1:65000".to_string()];
     let ok = check_vpn::networking::is_online(&endpoints, 1).expect("is_online failed");
-    assert!(!ok, "expected unreachable host to be unreachable");
+    assert!(!ok, "expected high-numbered loopback port to be unreachable");
 }
 
 #[test]
