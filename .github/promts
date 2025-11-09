@@ -1,0 +1,148 @@
+# AI Engineering Guide for Rust in this Repository
+
+Purpose: These instructions help an automated coding agent implement features and fixes safely and consistently in this Rust project.
+
+## Project quick facts
+
+- Crate: `check_vpn`
+- Edition: Rust 2021
+- Style: blocking I/O (reqwest blocking client), `log` for logging
+- Config format: XML (quick-xml), merged with CLI (clap v4)
+- Tests: unit and integration under `tests/`
+
+## Architecture map (where to look)
+
+- `src/app.rs` — runtime loop, merge config + args, validate, call checks, exit code mapping
+- `src/cli.rs` — clap Args; add new flags here
+- `src/config.rs` — Config/EffectiveConfig, defaults, merge logic, validation and exit codes
+- `src/networking.rs` — TCP connectivity check with timeouts/retries, `NetworkingError`
+- `src/ip_api.rs` — query IP API with blocking reqwest + retries
+- `src/actions.rs` — actions on VPN loss: reboot (D-Bus), restart unit (D-Bus), or shell command; honors `dry_run`
+- `src/xml_io.rs` — generic XML read/write helpers
+- `src/logging.rs` — env_logger setup
+
+## Golden rules
+
+1. Prefer small, targeted patches; preserve public APIs unless the change is intentional and tested.
+2. Always add/adjust tests when changing behavior (unit and/or integration).
+3. No panics in library paths; propagate errors with `anyhow::Result` or typed errors where it helps.
+5. Have real network test and mock network tests separate
+6. Keep promts and instructions file upto date with any requested changes
+
+## Error handling and exit codes
+
+- Use `anyhow::Result<T>` at app boundaries and small typed enums when it improves clarity (e.g., `NetworkingError`).
+- Map errors to exit codes in `app.rs` only, via constants defined in `config.rs`:
+	- `EXIT_INVALID_CONFIG = 2`
+	- `EXIT_CONNECTIVITY_DNS = 3`
+	- `EXIT_CONNECTIVITY_FAILURE = 4`
+	- `EXIT_ISP_FAILURE = 5`
+- Exit with these codes only when:
+	- `Args::run_once` is true, or
+	- `EffectiveConfig::exit_on_error` is true.
+
+## Logging
+
+- Use `log` macros at appropriate levels:
+	- info: normal progress (start/stop, VPN status)
+	- warn: VPN lost detection
+	- error: failures fetching ISP/config/connectivity
+	- debug/trace: connection attempts, retries, detailed diagnostics
+- Initialize via `check_vpn::logging::init()` early (see `main.rs`).
+
+## Connectivity checks
+
+- Prefer `is_online_with_retries(endpoints, timeout_secs, ports, retries)` to handle transient issues.
+- `DEFAULT_PORTS = [443, 53, 80]`, `DEFAULT_TIMEOUT_SECS = 2`, `DEFAULT_RETRIES = 1`.
+- DNS resolution failures return `Err(NetworkingError::DnsResolve(..))`.
+- Unreachable/timeouts return `Ok(false)`; do not surface as errors.
+
+## IP API client
+
+- Use `get_isp_with_client_and_url(&Client, &str, retries)` for testability.
+- Build blocking client with a reasonable timeout (5s default) and a UA.
+- Retry on server errors (5xx) and 429 with a small linear backoff.
+
+## CLI and configuration
+
+- CLI: `clap` v4 derive. Add flags in `src/cli.rs`.
+- Merge: `Config::merge_with_args` — CLI overrides XML config.
+- Validate: `Config::validate_values` before running; on error, log all issues and exit with `EXIT_INVALID_CONFIG`.
+- When adding a new config option:
+	1) Add to `Config` (Option<T>) and `EffectiveConfig` (T)
+	2) Set default in `Config::default()`
+	3) Merge in `merge_with_args`
+	4) Validate in `validate_values`
+	5) Document in README and CHANGELOG, add tests
+
+## Actions (on VPN loss)
+
+- `Action::Reboot` uses D-Bus (logind); `Action::RestartUnit` uses systemd D-Bus; `Action::Command` runs shell.
+- Honor `dry_run`: in dry run, only log intent, do not contact D-Bus or run shell.
+- Do not panic on failures; log errors.
+
+## Testing strategy
+
+- Unit tests (existing examples):
+	- Parsing: `tests/cli_tests.rs`, `tests/actions_tests.rs`
+	- XML I/O: `tests/xml_io_tests.rs`
+	- JSON I/O: `tests/ip_api_file_tests.rs`
+	- Timer behavior: `tests/timer_tests.rs`
+	- Internal actions (dry-run): `tests/actions_run_tests.rs`
+- Integration tests:
+	- IP API via `httpmock`: success, retries, timeouts, malformed responses, 429
+	- Connectivity: local `TcpListener` to assert `is_online` behavior
+- Write fast, deterministic tests. Use ephemeral ports and temp files.
+
+## Cross-platform considerations
+
+- Keep networking tests local; avoid privileged ICMP/ping.
+- D-Bus is not available on Windows; tests must not require it. Dry-run tests are OK cross-platform.
+
+## Performance and robustness
+
+- Prefer minimal allocations and reuse buffers where reasonable, but clarity first.
+- Backoffs: simple linear backoff is fine; avoid long sleeps in tests (use 100–500ms ranges).
+
+## Security notes
+
+- Be cautious with `Action::Command`: command is passed to `sh -c`. Do not concatenate untrusted input in the code; treat it as user-configured.
+
+## Checklist for any change
+
+1) Update code and unit/integration tests
+2) `cargo test` passes locally on all tests
+3) Update `README.md` and `CHANGELOG.md` if user-facing behavior changes
+4) Keep logs clear and actionable
+
+## Prompt templates (copy/paste for the AI agent)
+
+- Add a new CLI flag and config option:
+	- Files: `src/cli.rs`, `src/config.rs`, `src/app.rs` (if used), `README.md`, `CHANGELOG.md`
+	- Steps: define flag, merge into `EffectiveConfig`, set default, validate, use it, add tests in `tests/cli_tests.rs` and others
+
+- Add a connectivity feature (e.g., jitter/backoff tweak):
+	- Files: `src/networking.rs`, tests in `tests/connectivity_tests.rs`
+	- Ensure `is_online_with_retries` semantics remain: DNS errors -> Err, unreachable -> Ok(false)
+
+- Modify ISP fetching behavior (timeouts/retries/headers):
+	- Files: `src/ip_api.rs`, tests in `tests/ip_api_integration.rs`
+	- Use blocking client, keep retries/backoff simple, mock via `httpmock`
+
+- Add exit code mapping for a new error case:
+	- Files: constants in `src/config.rs`, mapping in `src/app.rs`, docs/tests
+
+## Symbols quick reference
+
+- `Config`, `EffectiveConfig`, `Config::merge_with_args`, `Config::validate_values`
+- `Args` (clap), flags: `--run-once`, `--exit-on-error`, connectivity flags
+- `NetworkingError::{DnsResolve, Io}`
+- `is_online_with_retries`, `get_isp_with_client_and_url`
+- `Action::{Reboot, RestartUnit, Command}`, `run_action`
+
+## Do not
+
+- Do not introduce async runtimes into prod code; this crate uses blocking I/O.
+- Do not perform real external HTTP calls in tests.
+- Do not add global sleeps that slow tests significantly; keep delays short and deterministic.
+

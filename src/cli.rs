@@ -5,7 +5,7 @@ use clap::Parser;
 #[command(author, version, about = "VPN checker (Rust port)")]
 pub struct Args {
     /// Seconds between checks (overrides config)
-    #[arg(short, long)]
+    #[arg(long = "interval")] // removed short flag to avoid collision with isp_to_check '-i'
     pub interval: Option<u64>,
 
     /// ISP string that indicates VPN is lost (overrides config)
