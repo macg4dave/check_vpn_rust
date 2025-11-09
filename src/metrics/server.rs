@@ -1,5 +1,5 @@
 use log::{error, info, trace};
-use std::io::Read;
+use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;

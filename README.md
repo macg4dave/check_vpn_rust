@@ -4,8 +4,6 @@
 
 This repository contains a small Rust utility that checks if a VPN appears to be lost by checking the public ISP reported by ip-api.com. If the ISP matches a configured value (the ISP used when VPN is lost), the program runs an action such as rebooting or reconnecting the VPN.
 
-This is a port of an existing `check_vpn.sh` script to Rust so you get a single compiled binary and better control over logging and flags.
-
 Build
 
 You need Rust and cargo installed. Then:
@@ -54,24 +52,6 @@ Testing
 -------
 
 Some tests in this repository exercise real network endpoints and are marked ignored by default to avoid flakiness in CI or when running offline. Use the following commands to run tests that require network access.
-
-Run all tests (mocked and unit tests):
-
-```powershell
-cargo test
-```
-
-Run only ignored tests (these include real-network integration tests):
-
-```powershell
-cargo test -- --ignored
-```
-
-Run a single ignored test (example):
-
-```powershell
-cargo test --test networking_testsreal real_ip_api_returns_200_and_parses -- --ignored
-```
 
 Notes:
 - Mocked HTTP tests (using `httpmock`) cover common ip-api behaviors: 200, 500, 429, timeouts, and malformed responses. These run by default.
@@ -203,13 +183,43 @@ Notes
 - Prefer unit tests that inject mocks for `get_isp` and `run_action` (fast and deterministic).
 - Real-network integration tests are available under `tests/*real.rs` and are ignored by default; run them explicitly with `cargo test -- --ignored` when needed.
 
-Refactor notes (recent)
------------------------
+Examples for `start_metrics_server` (Rust + curl)
+-----------------------------------------------
 
-- The CLI argument handling has been reorganized into `src/cli/mod.rs` with the same public type `crate::cli::Args` kept for compatibility. This makes it easier to extend the CLI module with helpers and submodules.
-- The negative connectivity test that previously used a remote/unroutable address has been replaced with a deterministic local simulation against a high loopback port (65000) to avoid flaky CI behavior.
-- A small cleanup removed an intermediate legacy file and tidied module layout.
- - The `networking` code has been reorganized into a module folder for clarity: `src/networking/mod.rs` now contains the public API (`is_online`, `is_online_with_retries`, constants, etc.), with helper modules alongside it at `src/networking/connect.rs` (connection logic) and `src/networking/error.rs` (error types). Callers continue to use `crate::networking::...` with no API changes.
+Minimal Rust usage example (start server in background thread):
+
+```rust
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::time::Duration;
+
+fn main() {
+	// Create the shared shutdown flag
+	let keep_running = Arc::new(AtomicBool::new(true));
+
+	// Start the server and keep the JoinHandle so we can join on shutdown.
+	let handle = check_vpn::metrics::start_metrics_server("127.0.0.1:9090", keep_running.clone());
+
+	// Server is now serving `/health` and `/metrics` on 127.0.0.1:9090
+	// (In a real program you'd continue running your main loop here.)
+	std::thread::sleep(Duration::from_secs(2));
+
+	// Request graceful shutdown
+	keep_running.store(false, Ordering::SeqCst);
+	if let Some(h) = handle { let _ = h.join(); }
+}
+```
+
+Quick smoke-test from the shell (once the server is running):
+
+```sh
+# health
+curl -sS http://127.0.0.1:9090/health
+
+# metrics
+curl -sS http://127.0.0.1:9090/metrics
+```
+
+
 
 How to run tests (recap)
 -----------------------
@@ -224,6 +234,16 @@ cargo test
 
 ```sh
 cargo test -- --ignored
+```
+
+Run the metrics integration test specifically (ignored by default):
+
+```sh
+# Run all ignored tests (including metrics integration)
+cargo test -- --ignored
+
+# Or run only the metrics integration test by test filename
+cargo test --test metrics_integration -- --ignored
 ```
 
 If you'd like, I can add a small `contrib/` or CI job that runs the ignored integration tests on a schedule.
