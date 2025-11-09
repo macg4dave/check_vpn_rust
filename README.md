@@ -12,238 +12,247 @@ You need Rust and cargo installed. Then:
 cargo build --release
 ```
 
-The resulting binary will be at `target/release/check_vpn`.
+# check_vpn (Rust)
 
-Run (dry-run)
+[![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
+
+A small Rust utility that detects when your VPN appears to be lost (by checking the public ISP reported by an IP lookup service) and performs a configurable action such as restarting a unit, running a command, or rebooting.
+
+This README provides build/install instructions, full usage examples, and systemd unit examples for Debian and Fedora-style systems.
+
+## Quick start
+
+Build from source (requires Rust/cargo):
+
+```sh
+cargo build --release
+# resulting binary: target/release/check_vpn
+```
+
+Run a quick dry-run to verify behavior (no actions executed):
 
 ```sh
 target/release/check_vpn --dry-run
 ```
 
-Common options
-- `--interval <seconds>`: seconds between checks (default 60)
-- `--isp-to-check`: ISP string that indicates VPN is lost (default set to the original script value)
-- `--vpn-lost-action`: shell command to run when VPN is lost (default `/sbin/shutdown -r now`)
-- `--dry-run`: log the action instead of executing it
-- `--config-file`: Overrides config.xml path
- - `--connectivity-timeout <secs>`: timeout for connectivity checks (default 2)
- - `--connectivity-retries <n>`: number of attempts for connectivity checks before declaring offline (default 1)
-
-
-Features
-VPN Status Check: Determines if the VPN is active by checking the external ISP.
-Automatic Action on VPN Loss: Executes a specified command when the VPN is disconnected, e.g., restart the VPN service, run a script or reboot.
-Internet Connectivity Check: Only checks VPN status if there is internet access.
-
-Configuration
-The program reads configuration from XML (see `examples/check_vpn.xml`) or from command-line flags. A new optional field `connectivity_retries` controls how many times the program will retry connectivity probes before concluding the internet is down. This can also be overridden with the CLI flag `--connectivity-retries`.
-
-Exit codes
-- `2` — configuration validation failed on startup. The program prints each validation error as a separate log line before exiting.
- - `3` — DNS/name resolution failure occurred while attempting connectivity checks.
- - `4` — Generic connectivity failure (unreachable/timeout) when considered fatal.
- - `5` — Failed to determine ISP from the IP API when considered fatal.
-
-By default the program only exits with non-zero codes for configuration validation errors. When invoking with `--run-once` it will also exit with the connectivity/ISP exit codes described above. Use `--exit-on-error` to force the process to exit with the same codes even in long-running mode (useful for container health checks or external monitors).
-
-log_file="/var/log/check_vpn/check_vpn.log" # Log file path log_verbose=1 # Verbosity level: 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
-
-Testing
--------
-
-Some tests in this repository exercise real network endpoints and are marked ignored by default to avoid flakiness in CI or when running offline. Use the following commands to run tests that require network access.
-
-Notes:
-- Mocked HTTP tests (using `httpmock`) cover common ip-api behaviors: 200, 500, 429, timeouts, and malformed responses. These run by default.
-- Real-network integration tests are kept under `tests/*real.rs` and are ignored by default. Enable them when you have network access and want end-to-end verification.
-- If you want to run only a subset of tests, use `cargo test <pattern>` or `cargo test --test <testfile>` as usual.
-
-Testing in containers and CI
----------------------------
-
-You can run the test suite inside a container (useful for reproducing CI environments) or configure CI workflows to run both unit/mocked tests and, optionally, real-network integration tests.
-
-Example Dockerfile (run tests inside a Rust container):
-
-```dockerfile
-FROM rust:1.73-slim
-WORKDIR /usr/src/check_vpn
-COPY . .
-
-# Install build tools for dependencies if needed (deb-based image)
-RUN apt-get update && apt-get install -y pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Run tests (default tests only)
-RUN cargo test --verbose
-
-# To run ignored tests (real network), execute at runtime with -- --ignored
-# docker build -t check_vpn_tests .
-# docker run --rm check_vpn_tests
-# or run the ignored tests via an interactive container:
-# docker run --rm -it check_vpn_tests bash -c "cargo test -- --ignored"
-```
-
-GitHub Actions example (run default tests on push, and a nightly job for ignored tests):
-
-Create `.github/workflows/ci.yml` with:
-
-```yaml
-name: CI
-
-on:
-	push:
-		branches: [ main ]
-	pull_request:
-		branches: [ main ]
-	schedule:
-		- cron: '0 3 * * *' # nightly run for optional integration tests (UTC)
-
-jobs:
-	test:
-		runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v4
-			- name: Install Rust
-				uses: dtolnay/gh-actions-rs@v1
-				with:
-					profile: minimal
-					toolchain: stable
-			- name: Cache cargo
-				uses: actions/cache@v4
-				with:
-					path: |
-						~/.cargo/registry
-						~/.cargo/git
-						target
-					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-			- name: Run tests (unit & mocked)
-				run: cargo test --verbose
-
-	# Optional job for running ignored real-network tests (scheduled or manual)
-	real_tests:
-		if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-		runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v4
-			- name: Install Rust
-				uses: dtolnay/gh-actions-rs@v1
-				with:
-					profile: minimal
-					toolchain: stable
-			- name: Cache cargo
-				uses: actions/cache@v4
-				with:
-					path: |
-						~/.cargo/registry
-						~/.cargo/git
-						target
-					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-real
-			- name: Run ignored real-network tests
-				# These tests are marked #[ignore]; run them explicitly
-				run: cargo test -- --ignored --nocapture
-```
-
-Notes and safety
-- Running ignored real-network tests in CI can cause external network traffic and may occasionally fail due to remote service changes. Keep them in a separate scheduled or manually-triggered job.
-- If tests require environment variables or secrets (e.g., private endpoints), add them as GitHub Secrets and pass them to the workflow using `env:` on the step.
-- Use `-- --ignored` to execute ignored tests; use `cargo test <pattern>` to run a single test or file.
-
-If you want, I can add the GitHub Actions workflow file to the repository and/or a Dockerfile under `contrib/` so you can run the containerized tests easily.
-
-## Metrics endpoint & testing seam
-
-Metrics endpoint
-- When enabled via configuration or CLI the program starts a small HTTP server bound to the configured address. It exposes two simple endpoints useful for monitoring and health checks:
-	- `/health` — returns HTTP 200 when the process is running; suitable for container liveness/readiness probes.
-	- `/metrics` — returns a small plain-text metrics payload intended for scraping by Prometheus or simple monitoring tools (contains basic runtime/check information).
-
-Example (when metrics are configured to bind to `127.0.0.1:9090`):
-
-- Health: `http://127.0.0.1:9090/health`
-- Metrics: `http://127.0.0.1:9090/metrics`
-
-Testing seam: `perform_check`
-- The single-iteration check logic is implemented in a test-friendly function re-exported as `check_vpn::app::perform_check`.
-- `perform_check` is designed for dependency injection: in tests you can pass closures or mocks for the ISP lookup and the action runner so tests avoid real network calls and external side effects.
-
-Example unit-test sketch:
-
-```rust
-let mut action_ran = false;
-let cfg = /* build a minimal Config for the check */;
-let get_isp = || -> Result<String, _> { Ok("SomeISP".to_string()) };
-let run_action = |_: &str| -> Result<(), _> { action_ran = true; Ok(()) };
-
-// Call the test seam. The exact signature is dependency-injected; this sketch shows the intent.
-check_vpn::app::perform_check(&cfg, &get_isp, &run_action).unwrap();
-assert!(action_ran);
-```
-
-Notes
-- Prefer unit tests that inject mocks for `get_isp` and `run_action` (fast and deterministic).
-- Real-network integration tests are available under `tests/*real.rs` and are ignored by default; run them explicitly with `cargo test -- --ignored` when needed.
-
-Examples for `start_metrics_server` (Rust + curl)
------------------------------------------------
-
-Minimal Rust usage example (start server in background thread):
-
-```rust
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use std::time::Duration;
-
-fn main() {
-	// Create the shared shutdown flag
-	let keep_running = Arc::new(AtomicBool::new(true));
-
-	// Start the server and keep the JoinHandle so we can join on shutdown.
-	let handle = check_vpn::metrics::start_metrics_server("127.0.0.1:9090", keep_running.clone());
-
-	// Server is now serving `/health` and `/metrics` on 127.0.0.1:9090
-	// (In a real program you'd continue running your main loop here.)
-	std::thread::sleep(Duration::from_secs(2));
-
-	// Request graceful shutdown
-	keep_running.store(false, Ordering::SeqCst);
-	if let Some(h) = handle { let _ = h.join(); }
-}
-```
-
-Quick smoke-test from the shell (once the server is running):
+Run a single iteration (useful for testing/config verification):
 
 ```sh
-# health
-curl -sS http://127.0.0.1:9090/health
+target/release/check_vpn --run-once --isp-to-check "MyISP" --dry-run
+```
 
-# metrics
+## Usage (flags)
+
+Key command-line flags (the project uses `clap`):
+
+- `--interval <seconds>` — seconds between checks (overrides config)
+- `-i, --isp-to-check <STRING>` — ISP string that indicates VPN is lost
+- `-t, --vpn-lost-action-type <reboot|restart-unit|command>` — action type
+- `-a, --vpn-lost-action-arg <ARG>` — argument for the action type (unit name or command)
+- `--dry-run` — log the action instead of executing it
+- `--config-file <PATH>` — load configuration from an XML file (see `examples/check_vpn.xml`)
+- `--connectivity-endpoint <HOST|IP>` — connectivity probe endpoints (repeatable / CSV)
+- `--connectivity-ports <PORTS>` — ports to try when endpoints don't include a port
+- `--connectivity-timeout <secs>` — timeout for connectivity checks
+- `--connectivity-retries <n>` — number of retries for connectivity checks
+- `--run-once` — execute a single iteration and exit
+- `-v, --verbose` — increase logging verbosity (repeatable)
+- `--enable-metrics` — enable a small HTTP health/metrics endpoint
+- `--metrics-addr <ADDR:PORT>` — address for metrics endpoint (default `0.0.0.0:9090`)
+- `--exit-on-error` — exit with non-zero codes on errors even in long-running mode
+
+Use `--help` to see the full set of flags and defaults.
+
+## Example command lines
+
+# Basic continuous run with default config
+check_vpn --enable-metrics --metrics-addr 127.0.0.1:9090
+
+# Run once for manual testing (dry-run)
+check_vpn --run-once --isp-to-check "YourISP" --dry-run
+
+# Use command action to call a custom script on VPN lost
+check_vpn -t command -a "/usr/local/bin/reconnect_vpn.sh"
+
+# Restart a systemd unit when VPN is lost
+check_vpn -t restart-unit -a "openvpn-client@myvpn.service"
+
+## Configuration
+
+The application can read configuration from an XML file (example in `examples/check_vpn.xml`) or via CLI flags. The config file location can be overridden with `--config-file`.
+
+Reasonable default runtime paths (packaging/installation should follow):
+
+- Config: `/etc/check_vpn/config.xml` (directory `/etc/check_vpn/`)
+- Logs (if writing to file): `/var/log/check_vpn/check_vpn.log`
+- Binary (manual install): `/usr/local/bin/check_vpn` or `/usr/bin/check_vpn` (packaging decides)
+
+Make sure directories exist and are owned by the service user when running as a non-root service.
+
+## Metrics & health endpoint
+
+Enable with `--enable-metrics`. By default the server binds to `0.0.0.0:9090`. It exposes:
+
+- `/health` — returns HTTP 200 when the process is running (liveness/readiness)
+- `/metrics` — a plain-text metrics payload suitable for simple scraping
+
+Examples:
+
+```sh
+curl -sS http://127.0.0.1:9090/health
 curl -sS http://127.0.0.1:9090/metrics
 ```
 
+## Systemd service examples
 
+Below are two systemd unit examples: one for a system service (runs as `checkvpn` user) and one for a simple user service.
 
-How to run tests (recap)
------------------------
+Notes before enabling:
 
-- Run all default tests (fast, mocked, unit):
+- Create a dedicated user/group if you don't want the service to run as `root`:
+
+```sh
+sudo useradd --system --no-create-home --group nogroup --shell /usr/sbin/nologin checkvpn || true
+sudo mkdir -p /etc/check_vpn /var/log/check_vpn
+sudo chown checkvpn:checkvpn /etc/check_vpn /var/log/check_vpn
+```
+
+- Install the binary to `/usr/local/bin/check_vpn` or `/usr/bin/check_vpn`.
+
+System service (recommended for servers):
+
+`/etc/systemd/system/check_vpn.service`:
+
+```ini
+[Unit]
+Description=check_vpn - VPN monitoring and auto-reconnect
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=checkvpn
+Group=checkvpn
+ExecStart=/usr/local/bin/check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
+Restart=on-failure
+RestartSec=10
+RuntimeDirectory=check_vpn
+# If you write logs to /var/log/check_vpn, ensure permissions are correct
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable --now check_vpn.service
+sudo journalctl -u check_vpn -f
+```
+
+User service (per-user, placed under `~/.config/systemd/user/`):
+
+`~/.config/systemd/user/check_vpn.service`:
+
+```ini
+[Unit]
+Description=check_vpn (user)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/youruser/.local/bin/check_vpn --config-file /home/youruser/.config/check_vpn/config.xml --enable-metrics
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+```
+
+Start with:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user enable --now check_vpn.service
+journalctl --user -u check_vpn -f
+```
+
+## Log rotation
+
+If your service writes to `/var/log/check_vpn/check_vpn.log`, add a logrotate config at `/etc/logrotate.d/check_vpn`:
+
+```
+/var/log/check_vpn/check_vpn.log {
+	copytruncate
+	daily
+	rotate 14
+	compress
+	missingok
+	notifempty
+}
+```
+
+If you rely on `journald` (the default when using systemd without explicit file logs), journal rotation is managed by systemd and `journald.conf`.
+
+## Fedora (SELinux) notes
+
+On Fedora with SELinux Enforcing enabled, if you install the binary to a non-standard path or the service needs to access network resources/files with different contexts, you may need to:
+
+- Ensure executable has correct context: `sudo restorecon -v /usr/local/bin/check_vpn`
+- If you write to `/var/log/check_vpn`, ensure correct context or use `chcon`/`semanage fcontext` to persist changes:
+
+```sh
+sudo semanage fcontext -a -t var_log_t "/var/log/check_vpn(/.*)?"
+sudo restorecon -Rv /var/log/check_vpn
+```
+
+If the service is prevented from performing needed network operations, examine `ausearch -m avc -ts recent` and create a simple local policy or adjust booleans (be conservative):
+
+```sh
+sudo ausearch -m avc -ts today | audit2allow -M check_vpn_local
+sudo semodule -i check_vpn_local.pp
+```
+
+## Packaging notes (Debian / Fedora)
+
+- Debian: building a .deb can be done with `cargo deb` or packaging into a proper Debian package that installs the binary to `/usr/bin`, puts config into `/etc/check_vpn/` and installs the systemd unit.
+- Fedora: build an RPM that installs the binary and unit. For SELinux-managed systems ensure file contexts are correct or ship a policy module.
+
+Minimal packaging checklist:
+
+1. Binary -> `/usr/bin/check_vpn`
+2. Config template -> `/etc/check_vpn/config.xml` (owner root:root mode 0644)
+3. Systemd unit -> `/lib/systemd/system/check_vpn.service` (or `/etc/systemd/system/` for local installs)
+4. Post-install enable the unit (packagers typically avoid auto-start in some distros; include instructions)
+5. Logrotate file (optional) -> `/etc/logrotate.d/check_vpn`
+
+## Testing
+
+Run unit & mocked tests (default):
 
 ```sh
 cargo test
 ```
 
-- Run ignored tests (real-network/integration tests) explicitly:
+Run ignored integration tests (real-network tests) explicitly:
 
 ```sh
 cargo test -- --ignored
 ```
 
-Run the metrics integration test specifically (ignored by default):
+There are integration tests in `tests/` that are ignored by default. Use `-- --ignored` to run them.
 
-```sh
-# Run all ignored tests (including metrics integration)
-cargo test -- --ignored
+## Troubleshooting
 
-# Or run only the metrics integration test by test filename
-cargo test --test metrics_integration -- --ignored
-```
+- If the service won't start, check `sudo journalctl -u check_vpn -b`.
+- If the program can't determine ISP, run `--run-once --dry-run --verbose` to see more debug output.
+- If file permissions prevent reading config or writing logs, ensure the `checkvpn` user has access to `/etc/check_vpn` and `/var/log/check_vpn`.
 
-If you'd like, I can add a small `contrib/` or CI job that runs the ignored integration tests on a schedule.
+## Contributing
+
+Contributions welcome. Please open issues for bugs or feature requests and consider sending pull requests with tests.
+
+## License
+
+See the repository `LICENSE` file for license details.

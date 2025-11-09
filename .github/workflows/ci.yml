@@ -19,7 +19,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
-        uses: dtolnay/gh-actions-rs@v1
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -32,7 +32,72 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Run tests (unit & mocked)
-        run: "cargo test --verbose"
+        run: cargo test --verbose
+
+  acceptance:
+    name: Acceptance (run-once dry-run)
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      - name: Build release
+        run: cargo build --release
+      - name: Run acceptance script (non-fatal)
+        # Use the shipped acceptance helper; run via bash to avoid needing exec bit
+        run: |
+          bash contrib/run_acceptance.sh || true
+
+  package-deb:
+    name: Package (.deb)
+    needs: acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+      - name: Install cargo-deb
+        run: cargo install cargo-deb || true
+      - name: Build .deb
+        run: |
+          if command -v cargo-deb >/dev/null 2>&1; then
+            cargo deb --no-strip || true
+          else
+            echo "cargo-deb not installed; skipping deb build"
+          fi
+      - name: Upload deb artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: debs
+          path: target/debian || true
+
+  package-rpm:
+    name: Package (.rpm)
+    needs: acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies for fpm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby-dev build-essential rpm
+          sudo gem install --no-document fpm || true
+      - name: Build rpm with fpm
+        run: |
+          chmod +x contrib/fpm-build.sh || true
+          ./contrib/fpm-build.sh 0.1.0 || true
+      - name: Upload rpm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms
+          path: ./*.rpm || true
 
   integration:
     name: Integration Tests (ignored)
@@ -43,7 +108,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install Rust
-        uses: dtolnay/gh-actions-rs@v1
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           profile: minimal
@@ -59,4 +124,4 @@ jobs:
         # We run only ignored tests here. Use -- --ignored --nocapture to see
         # test output in Actions logs. To run a single integration test file,
         # use: cargo test --test metrics_integration -- --ignored --nocapture
-        run: "cargo test -- --ignored --nocapture"
+        run: cargo test -- --ignored --nocapture

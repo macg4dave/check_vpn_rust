@@ -1,0 +1,16 @@
+[Unit]
+Description=check_vpn - VPN monitoring and auto-reconnect
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=checkvpn
+Group=checkvpn
+ExecStart=/usr/local/bin/check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
+Restart=on-failure
+RestartSec=10
+RuntimeDirectory=check_vpn
+
+[Install]
+WantedBy=multi-user.target

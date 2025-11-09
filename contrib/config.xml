@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Example config file for check_vpn. Place at /etc/check_vpn/config.xml or pass with --config-file -->
+<check_vpn>
+  <!-- Seconds between checks -->
+  <interval>60</interval>
+
+  <!-- ISP string observed when VPN is lost -->
+  <isp_to_check>YourISP</isp_to_check>
+
+  <!-- Action: one of reboot, restart-unit, command -->
+  <vpn_lost_action_type>restart-unit</vpn_lost_action_type>
+
+  <!-- For restart-unit put the systemd unit name; for command put the full command -->
+  <vpn_lost_action_arg>openvpn-client@myvpn.service</vpn_lost_action_arg>
+
+  <!-- Connectivity probes -->
+  <connectivity_endpoints>
+    <endpoint>8.8.8.8</endpoint>
+    <endpoint>1.1.1.1</endpoint>
+  </connectivity_endpoints>
+  <connectivity_ports>
+    <port>443</port>
+    <port>53</port>
+  </connectivity_ports>
+
+  <connectivity_timeout_secs>2</connectivity_timeout_secs>
+  <connectivity_retries>1</connectivity_retries>
+
+  <!-- Metrics binding (optional) -->
+  <enable_metrics>false</enable_metrics>
+  <metrics_addr>127.0.0.1:9090</metrics_addr>
+</check_vpn>
