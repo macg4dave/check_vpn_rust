@@ -15,11 +15,11 @@ fn get_isp_parses_isp_field() {
             .body(format!("{{ \"isp\": \"{}\" }}", isp_value));
     });
 
-    // Point networking to the mock server via env var
+    // Point ip_api to the mock server via env var
     std::env::set_var("CHECK_VPN_TEST_URL", server.url("/json"));
 
     // Call the function under test
-    let isp = check_vpn::networking::get_isp().expect("get_isp failed");
+    let isp = check_vpn::ip_api::get_isp().expect("get_isp failed");
     assert_eq!(isp, isp_value.to_string());
 
     mock.assert();

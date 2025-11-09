@@ -4,10 +4,6 @@ This repository contains a small Rust utility that checks if a VPN appears to be
 
 This is a port of an existing `check_vpn.sh` script to Rust so you get a single compiled binary and better control over logging and flags.
 
-Important assumptions
-- The program expects to run on a Unix-like system (Linux). The `ping` invocation uses `-c` and `-W` options on non-Windows systems.
-- Running a reboot/shutdown action requires root privileges.
-
 Build
 
 You need Rust and cargo installed. Then:
@@ -29,23 +25,12 @@ Common options
 - `--isp-to-check`: ISP string that indicates VPN is lost (default set to the original script value)
 - `--vpn-lost-action`: shell command to run when VPN is lost (default `/sbin/shutdown -r now`)
 - `--dry-run`: log the action instead of executing it
+- `--config-file`: Overrides config.xml path
 
-Installing as a systemd service
 
-You can adapt the existing `check_vpn.service` and point `ExecStart` to the compiled binary (for example `/usr/local/bin/check_vpn/check_vpn`). Example `ExecStart`:
+Features
+VPN Status Check: Determines if the VPN is active by checking the external ISP.
+Automatic Action on VPN Loss: Executes a specified command when the VPN is disconnected, e.g., restart the VPN service, run a script or reboot.
+Internet Connectivity Check: Only checks VPN status if there is internet access.
 
-```
-ExecStart=/usr/local/bin/check_vpn/check_vpn --interval 60
-```
-
-Then install unit and enable it:
-
-```sh
-sudo cp target/release/check_vpn /usr/local/bin/check_vpn/check_vpn
-sudo cp check_vpn.service /etc/systemd/system/check_vpn.service
-sudo systemctl daemon-reload
-sudo systemctl enable --now check_vpn.service
-```
-
-Notes & next steps
-- I implemented a conservative, minimal Rust port. Next iteration could add retries/backoff, better detection (interface checks), or an option to call an external script such as an OpenVPN management command to reconnect.
+log_file="/var/log/check_vpn/check_vpn.log" # Log file path log_verbose=1 # Verbosity level: 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG

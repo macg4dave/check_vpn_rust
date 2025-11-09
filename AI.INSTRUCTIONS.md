@@ -1,0 +1,128 @@
+## Purpose
+
+This file documents precise, actionable instructions for an automated assistant (AI) to work on the `check_vpn` repository. It describes repository goals, how to run and test the code, coding and commit conventions, constraints, and a small checklist the assistant should follow when making edits.
+
+Use this file as the single source-of-truth for how to interact with the project when automating edits, tests, or CI changes.
+
+## Repo summary
+
+- Project: check_vpn (Rust)
+- Goal: regularly verify that a VPN is active (via ISP detection / connectivity checks) and run a configured action if VPN is lost.
+- Main language: Rust (edition 2021). Build and test via `cargo`.
+- Config: XML (`check_vpn.xml` or `/etc/check_vpn/config.xml`), with CLI overrides.
+- Scheduling: supports built-in polling (interval in config or CLI) and `--run-once` for systemd timer usage.
+
+## High-level assistant contract
+
+- Inputs: edits to repository files (patches), CLI args, environment variables (for tests), and local filesystem.
+- Outputs: source code edits (small patches), tests, new files (e.g., examples, README snippets), and test results.
+- Success criteria: repository builds, `cargo test` passes, and changes are minimal and well-scoped. When adding features, include tests and update README or example configs.
+
+## Safety and constraints
+
+- Do not exfiltrate secrets or read/write files outside the workspace.
+- Prefer pure-Rust solutions; avoid shelling out unless necessary and documented.
+- Keep changes minimal: prefer focused patches that compile and have tests.
+- Avoid reformatting unrelated files.
+
+## Development workflow for the assistant
+
+1. Read the user's request carefully and add a short todo list describing the concrete steps.
+2. Run a workspace search to find relevant files (modules, tests, Cargo.toml) if needed.
+3. Make minimal edits using the repository patch format (apply single or small set of patches). When editing code, update or add tests before or alongside the implementation.
+4. Run `cargo test` locally and ensure everything passes. Fix compile or test errors iteratively, but do not loop more than three times on the same file without asking the user.
+5. Update the todo list to reflect completed tasks.
+6. Provide a concise summary of changes, which files were added/edited, how tests were validated, and suggested next steps.
+
+## Commands the assistant may run (examples)
+
+Linux (bash) examples:
+```bash
+# build
+cargo build --release
+
+# run tests
+cargo test
+
+# run a single test
+cargo test --test timer_tests
+```
+
+Windows PowerShell examples (the user's default shell):
+```powershell
+# build
+cargo build --release
+
+# run tests
+cargo test
+
+# run a single test file
+cargo test --test timer_tests
+```
+
+## Files of interest
+
+- `src/main.rs` — minimal launcher, initializing logging and handing off to `app::run`.
+- `src/app.rs` — main application loop, config merging, polling logic, and `perform_check` (test seam).
+- `src/config.rs` — `Config` struct, defaults, validation, and `EffectiveConfig` merge logic.
+- `src/networking.rs` — connectivity checks (TCP connect).
+- `src/ip_api.rs` — ISP HTTP lookup.
+- `src/actions.rs` — parse and run configured actions (D-Bus or command fallback).
+- `src/xml_io.rs` — XML read/write helpers.
+- `src/timer.rs` — small cross-platform timer utility (start/stop).
+- `tests/` — unit and integration tests. New test files should live here.
+
+## Testing and quality gates
+
+The assistant must run `cargo test` after substantive changes. The quality gates are:
+
+- Build: `cargo build` must succeed. REPORT PASS/FAIL.
+- Tests: `cargo test` must pass. REPORT PASS/FAIL and failing tests if any.
+- Lint/format: (Optional) run `cargo fmt -- --check` if formatting changes are made.
+
+If any gate fails and the assistant can fix it within three quick iterations, it should attempt to fix and re-run tests. If not fixable, report the exact failing commands and outputs to the user.
+
+## Coding conventions and PR/commit guidance
+
+- Keep commits small and focused. Use present-tense imperative commit messages (e.g., "fix: validate interval in config").
+- Add unit tests for new behaviors and small integration tests where appropriate.
+- Prefer using `anyhow::Result` for functions that may fail and use `context()` to add helpful messages.
+- Use `log` macros (info/debug/warn/error) for runtime messages and initialize `env_logger` in `main.rs`.
+
+## Applying patches
+
+- Use the provided canonical patch format for edits (do not print raw diffs in the final message unless requested).
+- When adding files, include a one-line purpose and example usage if applicable.
+
+## Config editing and runtime behavior notes
+
+- The program reads config in this order: `CHECK_VPN_CONFIG` env var -> `./check_vpn.xml` -> `/etc/check_vpn/config.xml` -> defaults.
+- Interval changes in the XML are picked up by the long-running daemon on the next iteration; `--run-once` is for timer-driven runs.
+- When implementing new scheduling behavior, ensure Windows compatibility (avoid Linux-only APIs).
+
+## Example quick tasks the assistant might be asked to do
+
+- Add a systemd timer unit (`check_vpn.timer`) and document usage.
+- Implement SIGHUP-based reload on Linux while keeping safe no-op behavior on Windows.
+- Add a new unit test for `perform_check` and mock out `get_isp` and `run_action` using dependency injection.
+
+## Communication style
+
+- Keep replies concise and actionable. When multiple edits are made, summarize changed files and test results.
+- If a choice is required (e.g., pick a library or file layout), present 2–3 options with brief pros/cons and the recommended choice.
+
+## Troubleshooting hints
+
+- If a test fails due to network timing, increase sleep intervals in tests or mock the network call.
+- For XML serialization quirks, prefer deserializing from a string in tests rather than writing complex Vec shapes.
+
+## Final checklist for the assistant before reporting success
+
+1. Code compiles (cargo build) — PASS/FAIL
+2. Tests pass (cargo test) — PASS/FAIL
+3. New tests added for new behavior — yes/no
+4. README or example config updated if behavior changed — yes/no
+5. Todo list updated — yes/no
+
+---
+File created by: automated assistant.

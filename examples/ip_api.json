@@ -1,0 +1,16 @@
+{
+	"status": "success",
+	"country": "Sweden",
+	"countryCode": "SE",
+	"region": "AB",
+	"regionName": "Stockholm County",
+	"city": "Stockholm",
+	"zip": "10004",
+	"lat": 59.3327,
+	"lon": 18.0656,
+	"timezone": "Europe/Stockholm",
+	"isp": "GleSYS AB",
+	"org": "PRIVATE INTERNET ACCESS, Inc",
+	"as": "AS42708 GleSYS AB",
+	"query": "46.246.8.48"
+}
