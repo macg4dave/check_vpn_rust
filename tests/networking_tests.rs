@@ -24,3 +24,4 @@ fn get_isp_parses_isp_field() {
 
     mock.assert();
 }
+

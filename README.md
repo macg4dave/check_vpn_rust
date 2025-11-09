@@ -1,5 +1,7 @@
 # check_vpn (Rust)
 
+[![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
+
 This repository contains a small Rust utility that checks if a VPN appears to be lost by checking the public ISP reported by ip-api.com. If the ISP matches a configured value (the ISP used when VPN is lost), the program runs an action such as rebooting or reconnecting the VPN.
 
 This is a port of an existing `check_vpn.sh` script to Rust so you get a single compiled binary and better control over logging and flags.
@@ -47,3 +49,123 @@ Exit codes
 By default the program only exits with non-zero codes for configuration validation errors. When invoking with `--run-once` it will also exit with the connectivity/ISP exit codes described above. Use `--exit-on-error` to force the process to exit with the same codes even in long-running mode (useful for container health checks or external monitors).
 
 log_file="/var/log/check_vpn/check_vpn.log" # Log file path log_verbose=1 # Verbosity level: 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
+
+Testing
+-------
+
+Some tests in this repository exercise real network endpoints and are marked ignored by default to avoid flakiness in CI or when running offline. Use the following commands to run tests that require network access.
+
+Run all tests (mocked and unit tests):
+
+```powershell
+cargo test
+```
+
+Run only ignored tests (these include real-network integration tests):
+
+```powershell
+cargo test -- --ignored
+```
+
+Run a single ignored test (example):
+
+```powershell
+cargo test --test networking_testsreal real_ip_api_returns_200_and_parses -- --ignored
+```
+
+Notes:
+- Mocked HTTP tests (using `httpmock`) cover common ip-api behaviors: 200, 500, 429, timeouts, and malformed responses. These run by default.
+- Real-network integration tests are kept under `tests/*real.rs` and are ignored by default. Enable them when you have network access and want end-to-end verification.
+- If you want to run only a subset of tests, use `cargo test <pattern>` or `cargo test --test <testfile>` as usual.
+
+Testing in containers and CI
+---------------------------
+
+You can run the test suite inside a container (useful for reproducing CI environments) or configure CI workflows to run both unit/mocked tests and, optionally, real-network integration tests.
+
+Example Dockerfile (run tests inside a Rust container):
+
+```dockerfile
+FROM rust:1.73-slim
+WORKDIR /usr/src/check_vpn
+COPY . .
+
+# Install build tools for dependencies if needed (deb-based image)
+RUN apt-get update && apt-get install -y pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Run tests (default tests only)
+RUN cargo test --verbose
+
+# To run ignored tests (real network), execute at runtime with -- --ignored
+# docker build -t check_vpn_tests .
+# docker run --rm check_vpn_tests
+# or run the ignored tests via an interactive container:
+# docker run --rm -it check_vpn_tests bash -c "cargo test -- --ignored"
+```
+
+GitHub Actions example (run default tests on push, and a nightly job for ignored tests):
+
+Create `.github/workflows/ci.yml` with:
+
+```yaml
+name: CI
+
+on:
+	push:
+		branches: [ main ]
+	pull_request:
+		branches: [ main ]
+	schedule:
+		- cron: '0 3 * * *' # nightly run for optional integration tests (UTC)
+
+jobs:
+	test:
+		runs-on: ubuntu-latest
+		steps:
+			- uses: actions/checkout@v4
+			- name: Install Rust
+				uses: dtolnay/gh-actions-rs@v1
+				with:
+					profile: minimal
+					toolchain: stable
+			- name: Cache cargo
+				uses: actions/cache@v4
+				with:
+					path: |
+						~/.cargo/registry
+						~/.cargo/git
+						target
+					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+			- name: Run tests (unit & mocked)
+				run: cargo test --verbose
+
+	# Optional job for running ignored real-network tests (scheduled or manual)
+	real_tests:
+		if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+		runs-on: ubuntu-latest
+		steps:
+			- uses: actions/checkout@v4
+			- name: Install Rust
+				uses: dtolnay/gh-actions-rs@v1
+				with:
+					profile: minimal
+					toolchain: stable
+			- name: Cache cargo
+				uses: actions/cache@v4
+				with:
+					path: |
+						~/.cargo/registry
+						~/.cargo/git
+						target
+					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-real
+			- name: Run ignored real-network tests
+				# These tests are marked #[ignore]; run them explicitly
+				run: cargo test -- --ignored --nocapture
+```
+
+Notes and safety
+- Running ignored real-network tests in CI can cause external network traffic and may occasionally fail due to remote service changes. Keep them in a separate scheduled or manually-triggered job.
+- If tests require environment variables or secrets (e.g., private endpoints), add them as GitHub Secrets and pass them to the workflow using `env:` on the step.
+- Use `-- --ignored` to execute ignored tests; use `cargo test <pattern>` to run a single test or file.
+
+If you want, I can add the GitHub Actions workflow file to the repository and/or a Dockerfile under `contrib/` so you can run the containerized tests easily.
