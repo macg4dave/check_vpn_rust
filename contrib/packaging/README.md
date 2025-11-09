@@ -10,8 +10,29 @@ Files
 
 Usage notes
 
-- Deb packages: `cargo-deb` supports packaging Debian maintainer scripts when provided under `debian/` in the crate. This repository does not modify `Cargo.toml` to embed them; instead the `fpm` path below uses these scripts directly.
-- RPM packages: `contrib/fpm-build.sh` will include these scripts using `--after-install` and `--before-remove` when building an RPM with `fpm`.
+- Deb packages: `cargo-deb` supports packaging Debian maintainer scripts and additional files. This repository now includes a recommended `package.metadata.deb` section in `Cargo.toml` so `cargo-deb` can embed the following:
+
+	- binary -> `/usr/bin/check_vpn`
+	- config template -> `/etc/check_vpn/config.xml`
+	- systemd unit -> `/lib/systemd/system/check_vpn.service`
+	- logrotate snippet -> `/etc/logrotate.d/check_vpn`
+	- maintainer scripts: `contrib/packaging/postinst` and `contrib/packaging/prerm`
+
+	To build a .deb locally (developer machine), install `cargo-deb` and run:
+
+	```sh
+	cargo install cargo-deb
+	cargo deb --no-strip
+	# resulting .deb will be under target/debian/
+	```
+
+- RPM packages: `contrib/fpm-build.sh` will include these scripts using `--after-install` and `--before-remove` when building an RPM with `fpm`. Example (requires `fpm` installed):
+
+	```sh
+	sudo gem install --no-document fpm
+	./contrib/fpm-build.sh 0.1.0
+	# resulting .rpm will be created in the current directory
+	```
 
 SELinux
 

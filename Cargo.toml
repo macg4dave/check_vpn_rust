@@ -40,3 +40,18 @@ xml_pretty = []
 xml_tracing = ["dep:tracing"]
 # Pretty-print JSON output when writing files (optional)
 json_pretty = []
+
+[package.metadata.deb]
+maintainer = "packager@example.com"
+description = "check_vpn: VPN monitoring and automatic reconnect"
+assets = [
+	"target/release/check_vpn=/usr/bin/",
+	"contrib/config.xml=/etc/check_vpn/config.xml",
+	"contrib/check_vpn.service=/lib/systemd/system/check_vpn.service",
+	"contrib/logrotate.conf=/etc/logrotate.d/check_vpn",
+]
+
+[package.metadata.deb.scripts]
+postinst = "contrib/packaging/postinst"
+prerm = "contrib/packaging/prerm"
+
