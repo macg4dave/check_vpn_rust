@@ -1,131 +1,154 @@
-# check_vpn (Rust)
+# check_vpn
 
 [![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
 
-This repository contains a small Rust utility that checks if a VPN appears to be lost by checking the public ISP reported by ip-api.com. If the ISP matches a configured value (the ISP used when VPN is lost), the program runs an action such as rebooting or reconnecting the VPN.
+**Automatic VPN monitoring and reconnection for Linux systems**
 
-Build
+`check_vpn` is a lightweight Rust utility that continuously monitors your VPN connection by checking your public ISP. When it detects your real ISP (indicating VPN disconnection), it automatically takes action to restore your connection—whether that's restarting your VPN service, running a custom reconnection script, or rebooting the system.
 
-You need Rust and cargo installed. Then:
+### Key Features
+
+- 🔒 **Automatic VPN monitoring** - Continuously checks your public ISP to detect VPN drops
+- ⚡ **Fast and lightweight** - Written in Rust for minimal resource usage
+- 🔧 **Flexible actions** - Restart systemd units, run custom commands, or reboot
+- 📊 **Built-in metrics** - HTTP endpoint for health checks and monitoring
+- 🐧 **Linux-optimized** - Systemd integration, logrotate support, SELinux compatibility
+- 🎯 **Easy configuration** - XML config file or command-line flags
+
+Perfect for headless servers, always-on VPN clients, or any system where VPN uptime is critical.
+
+---
+
+## Installation
+
+### Quick Install (Pre-built Binary)
+
+Download the latest release from the [releases page](https://github.com/macg4dave/check_vpn_rust/releases) and install:
+
+```sh
+sudo install -m 755 check_vpn /usr/local/bin/check_vpn
+```
+
+### Build from Source
+
+Requires Rust 1.70+ and cargo:
 
 ```sh
 cargo build --release
+sudo install -m 755 target/release/check_vpn /usr/local/bin/check_vpn
 ```
 
-# check_vpn (Rust)
+### Set Up Configuration
 
-[![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
-
-A small Rust utility that detects when your VPN appears to be lost (by checking the public ISP reported by an IP lookup service) and performs a configurable action such as restarting a unit, running a command, or rebooting.
-
-This README provides build/install instructions, full usage examples, and systemd unit examples for Debian and Fedora-style systems.
-
-## Quick start
-
-Build from source (requires Rust/cargo):
+Create the configuration directory and copy the example config:
 
 ```sh
-cargo build --release
-# resulting binary: target/release/check_vpn
+sudo mkdir -p /etc/check_vpn
+sudo cp examples/check_vpn.xml /etc/check_vpn/config.xml
+sudo chmod 644 /etc/check_vpn/config.xml
 ```
 
-Run a quick dry-run to verify behavior (no actions executed):
+Edit `/etc/check_vpn/config.xml` to match your setup:
 
-```sh
-target/release/check_vpn --dry-run
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+  <interval>60</interval>
+  <isp_to_check>Your Real ISP Name</isp_to_check>
+  <vpn_lost_action_type>restart-unit</vpn_lost_action_type>
+  <vpn_lost_action_arg>openvpn-client@myvpn.service</vpn_lost_action_arg>
+  <dry_run>false</dry_run>
+</config>
 ```
 
-Run a single iteration (useful for testing/config verification):
+---
+
+## Usage
+
+### Quick Start
+
+Test your configuration with a dry run (no actions executed):
 
 ```sh
-target/release/check_vpn --run-once --isp-to-check "MyISP" --dry-run
+check_vpn --config-file /etc/check_vpn/config.xml --dry-run --run-once
 ```
 
-## Usage (flags)
-
-Key command-line flags (the project uses `clap`):
-
-- `--interval <seconds>` — seconds between checks (overrides config)
-- `-i, --isp-to-check <STRING>` — ISP string that indicates VPN is lost
-- `-t, --vpn-lost-action-type <reboot|restart-unit|command>` — action type
-- `-a, --vpn-lost-action-arg <ARG>` — argument for the action type (unit name or command)
-- `--dry-run` — log the action instead of executing it
-- `--config-file <PATH>` — load configuration from an XML file (see `examples/check_vpn.xml`)
-- `--connectivity-endpoint <HOST|IP>` — connectivity probe endpoints (repeatable / CSV)
-- `--connectivity-ports <PORTS>` — ports to try when endpoints don't include a port
-- `--connectivity-timeout <secs>` — timeout for connectivity checks
-- `--connectivity-retries <n>` — number of retries for connectivity checks
-- `--run-once` — execute a single iteration and exit
-- `-v, --verbose` — increase logging verbosity (repeatable)
-- `--enable-metrics` — enable a small HTTP health/metrics endpoint
-- `--metrics-addr <ADDR:PORT>` — address for metrics endpoint (default `0.0.0.0:9090`)
-- `--exit-on-error` — exit with non-zero codes on errors even in long-running mode
-
-Use `--help` to see the full set of flags and defaults.
-
-## Example command lines
-
-# Basic continuous run with default config
-check_vpn --enable-metrics --metrics-addr 127.0.0.1:9090
-
-# Run once for manual testing (dry-run)
-check_vpn --run-once --isp-to-check "YourISP" --dry-run
-
-# Use command action to call a custom script on VPN lost
-check_vpn -t command -a "/usr/local/bin/reconnect_vpn.sh"
-
-# Restart a systemd unit when VPN is lost
-check_vpn -t restart-unit -a "openvpn-client@myvpn.service"
-
-## Configuration
-
-The application can read configuration from an XML file (example in `examples/check_vpn.xml`) or via CLI flags. The config file location can be overridden with `--config-file`.
-
-Reasonable default runtime paths (packaging/installation should follow):
-
-- Config: `/etc/check_vpn/config.xml` (directory `/etc/check_vpn/`)
-- Logs (if writing to file): `/var/log/check_vpn/check_vpn.log`
-- Binary (manual install): `/usr/local/bin/check_vpn` or `/usr/bin/check_vpn` (packaging decides)
-
-Make sure directories exist and are owned by the service user when running as a non-root service.
-
-## Metrics & health endpoint
-
-Enable with `--enable-metrics`. By default the server binds to `0.0.0.0:9090`. It exposes:
-
-- `/health` — returns HTTP 200 when the process is running (liveness/readiness)
-- `/metrics` — a plain-text metrics payload suitable for simple scraping
-
-Examples:
+Run continuously with metrics enabled:
 
 ```sh
-curl -sS http://127.0.0.1:9090/health
-curl -sS http://127.0.0.1:9090/metrics
+check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics
 ```
 
-## Systemd service examples
+### Command-Line Options
 
-Below are two systemd unit examples: one for a system service (runs as `checkvpn` user) and one for a simple user service.
+### Command-Line Options
 
-Notes before enabling:
+Key flags (use `check_vpn --help` for complete list):
 
-- Create a dedicated user/group if you don't want the service to run as `root`:
+**Basic Options:**
+- `--config-file <PATH>` — Load configuration from XML file (default: searches common paths)
+- `--interval <seconds>` — Seconds between VPN checks (default: 60)
+- `-i, --isp-to-check <STRING>` — ISP name that indicates VPN is lost
+- `--dry-run` — Log actions without executing them (safe testing mode)
+- `--run-once` — Execute a single check and exit
+- `-v, --verbose` — Increase logging verbosity (repeatable: -v, -vv, -vvv)
+
+**Action Configuration:**
+- `-t, --vpn-lost-action-type <TYPE>` — Action type: `reboot`, `restart-unit`, or `command`
+- `-a, --vpn-lost-action-arg <ARG>` — Action argument (systemd unit name or command to run)
+
+**Connectivity Options:**
+- `--connectivity-endpoint <HOST|IP>` — Connectivity probe endpoints (repeatable)
+- `--connectivity-ports <PORTS>` — Ports to try for connectivity checks
+- `--connectivity-timeout <secs>` — Timeout for connectivity checks
+- `--connectivity-retries <n>` — Number of retry attempts
+
+**Metrics & Monitoring:**
+- `--enable-metrics` — Enable HTTP metrics/health endpoint
+- `--metrics-addr <ADDR:PORT>` — Metrics server address (default: `0.0.0.0:9090`)
+- `--exit-on-error` — Exit with error code on failures (useful for systemd restarts)
+
+### Usage Examples
+
+**Monitor VPN and restart systemd unit when lost:**
+```sh
+check_vpn -i "Your ISP Name" -t restart-unit -a "openvpn-client@myvpn.service"
+```
+
+**Run custom reconnection script:**
+```sh
+check_vpn -i "Your ISP Name" -t command -a "/usr/local/bin/reconnect_vpn.sh"
+```
+
+**Test configuration without taking action:**
+```sh
+check_vpn --config-file /etc/check_vpn/config.xml --dry-run --run-once -vv
+```
+
+**Run with metrics enabled for monitoring:**
+```sh
+check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
+```
+
+---
+
+## Systemd Integration
+
+### System Service Setup
+
+Create a dedicated service user (recommended for security):
 
 ```sh
-sudo useradd --system --no-create-home --group nogroup --shell /usr/sbin/nologin checkvpn || true
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin checkvpn
 sudo mkdir -p /etc/check_vpn /var/log/check_vpn
 sudo chown checkvpn:checkvpn /etc/check_vpn /var/log/check_vpn
 ```
 
-- Install the binary to `/usr/local/bin/check_vpn` or `/usr/bin/check_vpn`.
-
-System service (recommended for servers):
-
-`/etc/systemd/system/check_vpn.service`:
+Create the systemd service file at `/etc/systemd/system/check_vpn.service`:
 
 ```ini
 [Unit]
-Description=check_vpn - VPN monitoring and auto-reconnect
+Description=VPN Connection Monitor
 After=network-online.target
 Wants=network-online.target
 
@@ -137,32 +160,32 @@ ExecStart=/usr/local/bin/check_vpn --config-file /etc/check_vpn/config.xml --ena
 Restart=on-failure
 RestartSec=10
 RuntimeDirectory=check_vpn
-# If you write logs to /var/log/check_vpn, ensure permissions are correct
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Enable and start:
+Enable and start the service:
 
 ```sh
 sudo systemctl daemon-reload
 sudo systemctl enable --now check_vpn.service
+sudo systemctl status check_vpn
 sudo journalctl -u check_vpn -f
 ```
 
-User service (per-user, placed under `~/.config/systemd/user/`):
+### User Service (Optional)
 
-`~/.config/systemd/user/check_vpn.service`:
+For per-user installations, create `~/.config/systemd/user/check_vpn.service`:
 
 ```ini
 [Unit]
-Description=check_vpn (user)
+Description=VPN Connection Monitor (User)
 After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/home/youruser/.local/bin/check_vpn --config-file /home/youruser/.config/check_vpn/config.xml --enable-metrics
+ExecStart=%h/.local/bin/check_vpn --config-file %h/.config/check_vpn/config.xml --enable-metrics
 Restart=on-failure
 RestartSec=10
 
@@ -170,7 +193,7 @@ RestartSec=10
 WantedBy=default.target
 ```
 
-Start with:
+Enable with:
 
 ```sh
 systemctl --user daemon-reload
@@ -178,81 +201,230 @@ systemctl --user enable --now check_vpn.service
 journalctl --user -u check_vpn -f
 ```
 
-## Log rotation
+---
 
-If your service writes to `/var/log/check_vpn/check_vpn.log`, add a logrotate config at `/etc/logrotate.d/check_vpn`:
+## Monitoring & Metrics
+
+When metrics are enabled with `--enable-metrics`, check_vpn exposes an HTTP endpoint (default: `http://0.0.0.0:9090`).
+
+### Available Endpoints
+
+**Health Check:**
+```sh
+curl http://127.0.0.1:9090/health
+# Returns: HTTP 200 OK when service is running
+```
+
+**Metrics:**
+```sh
+curl http://127.0.0.1:9090/metrics
+# Returns: Plain-text metrics for monitoring systems
+```
+
+Use these endpoints with monitoring tools like Prometheus, Nagios, or simple HTTP monitoring scripts.
+
+---
+
+## Log Management
+
+### Logrotate Configuration
+
+If writing to `/var/log/check_vpn/check_vpn.log`, create `/etc/logrotate.d/check_vpn`:
 
 ```
 /var/log/check_vpn/check_vpn.log {
-	copytruncate
-	daily
-	rotate 14
-	compress
-	missingok
-	notifempty
+    daily
+    rotate 14
+    compress
+    missingok
+    notifempty
+    copytruncate
 }
 ```
 
-If you rely on `journald` (the default when using systemd without explicit file logs), journal rotation is managed by systemd and `journald.conf`.
+### Journald Logs
 
-## Fedora (SELinux) notes
-
-On Fedora with SELinux Enforcing enabled, if you install the binary to a non-standard path or the service needs to access network resources/files with different contexts, you may need to:
-
-- Ensure executable has correct context: `sudo restorecon -v /usr/local/bin/check_vpn`
-- If you write to `/var/log/check_vpn`, ensure correct context or use `chcon`/`semanage fcontext` to persist changes:
+When running as a systemd service (recommended), logs are managed by journald:
 
 ```sh
+# View recent logs
+sudo journalctl -u check_vpn -n 100
+
+# Follow logs in real-time
+sudo journalctl -u check_vpn -f
+
+# View logs since last boot
+sudo journalctl -u check_vpn -b
+```
+
+---
+
+## Platform-Specific Notes
+
+### Fedora / RHEL / Rocky Linux (SELinux)
+
+If SELinux is in Enforcing mode, ensure proper file contexts:
+
+```sh
+# Set correct context for binary
+sudo restorecon -v /usr/local/bin/check_vpn
+
+# Set context for log directory
 sudo semanage fcontext -a -t var_log_t "/var/log/check_vpn(/.*)?"
 sudo restorecon -Rv /var/log/check_vpn
 ```
 
-If the service is prevented from performing needed network operations, examine `ausearch -m avc -ts recent` and create a simple local policy or adjust booleans (be conservative):
+If SELinux blocks operations, check audit logs and create a policy:
 
 ```sh
+# Check for denials
+sudo ausearch -m avc -ts recent
+
+# Generate and install policy if needed
 sudo ausearch -m avc -ts today | audit2allow -M check_vpn_local
 sudo semodule -i check_vpn_local.pp
 ```
 
-## Packaging notes (Debian / Fedora)
+### Debian / Ubuntu
 
-- Debian: building a .deb can be done with `cargo deb` or packaging into a proper Debian package that installs the binary to `/usr/bin`, puts config into `/etc/check_vpn/` and installs the systemd unit.
-- Fedora: build an RPM that installs the binary and unit. For SELinux-managed systems ensure file contexts are correct or ship a policy module.
+Use `cargo-deb` for easy .deb package creation:
 
-Minimal packaging checklist:
+```sh
+cargo install cargo-deb
+cargo deb
+# Installs to /usr/bin/check_vpn with systemd unit
+```
 
-1. Binary -> `/usr/bin/check_vpn`
-2. Config template -> `/etc/check_vpn/config.xml` (owner root:root mode 0644)
-3. Systemd unit -> `/lib/systemd/system/check_vpn.service` (or `/etc/systemd/system/` for local installs)
-4. Post-install enable the unit (packagers typically avoid auto-start in some distros; include instructions)
-5. Logrotate file (optional) -> `/etc/logrotate.d/check_vpn`
+---
 
-## Testing
+## Troubleshooting
 
-Run unit & mocked tests (default):
+**Service won't start:**
+```sh
+sudo journalctl -u check_vpn -b
+# Check for config errors or permission issues
+```
+
+**Can't detect ISP:**
+```sh
+check_vpn --run-once --dry-run -vvv
+# Verbose output shows API responses and ISP detection
+```
+
+**Permission denied errors:**
+```sh
+# Ensure service user has access to required directories
+sudo chown -R checkvpn:checkvpn /etc/check_vpn /var/log/check_vpn
+sudo chmod 755 /etc/check_vpn /var/log/check_vpn
+```
+
+**VPN not reconnecting:**
+- Verify the action type and argument are correct
+- Test the action manually (e.g., `sudo systemctl restart your-vpn-unit`)
+- Check if the service user has permissions to execute the action
+- For `restart-unit`, ensure the service user has appropriate PolicyKit rules or run as root
+
+---
+
+## Development
+
+### Building from Source
+
+Requirements:
+- Rust 1.70 or later
+- Cargo (comes with Rust)
+
+```sh
+git clone https://github.com/macg4dave/check_vpn_rust.git
+cd check_vpn_rust
+cargo build --release
+```
+
+The compiled binary will be at `target/release/check_vpn`.
+
+### Running Tests
+
+Run standard unit tests:
 
 ```sh
 cargo test
 ```
 
-Run ignored integration tests (real-network tests) explicitly:
+Run integration tests (requires network access):
 
 ```sh
 cargo test -- --ignored
 ```
 
-There are integration tests in `tests/` that are ignored by default. Use `-- --ignored` to run them.
+Run all tests with verbose output:
 
-## Troubleshooting
+```sh
+cargo test -- --nocapture
+```
 
-- If the service won't start, check `sudo journalctl -u check_vpn -b`.
-- If the program can't determine ISP, run `--run-once --dry-run --verbose` to see more debug output.
-- If file permissions prevent reading config or writing logs, ensure the `checkvpn` user has access to `/etc/check_vpn` and `/var/log/check_vpn`.
+### Project Structure
 
-## Contributing
+```
+src/
+├── main.rs           # Entry point
+├── app.rs            # Main application logic
+├── app_check.rs      # VPN check implementation
+├── timer.rs          # Interval timing
+├── logging.rs        # Logging setup
+├── actions/          # Action execution (reboot, restart-unit, command)
+├── cli/              # Command-line parsing
+├── config/           # Configuration loading and validation
+├── ip_api/           # IP lookup API client
+├── metrics/          # HTTP metrics server
+└── networking/       # Connectivity checks
+```
 
-Contributions welcome. Please open issues for bugs or feature requests and consider sending pull requests with tests.
+### Building Packages
+
+**Debian/Ubuntu .deb:**
+```sh
+cargo install cargo-deb
+cargo deb
+# Output: target/debian/check_vpn_*.deb
+```
+
+**Fedora/RHEL .rpm:**
+```sh
+# See contrib/check_vpn.spec for RPM spec file
+rpmbuild -ba contrib/check_vpn.spec
+```
+
+**Docker:**
+```sh
+docker build -f contrib/Dockerfile -t check_vpn:latest .
+```
+
+### Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes with tests
+4. Run `cargo test` and `cargo clippy`
+5. Commit your changes (`git commit -am 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Development Scripts
+
+- `scripts/install-hooks.sh` - Install git pre-commit hooks
+- `scripts/pre-commit.sh` - Run tests and linting before commits
+- `contrib/run_acceptance.sh` - Run acceptance tests
+
+---
 
 ## License
 
-See the repository `LICENSE` file for license details.
+See [LICENSE](LICENSE) file for details.
+
+## Support
+
+- **Issues:** [GitHub Issues](https://github.com/macg4dave/check_vpn_rust/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/macg4dave/check_vpn_rust/discussions)
+
