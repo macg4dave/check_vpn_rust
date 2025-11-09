@@ -3,6 +3,7 @@ pub mod networking;
 pub mod ip_api;
 pub mod app;
 pub mod xml_io;
+pub mod json_io;
 pub mod actions;
 pub mod logging;
 pub mod config;

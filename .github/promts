@@ -10,16 +10,6 @@ Purpose: These instructions help an automated coding agent implement features an
 - Config format: XML (quick-xml), merged with CLI (clap v4)
 - Tests: unit and integration under `tests/`
 
-## Architecture map (where to look)
-
-- `src/app.rs` — runtime loop, merge config + args, validate, call checks, exit code mapping
-- `src/cli.rs` — clap Args; add new flags here
-- `src/config.rs` — Config/EffectiveConfig, defaults, merge logic, validation and exit codes
-- `src/networking.rs` — TCP connectivity check with timeouts/retries, `NetworkingError`
-- `src/ip_api.rs` — query IP API with blocking reqwest + retries
-- `src/actions.rs` — actions on VPN loss: reboot (D-Bus), restart unit (D-Bus), or shell command; honors `dry_run`
-- `src/xml_io.rs` — generic XML read/write helpers
-- `src/logging.rs` — env_logger setup
 
 ## Golden rules
 
@@ -28,6 +18,7 @@ Purpose: These instructions help an automated coding agent implement features an
 3. No panics in library paths; propagate errors with `anyhow::Result` or typed errors where it helps.
 5. Have real network test and mock network tests separate
 6. Keep promts and instructions file upto date with any requested changes
+7. If it does something then write a test for it
 
 ## Error handling and exit codes
 
@@ -83,16 +74,7 @@ Purpose: These instructions help an automated coding agent implement features an
 
 ## Testing strategy
 
-- Unit tests (existing examples):
-	- Parsing: `tests/cli_tests.rs`, `tests/actions_tests.rs`
-	- XML I/O: `tests/xml_io_tests.rs`
-	- JSON I/O: `tests/ip_api_file_tests.rs`
-	- Timer behavior: `tests/timer_tests.rs`
-	- Internal actions (dry-run): `tests/actions_run_tests.rs`
-- Integration tests:
-	- IP API via `httpmock`: success, retries, timeouts, malformed responses, 429
-	- Connectivity: local `TcpListener` to assert `is_online` behavior
-- Write fast, deterministic tests. Use ephemeral ports and temp files.
+- Write fast, deterministic tests.
 
 ## Cross-platform considerations
 

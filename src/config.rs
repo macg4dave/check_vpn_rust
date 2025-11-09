@@ -3,20 +3,38 @@ use serde::{Deserialize, Serialize};
 // std::fs is no longer used here; xml_io handles file operations.
 // (Left intentionally blank to avoid unused-import warnings.)
 
-#[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "xml_strict", derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq))]
+#[cfg_attr(not(feature = "xml_strict",), derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq))]
 #[serde(rename = "config")]
+#[cfg_attr(feature = "xml_strict", serde(deny_unknown_fields))]
 pub struct Config {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub interval: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub isp_to_check: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vpn_lost_action_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub vpn_lost_action_arg: Option<String>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::config::serialize_option_bool"
+    )]
     pub dry_run: Option<bool>,
     /// If true, exit with non-zero codes on networking/ISP errors even in long-running mode
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::config::serialize_option_bool"
+    )]
     pub exit_on_error: Option<bool>,
     // Connectivity-related configuration
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connectivity_endpoints: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connectivity_ports: Option<Vec<u16>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connectivity_timeout_secs: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub connectivity_retries: Option<usize>,
 }
 
@@ -120,6 +138,20 @@ impl Config {
             run_once,
             exit_on_error,
         }
+    }
+}
+
+// --- Custom serializers ----------------------------------------------------
+/// Ensure Option<bool> serializes as <tag>true</tag> / <tag>false</tag> when Some,
+/// and is omitted entirely when None (to avoid empty elements like <tag/> that
+/// quick-xml cannot deserialize back into a bool).
+pub fn serialize_option_bool<S>(v: &Option<bool>, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match v {
+        Some(b) => s.serialize_bool(*b),
+        None => s.serialize_none(),
     }
 }
 
