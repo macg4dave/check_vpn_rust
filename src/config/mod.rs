@@ -56,6 +56,28 @@ pub struct Config {
     pub connectivity_timeout_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub connectivity_retries: Option<usize>,
+
+    // Provider selection and customization
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::config::serialize_option_bool"
+    )]
+    pub enable_ip_api: Option<bool>,
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        serialize_with = "crate::config::serialize_option_bool"
+    )]
+    pub enable_ifconfig_co: Option<bool>,
+    /// Additional provider URLs to try (queried before built-ins, in order)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_urls: Option<Vec<String>>,
+
+    /// Convenience: a single custom JSON server to query first (before provider_urls)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_json_server: Option<String>,
+    /// The JSON key to extract from the custom server (e.g., "asn", "org", "isp")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_json_key: Option<String>,
 }
 
 /// Effective configuration after merging CLI args and XML config/defaults.
@@ -72,6 +94,12 @@ pub struct EffectiveConfig {
     pub connectivity_retries: usize,
     pub run_once: bool,
     pub exit_on_error: bool,
+    // Providers
+    pub enable_ip_api: bool,
+    pub enable_ifconfig_co: bool,
+    pub provider_urls: Vec<String>,
+    pub custom_json_server: Option<String>,
+    pub custom_json_key: Option<String>,
 }
 
 impl Config {
@@ -126,6 +154,25 @@ impl Config {
 
         let run_once = args.run_once;
 
+        // Provider settings: default to enabling both built-ins unless disabled via CLI or config.
+        let enable_ip_api = if args.disable_ip_api { false } else { self.enable_ip_api.unwrap_or(true) };
+        let enable_ifconfig_co = if args.disable_ifconfig_co { false } else { self.enable_ifconfig_co.unwrap_or(true) };
+
+        let provider_urls = args
+            .provider_urls
+            .clone()
+            .or_else(|| self.provider_urls.clone())
+            .unwrap_or_else(|| Vec::new());
+
+        let custom_json_server = args
+            .custom_json_server
+            .clone()
+            .or_else(|| self.custom_json_server.clone());
+        let custom_json_key = args
+            .custom_json_key
+            .clone()
+            .or_else(|| self.custom_json_key.clone());
+
         EffectiveConfig {
             interval,
             isp_to_check,
@@ -138,6 +185,11 @@ impl Config {
             connectivity_retries,
             run_once,
             exit_on_error,
+            enable_ip_api,
+            enable_ifconfig_co,
+            provider_urls,
+            custom_json_server,
+            custom_json_key,
         }
     }
 }
@@ -184,6 +236,11 @@ impl Default for Config {
             connectivity_timeout_secs: Some(crate::networking::DEFAULT_TIMEOUT_SECS),
             connectivity_retries: Some(crate::networking::DEFAULT_RETRIES),
             exit_on_error: Some(false),
+            enable_ip_api: Some(true),
+            enable_ifconfig_co: Some(true),
+            provider_urls: Some(vec![]),
+            custom_json_server: None,
+            custom_json_key: None,
         }
     }
 }

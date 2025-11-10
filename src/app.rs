@@ -8,7 +8,7 @@ use std::time::Duration;
 use crate::actions;
 use crate::cli::Args;
 use crate::config::Config;
-use crate::ip_api;
+use crate::providers::{self, VpnInfoProvider};
 use std::net::TcpStream;
 
 mod check {
@@ -48,7 +48,8 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
 
     // If run_once requested, perform single check and exit. Use perform_check directly (testable).
     if eff.run_once {
-        perform_check(&eff, ip_api::get_isp, actions::run_action)?;
+        let get_isp_closure = build_provider_chain_getter(&eff);
+        perform_check(&eff, get_isp_closure, actions::run_action)?;
         return Ok(());
     }
 
@@ -106,8 +107,9 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
             }
         }
 
-        // Execute the single check using the current effective configuration.
-                perform_check(&eff, ip_api::get_isp, actions::run_action)?;
+    // Execute the single check using the current effective configuration.
+    let get_isp_closure = build_provider_chain_getter(&eff);
+    perform_check(&eff, get_isp_closure, actions::run_action)?;
 
         // Sleep but wake earlier if we are asked to stop; use the possibly-updated interval.
         let mut slept = 0u64;
@@ -130,3 +132,41 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
 }
 
 // perform_check has been moved to `src/app_check.rs` and is re-exported above.
+
+/// Build a closure `Fn() -> Result<String>` that queries the configured providers
+/// in order and returns the first successful ISP string.
+fn build_provider_chain_getter(eff: &crate::config::EffectiveConfig) -> impl Fn() -> anyhow::Result<String> + Send + Sync + 'static {
+    let mut chain: Vec<Box<dyn VpnInfoProvider>> = Vec::new();
+
+    // Custom provider URLs first, in specified order
+    for url in &eff.provider_urls {
+        if let Ok(p) = providers::generic_json_provider::GenericJsonProvider::new(url) {
+            chain.push(Box::new(p));
+        }
+    }
+
+    // Single custom JSON server with optional key override before others.
+    if let Some(ref url) = eff.custom_json_server {
+        if let Ok(p) = providers::generic_json_provider::GenericJsonProvider::new(url)
+            .map(|gp| gp.with_key(eff.custom_json_key.clone())) {
+            chain.insert(0, Box::new(p));
+        }
+    }
+
+    // Built-ins
+    if eff.enable_ip_api {
+        if let Ok(p) = providers::ip_api_provider::IpApiProvider::new_default() {
+            chain.push(Box::new(p));
+        }
+    }
+    if eff.enable_ifconfig_co {
+        if let Ok(p) = providers::ifconfig_co_provider::IfconfigCoProvider::new_default() {
+            chain.push(Box::new(p));
+        }
+    }
+
+    move || {
+        let id = providers::query_first_success(&chain)?;
+        Ok(id.isp)
+    }
+}

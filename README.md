@@ -12,6 +12,7 @@
 - ⚡ **Fast and lightweight** - Written in Rust for minimal resource usage
 - 🔧 **Flexible actions** - Restart systemd units, run custom commands, or reboot
 - 📊 **Built-in metrics** - HTTP endpoint for health checks and monitoring
+- 🌐 **Multi-provider ISP resolution** - Fallback across ip-api.com and ifconfig.co (plus custom JSON endpoints)
 - 🐧 **Linux-optimized** - Systemd integration, logrotate support, SELinux compatibility
 - 🎯 **Easy configuration** - XML config file or command-line flags
 
@@ -48,7 +49,7 @@ sudo cp examples/check_vpn.xml /etc/check_vpn/config.xml
 sudo chmod 644 /etc/check_vpn/config.xml
 ```
 
-Edit `/etc/check_vpn/config.xml` to match your setup:
+Edit `/etc/check_vpn/config.xml` to match your setup (provider flags shown too):
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -58,6 +59,11 @@ Edit `/etc/check_vpn/config.xml` to match your setup:
   <vpn_lost_action_type>restart-unit</vpn_lost_action_type>
   <vpn_lost_action_arg>openvpn-client@myvpn.service</vpn_lost_action_arg>
   <dry_run>false</dry_run>
+  <enable_ip_api>true</enable_ip_api>
+  <enable_ifconfig_co>true</enable_ifconfig_co>
+  <!-- Optional custom JSON server and key override -->
+  <!-- <custom_json_server>https://thisip.com/json</custom_json_server> -->
+  <!-- <custom_json_key>asn</custom_json_key> -->
 </config>
 ```
 
@@ -107,6 +113,13 @@ Key flags (use `check_vpn --help` for complete list):
 - `--enable-metrics` — Enable HTTP metrics/health endpoint
 - `--metrics-addr <ADDR:PORT>` — Metrics server address (default: `0.0.0.0:9090`)
 - `--exit-on-error` — Exit with error code on failures (useful for systemd restarts)
+
+**ISP Provider Selection:**
+- `--disable-ip-api` — Skip ip-api.com provider
+- `--disable-ifconfig-co` — Skip ifconfig.co provider
+- `--provider-url <URL>` — Custom JSON endpoint(s) providing `isp` or `asn_org` (repeat or comma-separated)
+ - `--custom-json-server <URL>` — Single custom JSON server queried first
+ - `--custom-json-key <KEY>` — Specific key (e.g. `asn`, `org`, `isp`) to extract from custom server
 
 ### Usage Examples
 
@@ -375,6 +388,7 @@ src/
 ├── cli/              # Command-line parsing
 ├── config/           # Configuration loading and validation
 ├── ip_api/           # IP lookup API client
+├── providers/        # Abstraction & multi-provider fallback (ip-api, ifconfig.co, generic)
 ├── metrics/          # HTTP metrics server
 └── networking/       # Connectivity checks
 ```

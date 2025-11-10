@@ -3,26 +3,13 @@ use std::sync::Arc;
 
 use check_vpn::config::Config;
 use check_vpn::cli::Args;
+use clap::Parser;
 
 #[test]
 fn perform_check_runs_action_when_isp_matches() {
     // Build effective config with a specific isp_to_check
-    let args = Args {
-        interval: None,
-        isp_to_check: Some("ISP-TEST".to_string()),
-        vpn_lost_action_type: None,
-        vpn_lost_action_arg: None,
-        dry_run: false,
-        connectivity_endpoints: None,
-        connectivity_ports: None,
-        connectivity_timeout_secs: None,
-        connectivity_retries: None,
-        run_once: false,
-        verbose: 0,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
-        exit_on_error: false,
-    };
+    let mut args = Args::parse_from(["check_vpn"].as_slice());
+    args.isp_to_check = Some("ISP-TEST".to_string());
 
     let eff = Config::default().merge_with_args(&args);
 
@@ -41,22 +28,8 @@ fn perform_check_runs_action_when_isp_matches() {
 
 #[test]
 fn perform_check_does_not_run_action_when_isp_differs() {
-    let args = Args {
-        interval: None,
-        isp_to_check: Some("ISP-TEST".to_string()),
-        vpn_lost_action_type: None,
-        vpn_lost_action_arg: None,
-        dry_run: false,
-        connectivity_endpoints: None,
-        connectivity_ports: None,
-        connectivity_timeout_secs: None,
-        connectivity_retries: None,
-        run_once: false,
-        verbose: 0,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
-        exit_on_error: false,
-    };
+    let mut args = Args::parse_from(["check_vpn"].as_slice());
+    args.isp_to_check = Some("ISP-TEST".to_string());
 
     let eff = Config::default().merge_with_args(&args);
 
@@ -75,22 +48,8 @@ fn perform_check_does_not_run_action_when_isp_differs() {
 
 #[test]
 fn perform_check_handles_get_isp_error_gracefully() {
-    let args = Args {
-        interval: None,
-        isp_to_check: Some("ISP-TEST".to_string()),
-        vpn_lost_action_type: None,
-        vpn_lost_action_arg: None,
-        dry_run: false,
-        connectivity_endpoints: None,
-        connectivity_ports: None,
-        connectivity_timeout_secs: None,
-        connectivity_retries: None,
-        run_once: false,
-        verbose: 0,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
-        exit_on_error: false,
-    };
+    let mut args = Args::parse_from(["check_vpn"].as_slice());
+    args.isp_to_check = Some("ISP-TEST".to_string());
 
     let eff = Config::default().merge_with_args(&args);
 

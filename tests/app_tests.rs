@@ -29,6 +29,11 @@ fn perform_check_runs_action_when_isp_matches() {
         connectivity_retries: 1,
         run_once: true,
         exit_on_error: false,
+        enable_ip_api: true,
+        enable_ifconfig_co: true,
+        provider_urls: vec![],
+        custom_json_server: None,
+        custom_json_key: None,
     };
 
     let called = Arc::new(AtomicBool::new(false));
@@ -68,6 +73,11 @@ fn perform_check_does_not_run_action_when_isp_differs() {
         connectivity_retries: 1,
         run_once: true,
         exit_on_error: false,
+        enable_ip_api: true,
+        enable_ifconfig_co: true,
+        provider_urls: vec![],
+        custom_json_server: None,
+        custom_json_key: None,
     };
 
     let called = Arc::new(AtomicBool::new(false));

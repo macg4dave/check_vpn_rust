@@ -16,6 +16,11 @@ fn make_eff(isp_to_check: &str) -> EffectiveConfig {
         connectivity_retries: check_vpn::networking::DEFAULT_RETRIES,
         run_once: false,
         exit_on_error: false,
+        enable_ip_api: true,
+        enable_ifconfig_co: true,
+        provider_urls: vec![],
+        custom_json_server: None,
+        custom_json_key: None,
     }
 }
 

@@ -25,6 +25,7 @@
 // layout is stable.
 pub mod cli;
 pub mod networking;
+pub mod providers;
 
 pub mod ip_api {
 	include!("ip_api/mod.rs");
@@ -59,6 +60,7 @@ pub mod timer {
 pub use actions::Action;
 pub use actions::parse_action;
 pub use ip_api::get_isp;
+pub use providers::{VpnIdentity};
 pub use timer::{start_timer, TimerHandle};
 pub use networking::NetworkingError;
 pub use config::Config;

@@ -2,6 +2,7 @@ use check_vpn::config::Config;
 use check_vpn::networking;
 use std::fs;
 use std::env;
+use clap::Parser;
 
 #[test]
 fn validate_good_values() {
@@ -61,23 +62,8 @@ fn missing_required_field_uses_default_on_merge() {
     let cfg = check_vpn::xml_io::read_xml::<check_vpn::config::Config>(path_str).expect("read xml should succeed");
     let _ = fs::remove_file(path_str);
 
-    // Build a default Args (no overrides)
-    let args = check_vpn::cli::Args {
-        interval: None,
-        isp_to_check: None,
-        vpn_lost_action_type: None,
-        vpn_lost_action_arg: None,
-        dry_run: false,
-        connectivity_endpoints: None,
-        connectivity_ports: None,
-        connectivity_timeout_secs: None,
-        connectivity_retries: None,
-        run_once: false,
-        exit_on_error: false,
-        verbose: 0,
-        enable_metrics: false,
-        metrics_addr: "0.0.0.0:9090".to_string(),
-    };
+    // Build default Args via clap (no overrides). Avoid manual struct literal to remain stable when fields evolve.
+    let args = check_vpn::cli::Args::parse_from(["check_vpn"].as_slice());
 
     let eff = cfg.merge_with_args(&args);
     // Default ISP from Config::merge_with_args is "Hutchison 3G UK Ltd"
