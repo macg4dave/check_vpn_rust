@@ -33,32 +33,24 @@ jobs:
           chmod +x contrib/fpm-build.sh || true
           ./contrib/fpm-build.sh "${{ github.ref_name }}" || true
 
-      - name: Create GitHub release
+      - name: Setup GitHub CLI
+        uses: cli/gh@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub release (gh)
         id: create_release
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: "Automated release for ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" --title "Release $TAG_NAME" --notes "Automated release for $TAG_NAME" || true
 
-      - name: Upload .deb artifact
+      - name: Upload release artifacts (gh)
         if: always()
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: target/debian/*.deb
-          asset_name: check_vpn_${{ github.ref_name }}.deb
-          asset_content_type: application/octet-stream
-
-      - name: Upload .rpm artifact
-        if: always()
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./*.rpm
-          asset_name: check_vpn_${{ github.ref_name }}.rpm
-          asset_content_type: application/octet-stream
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          for f in target/debian/*.deb ./*.rpm; do
+            [ -f "$f" ] || continue
+            gh release upload "$TAG_NAME" "$f" --clobber
+          done
