@@ -38,7 +38,28 @@ install -m 0755 "$BINARY" "$DEST_BIN"
 echo "Installing config to /etc/check_vpn/config.xml (if missing)"
 mkdir -p /etc/check_vpn
 if [ ! -f /etc/check_vpn/config.xml ]; then
-  install -m 0644 contrib/config.xml /etc/check_vpn/config.xml
+  # If running interactively, offer to run the init wizard to generate a config.
+  # In non-interactive contexts (packagers/CI), fall back to the bundled sample.
+  if [ -t 0 ]; then
+    echo "No configuration found at /etc/check_vpn/config.xml."
+    read -r -p "Run interactive wizard to generate it now? [Y/n] " yn || true
+    yn=${yn:-Y}
+    if echo "$yn" | grep -qi '^y' ; then
+      echo "Running wizard..."
+      # Run the installed binary to generate the config. If it fails, fall back to sample.
+      if "$DEST_BIN" --init --init-output /etc/check_vpn/config.xml; then
+        echo "Generated /etc/check_vpn/config.xml via wizard"
+      else
+        echo "Wizard failed; installing sample config instead"
+        install -m 0644 contrib/config.xml /etc/check_vpn/config.xml
+      fi
+    else
+      install -m 0644 contrib/config.xml /etc/check_vpn/config.xml
+    fi
+  else
+    echo "Non-interactive install; installing sample config"
+    install -m 0644 contrib/config.xml /etc/check_vpn/config.xml
+  fi
 else
   echo "/etc/check_vpn/config.xml already exists; leaving it in place"
 fi

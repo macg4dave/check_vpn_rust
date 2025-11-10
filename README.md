@@ -85,6 +85,18 @@ Run continuously with metrics enabled:
 check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics
 ```
 
+### Initialize a Config (Wizard)
+
+Generate a config interactively and prefill the ISP using your current network:
+
+```sh
+check_vpn --init --init-output ./check_vpn.xml
+```
+
+Options:
+- `--init-no-fetch` — don’t call providers; keep a placeholder for ISP
+- `--init-output <PATH>` — file to write (default: ./check_vpn.xml)
+
 ### Command-Line Options
 
 ### Command-Line Options

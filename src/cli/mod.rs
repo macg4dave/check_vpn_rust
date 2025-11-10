@@ -99,6 +99,16 @@ pub struct Args {
     /// Specific JSON key to extract from the custom server (e.g. asn, org, isp)
     #[arg(long = "custom-json-key")]
     pub custom_json_key: Option<String>,
+
+    /// Wizard mode: generate a config file interactively and exit
+    #[arg(long = "init", action = clap::ArgAction::SetTrue)]
+    pub init: bool,
+    /// Output path for generated config (defaults to ./check_vpn.xml)
+    #[arg(long = "init-output")]
+    pub init_output: Option<String>,
+    /// Skip fetching current ISP during init (leave placeholder instead)
+    #[arg(long = "init-no-fetch", action = clap::ArgAction::SetTrue)]
+    pub init_no_fetch: bool,
 }
 
 impl Args {
@@ -173,6 +183,10 @@ mod tests {
             "http://single.example/json",
             "--custom-json-key",
             "asn",
+            "--init",
+            "--init-output",
+            "./gen.xml",
+            "--init-no-fetch",
         ];
         let args = Args::parse_from(argv);
         assert!(args.disable_ip_api);
@@ -182,5 +196,8 @@ mod tests {
         assert_eq!(urls[0], "http://example.test/json1");
         assert_eq!(args.custom_json_server.as_ref().unwrap(), "http://single.example/json");
         assert_eq!(args.custom_json_key.as_ref().unwrap(), "asn");
+        assert!(args.init);
+        assert_eq!(args.init_output.as_ref().unwrap(), "./gen.xml");
+        assert!(args.init_no_fetch);
     }
 }
