@@ -1,0 +1,18 @@
+# Systemd-enabled Debian image for testing full install
+# Usage: build image then run privileged with cgroup mounts and the repo mounted at /work
+
+FROM debian:bookworm-slim
+ENV container docker
+
+# Install systemd and basic build deps
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       systemd systemd-sysv dbus ca-certificates \
+       pkg-config libssl-dev curl sudo build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+VOLUME ["/sys/fs/cgroup"]
+WORKDIR /work
+
+# Keep PID 1 as systemd
+CMD ["/sbin/init"]
