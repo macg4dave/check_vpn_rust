@@ -44,6 +44,44 @@ jobs:
             target/debian/*.deb
             *.rpm
 
+      # Create a GitHub Release and upload built package files when this is a
+      # tag push. The create-release action requires a token input and
+      # upload-release-asset expects an upload_url; curl the upload_url to
+      # attach all generated artifacts (deb/rpm/pkg) to the release.
+      - name: Create Release
+        id: create_release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Release ${{ github.ref_name }}
+          body: Automated package build for ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Install GitHub CLI
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Upload packages to Release (gh)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Authenticating gh..."
+          echo "$GITHUB_TOKEN" | gh auth login --with-token
+          for f in target/debian/*.deb *.rpm check_vpn.pkg; do
+            [ -f "$f" ] || continue
+            echo "Uploading $f to release $TAG_NAME"
+            gh release upload "$TAG_NAME" "$f" --clobber
+          done
+
   macos-pkg:
     name: Build macOS .pkg
     runs-on: macos-latest
