@@ -1,16 +1,34 @@
+
 [Unit]
 Description=check_vpn - VPN monitoring and auto-reconnect
 After=network-online.target
 Wants=network-online.target
 
 [Service]
+# Exec path: packaging places the binary in /usr/bin for distro packages
 Type=simple
 User=checkvpn
 Group=checkvpn
-ExecStart=/usr/local/bin/check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
+ExecStart=/usr/bin/check_vpn --config-file /etc/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
 Restart=on-failure
 RestartSec=10
 RuntimeDirectory=check_vpn
+RuntimeDirectoryMode=0750
+
+# Hardening: restrict privileges and resources to the minimum required
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryDenyWriteExecute=yes
+
+# Keep the unit simple; drop most capabilities. The app uses outbound TCP
+# connections (no raw sockets) so no special network capabilities are required.
 
 [Install]
 WantedBy=multi-user.target

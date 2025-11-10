@@ -1,0 +1,80 @@
+name: Build packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*', 'release-*' ]
+
+jobs:
+  linux-packages:
+    name: Build .deb and .rpm (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ruby-dev build-essential rpm
+          cargo install cargo-deb || true
+          sudo gem install --no-document fpm || true
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Build .deb with cargo-deb
+        run: cargo deb --no-strip
+
+      - name: Build .rpm with fpm
+        run: |
+          chmod +x contrib/fpm-build.sh
+          ./contrib/fpm-build.sh ${GITHUB_REF_NAME:-0.1.0}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            target/debian/*.deb
+            *.rpm
+
+  macos-pkg:
+    name: Build macOS .pkg
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build release
+        run: cargo build --release
+
+      - name: Prepare pkgroot
+        run: |
+          PKGROOT=$(mktemp -d)
+          mkdir -p "$PKGROOT"/usr/local/bin
+          cp target/release/check_vpn "$PKGROOT"/usr/local/bin/check_vpn
+          echo "$PKGROOT"
+          tar -czf check_vpn_macos_root.tar.gz -C "$PKGROOT" .
+
+      - name: Build pkg
+        run: |
+          PKGROOT_DIR=$(mktemp -d)
+          tar -xzf check_vpn_macos_root.tar.gz -C "$PKGROOT_DIR"
+          pkgbuild --root "$PKGROOT_DIR" --identifier org.check_vpn --version ${GITHUB_RUN_NUMBER} --install-location /usr/local check_vpn.pkg
+
+      - name: Upload macos pkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: check_vpn.pkg

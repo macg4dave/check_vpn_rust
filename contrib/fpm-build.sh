@@ -22,6 +22,13 @@ cp target/release/check_vpn "$DESTDIR"/usr/bin/
 cp contrib/config.xml "$DESTDIR"/etc/check_vpn/config.xml
 cp contrib/check_vpn.service "$DESTDIR"/lib/systemd/system/check_vpn.service
 
+# Copy systemd drop-in snippets if present
+if [ -d contrib/systemd/check_vpn.service.d ]; then
+  echo "Including systemd drop-ins"
+  mkdir -p "$DESTDIR"/lib/systemd/system/check_vpn.service.d
+  cp -r contrib/systemd/check_vpn.service.d/* "$DESTDIR"/lib/systemd/system/check_vpn.service.d/ || true
+fi
+
 if ! command -v fpm >/dev/null 2>&1; then
   echo "fpm not found. Install with: sudo gem install --no-document fpm" >&2
   exit 1

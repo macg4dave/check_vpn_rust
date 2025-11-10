@@ -97,6 +97,46 @@ Options:
 - `--init-no-fetch` — don’t call providers; keep a placeholder for ISP
 - `--init-output <PATH>` — file to write (default: ./check_vpn.xml)
 
+### Shell completions
+
+`check_vpn` can generate shell completion scripts for Bash and Zsh so flags and
+options complete when you press Tab (for example typing `./check_vpn --dry` and
+pressing Tab will complete to `--dry-run`). Generate and enable them like so:
+
+Bash (one-off / test):
+
+```bash
+./check_vpn --generate-completions bash > /tmp/check_vpn.bash
+source /tmp/check_vpn.bash
+# Now type: ./check_vpn --dry<TAB> -> completes to --dry-run
+```
+
+Bash (install system-wide):
+
+```bash
+sudo ./check_vpn --generate-completions bash --completions-output /etc/bash_completion.d/check_vpn
+```
+
+Zsh (one-off / test):
+
+```bash
+mkdir -p ~/.zsh/completions
+./check_vpn --generate-completions zsh --completions-output ~/.zsh/completions/_check_vpn
+fpath=(~/.zsh/completions $fpath)
+autoload -Uz compinit && compinit
+# Now type: ./check_vpn --dry<TAB> -> completes to --dry-run
+```
+
+Zsh (install system-wide):
+
+```bash
+sudo ./check_vpn --generate-completions zsh --completions-output /usr/share/zsh/site-functions/_check_vpn
+```
+
+Notes:
+- Ensure your shell's completion system is enabled (`bash-completion` sourced for bash, `compinit` for zsh).
+- For packaging, add a post-install step that runs these commands so completions are available to users automatically.
+
 ### Command-Line Options
 
 ### Command-Line Options

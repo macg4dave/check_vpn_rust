@@ -36,6 +36,14 @@ fn try_main() -> Result<()> {
         return check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch);
     }
 
+    // Generate shell completions when requested and exit.
+    if let Some(shell) = args.generate_completions.clone() {
+        return check_vpn::completions::generate_completions(
+            &shell,
+            args.completions_output.as_deref(),
+        );
+    }
+
     // Try to load config from disk; on error we log and fall back to defaults.
     let cfg = match check_vpn::config::Config::load() {
         Ok(c) => c,

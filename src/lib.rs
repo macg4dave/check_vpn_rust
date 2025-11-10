@@ -27,6 +27,7 @@ pub mod cli;
 pub mod networking;
 pub mod providers;
 pub mod init_wizard;
+pub mod completions;
 
 pub mod ip_api {
 	include!("ip_api/mod.rs");

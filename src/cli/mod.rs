@@ -109,6 +109,15 @@ pub struct Args {
     /// Skip fetching current ISP during init (leave placeholder instead)
     #[arg(long = "init-no-fetch", action = clap::ArgAction::SetTrue)]
     pub init_no_fetch: bool,
+
+    /// Generate shell completions for the given shell (bash or zsh). Writes to
+    /// stdout by default or to `--completions-output <PATH>` when provided.
+    #[arg(long = "generate-completions")]
+    pub generate_completions: Option<String>,
+    /// Output path for shell completions (optional). When omitted completions
+    /// are emitted to stdout.
+    #[arg(long = "completions-output")]
+    pub completions_output: Option<String>,
 }
 
 impl Args {

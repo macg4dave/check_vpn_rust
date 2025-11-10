@@ -8,6 +8,20 @@ Files
 - `prerm` — maintainer pre-remove script. Stops and disables the systemd service before package removal.
 - `generate-selinux-policy.sh` — helper to create a small SELinux policy module from audit logs (uses `audit2allow`).
 
+Systemd drop-ins
+-----------------
+
+This repo now includes a recommended systemd drop-in directory at
+`contrib/systemd/check_vpn.service.d/` with two snippets:
+
+- `hardening.conf` — extra security directives (NoNewPrivileges, ProtectSystem, MemoryDenyWriteExecute, etc.)
+- `limits.conf` — runtime directory mode and resource limits (LimitNOFILE, LimitNPROC)
+
+When packaging, include these files alongside the main unit under
+`/lib/systemd/system/check_vpn.service.d/` so distributions get the hardening
+settings by default. The `cargo-deb` metadata and `contrib/fpm-build.sh` have
+been updated to include these files.
+
 Usage notes
 
 - Deb packages: `cargo-deb` supports packaging Debian maintainer scripts and additional files. This repository now includes a recommended `package.metadata.deb` section in `Cargo.toml` so `cargo-deb` can embed the following:

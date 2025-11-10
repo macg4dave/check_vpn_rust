@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
+clap_complete = "4.3"
 reqwest = { version = "0.12.24", features = ["blocking", "json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -48,6 +49,8 @@ assets = [
 	"target/release/check_vpn=/usr/bin/",
 	"contrib/config.xml=/etc/check_vpn/config.xml",
 	"contrib/check_vpn.service=/lib/systemd/system/check_vpn.service",
+	"contrib/systemd/check_vpn.service.d/hardening.conf=/lib/systemd/system/check_vpn.service.d/hardening.conf",
+	"contrib/systemd/check_vpn.service.d/limits.conf=/lib/systemd/system/check_vpn.service.d/limits.conf",
 	"contrib/logrotate.conf=/etc/logrotate.d/check_vpn",
 ]
 
