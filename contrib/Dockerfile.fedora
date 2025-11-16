@@ -1,0 +1,33 @@
+# Fedora-based Dockerfile for testing the project
+# This image uses Fedora, installs a Rust toolchain via rustup,
+# installs system build deps, and runs `cargo test --verbose` by default.
+
+FROM fedora:latest
+
+# Install system dependencies required to build and run the tests
+RUN dnf -y update \
+    && dnf install -y \
+       gcc \
+       make \
+       openssl-devel \
+       pkgconfig \
+       ca-certificates \
+       curl \
+       git \
+       libcurl-devel \
+    && dnf clean all
+
+# Install rustup (non-interactive) and the stable toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+    && /root/.cargo/bin/rustc --version
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /usr/src/check_vpn
+
+# Copy the whole project into the image
+COPY . .
+
+# Default action: run tests. Use `docker run` to execute tests in a container
+# (or override the command to run other cargo commands).
+CMD ["cargo", "test", "--verbose"]

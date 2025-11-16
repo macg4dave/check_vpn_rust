@@ -1,0 +1,53 @@
+name: CI - matrix build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  matrix-build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Build on macOS
+        if: matrix.os == 'macos-latest'
+        run: |
+          cargo build --release
+          tar -czf target/release/checkvpn-macos.tar.gz -C target/release check_vpn || true
+
+      - name: Build on Windows (PowerShell)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Write-Host "Running Windows build script"
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Release
+
+      - name: Build Debian & Fedora via Docker (on ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Debian
+          docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
+          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_debian bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-debian.tar.gz -C target/release check_vpn* || true"
+          # Fedora
+          docker build -t check_vpn_fedora -f contrib/Dockerfile.fedora .
+          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_fedora bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-fedora.tar.gz -C target/release check_vpn* || true"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.os }}-artifacts
+          path: |
+            target/release/*.tar.gz
+            target/release/*.zip
