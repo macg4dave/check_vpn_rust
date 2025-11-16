@@ -19,36 +19,24 @@
 //! // perform_check(&effective_config, get_isp, run_action).unwrap();
 //! ```
 
-// Core modules. Some modules are inline-included to avoid duplicate-module
-// compilation issues during an ongoing directory-style refactor — the
-// include! usage is deliberate and safe. Prefer directory modules where the
-// layout is stable.
+// Core modules using standard Rust module system
 pub mod cli;
 pub mod networking;
-
-pub mod ip_api {
-	include!("ip_api/mod.rs");
-}
-
+pub mod ip_api;
 pub mod metrics;
+pub mod xml_io;
+pub mod json_io;
 
-pub mod app {
-	include!("app.rs");
-}
-
-pub mod xml_io {
-	include!("xml_io/mod.rs");
-}
-
-pub mod json_io {
-	include!("json_io/mod.rs");
-}
+// Application logic
+pub mod app;
 
 // Shared helpers and modules
 pub mod fs_ops;
 pub mod actions;
 pub mod logging;
 pub mod config;
+
+// Timer module (single file, included for consistency)
 pub mod timer {
 	include!("timer.rs");
 }
