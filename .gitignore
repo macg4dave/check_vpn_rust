@@ -29,3 +29,6 @@
 
 # system files
 Thumbs.db
+
+# Local build artifacts produced by Makefile
+/artifacts/

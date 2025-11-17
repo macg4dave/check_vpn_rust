@@ -71,6 +71,7 @@ jobs:
           path: |
             target/release/*.tar.gz
             target/release/*.zip
+            artifacts/**
           if-no-files-found: ignore
 
   docker-builds:
