@@ -1,6 +1,9 @@
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::{Duration, Instant};
 
 /// Integration test: start the real metrics server thread and perform raw TCP
@@ -20,7 +23,8 @@ fn metrics_server_serves_health_and_metrics() {
     let addr = format!("127.0.0.1:{}", port);
 
     let keep_running = Arc::new(AtomicBool::new(true));
-    let handle = check_vpn::metrics::start_metrics_server(&addr, keep_running.clone()).expect("failed to start metrics server");
+    let handle = check_vpn::metrics::start_metrics_server(&addr, keep_running.clone())
+        .expect("failed to start metrics server");
 
     // Wait until the server appears to be listening (try connecting a few times).
     let start = Instant::now();
@@ -42,7 +46,10 @@ fn metrics_server_serves_health_and_metrics() {
     // Helper to perform a GET and return the response string
     let do_get = |path: &str| -> String {
         let mut s = std::net::TcpStream::connect(&addr).expect("connect");
-        let req = format!("GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", path, addr);
+        let req = format!(
+            "GET {} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            path, addr
+        );
         s.write_all(req.as_bytes()).expect("write req");
         let mut buf = Vec::new();
         s.read_to_end(&mut buf).expect("read resp");
@@ -51,7 +58,11 @@ fn metrics_server_serves_health_and_metrics() {
 
     let health = do_get("/health");
     // Basic checks
-    assert!(health.contains("200 OK"), "health status missing: {}", health);
+    assert!(
+        health.contains("200 OK"),
+        "health status missing: {}",
+        health
+    );
     assert!(health.contains("ok"), "health body missing: {}", health);
 
     // Validate headers and content-length for health
@@ -70,8 +81,16 @@ fn metrics_server_serves_health_and_metrics() {
     }
 
     let metrics = do_get("/metrics");
-    assert!(metrics.contains("200 OK"), "metrics status missing: {}", metrics);
-    assert!(metrics.contains("check_vpn_up 1"), "metrics body missing: {}", metrics);
+    assert!(
+        metrics.contains("200 OK"),
+        "metrics status missing: {}",
+        metrics
+    );
+    assert!(
+        metrics.contains("check_vpn_up 1"),
+        "metrics body missing: {}",
+        metrics
+    );
 
     // Validate headers and content-length for metrics and that content-type indicates metrics format
     if let Some((raw_headers, body)) = metrics.split_once("\r\n\r\n") {
@@ -100,7 +119,10 @@ fn metrics_server_serves_health_and_metrics() {
         let addr_clone = addr.clone();
         handles.push(std::thread::spawn(move || {
             let mut s = std::net::TcpStream::connect(&addr_clone).expect("connect concurrent");
-            let req = format!("GET /metrics HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n", addr_clone);
+            let req = format!(
+                "GET /metrics HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+                addr_clone
+            );
             s.write_all(req.as_bytes()).expect("write req");
             let mut buf = Vec::new();
             s.read_to_end(&mut buf).expect("read resp");

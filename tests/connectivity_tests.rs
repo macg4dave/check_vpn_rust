@@ -23,7 +23,10 @@ fn unreachable_host_returns_false() {
     // on external networks and keeps the test deterministic.
     let endpoints = ["127.0.0.1:65000".to_string()];
     let ok = check_vpn::networking::is_online(&endpoints, 1).expect("is_online failed");
-    assert!(!ok, "expected high-numbered loopback port to be unreachable");
+    assert!(
+        !ok,
+        "expected high-numbered loopback port to be unreachable"
+    );
 }
 
 #[test]
@@ -46,6 +49,7 @@ fn transient_listener_becomes_available() {
     // Use the retries-enabled API; allow multiple attempts so the transient
     // listener has time to appear.
     let endpoints = ["127.0.0.1".to_string(); 1];
-    let ok = check_vpn::networking::is_online_with_retries(&endpoints, 1, &[port], 8).expect("is_online failed");
+    let ok = check_vpn::networking::is_online_with_retries(&endpoints, 1, &[port], 8)
+        .expect("is_online failed");
     assert!(ok, "expected transient listener to be detected by retries");
 }

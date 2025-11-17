@@ -21,32 +21,32 @@
 
 // Core modules using standard Rust module system
 pub mod cli;
-pub mod networking;
 pub mod ip_api;
-pub mod metrics;
-pub mod xml_io;
 pub mod json_io;
+pub mod metrics;
+pub mod networking;
+pub mod xml_io;
 
 // Application logic
 pub mod app;
 
 // Shared helpers and modules
-pub mod fs_ops;
 pub mod actions;
-pub mod logging;
 pub mod config;
+pub mod fs_ops;
+pub mod logging;
 
 // Timer module (single file, included for consistency)
 pub mod timer {
-	include!("timer.rs");
+    include!("timer.rs");
 }
 
 // Convenience re-exports for common items used throughout tests and the
 // examples in README. Keeping these re-exports stable makes the top-level
 // crate more ergonomic to use.
-pub use actions::Action;
 pub use actions::parse_action;
-pub use ip_api::get_isp;
-pub use timer::{start_timer, TimerHandle};
-pub use networking::NetworkingError;
+pub use actions::Action;
 pub use config::Config;
+pub use ip_api::get_isp;
+pub use networking::NetworkingError;
+pub use timer::{start_timer, TimerHandle};

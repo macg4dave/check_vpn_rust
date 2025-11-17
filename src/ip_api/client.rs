@@ -3,8 +3,8 @@ use reqwest::blocking::Client;
 use reqwest::header::RETRY_AFTER;
 use serde::Deserialize;
 use std::io::Read;
-use std::time::Duration;
 use std::thread::sleep;
+use std::time::Duration;
 
 /// Default maximum response body size in bytes before we reject the response.
 const DEFAULT_MAX_RESPONSE_BYTES: usize = 5 * 1024 * 1024; // 5MB
@@ -77,13 +77,18 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
                 // Read response body with a cap to avoid unbounded allocations
                 let mut buf: Vec<u8> = Vec::new();
                 let mut reader = r.take((max_bytes as u64) + 1);
-                reader.read_to_end(&mut buf).context("failed to read response body")?;
+                reader
+                    .read_to_end(&mut buf)
+                    .context("failed to read response body")?;
                 if buf.len() > max_bytes {
                     return Err(anyhow::anyhow!("response too large (>{} bytes)", max_bytes));
                 }
 
-                let parsed: IpApiResponse = serde_json::from_slice(&buf).context("failed to parse json")?;
-                return parsed.isp.ok_or_else(|| anyhow::anyhow!("isp field missing in response"));
+                let parsed: IpApiResponse =
+                    serde_json::from_slice(&buf).context("failed to parse json")?;
+                return parsed
+                    .isp
+                    .ok_or_else(|| anyhow::anyhow!("isp field missing in response"));
             }
             Err(e) => {
                 last_err = Some(anyhow::anyhow!("http request failed: {}", e));
@@ -108,9 +113,13 @@ fn parse_retry_after_secs(resp: &reqwest::blocking::Response) -> Option<u64> {
 /// Backwards-compatible helper: build a client and use env vars like before.
 pub fn get_isp() -> Result<String> {
     // Allow tests to override the endpoint via environment variable.
-    let url = std::env::var("CHECK_VPN_TEST_URL").unwrap_or_else(|_| "http://ip-api.com/json".to_string());
+    let url = std::env::var("CHECK_VPN_TEST_URL")
+        .unwrap_or_else(|_| "http://ip-api.com/json".to_string());
     // Simple configurable retry policy via env var CHECK_VPN_RETRY_COUNT (default 1)
-    let retries: usize = std::env::var("CHECK_VPN_RETRY_COUNT").ok().and_then(|s| s.parse().ok()).unwrap_or(1);
+    let retries: usize = std::env::var("CHECK_VPN_RETRY_COUNT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
 
     let client = Client::builder()
         .user_agent("check_vpn/0.1")
@@ -124,8 +133,8 @@ pub fn get_isp() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use httpmock::MockServer;
     use httpmock::Method::GET;
+    use httpmock::MockServer;
 
     #[test]
     fn get_isp_parses_isp_field() {
@@ -138,20 +147,30 @@ mod tests {
                 .body(format!("{{ \"isp\": \"{}\" }}", isp_value));
         });
 
-        unsafe { std::env::set_var("CHECK_VPN_TEST_URL", server.url("/json")); }
+        unsafe {
+            std::env::set_var("CHECK_VPN_TEST_URL", server.url("/json"));
+        }
 
-        let client = Client::builder().timeout(Duration::from_secs(2)).build().unwrap();
-        let isp = get_isp_with_client_and_url(&client, &server.url("/json"), 1).expect("get_isp failed");
+        let client = Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .unwrap();
+        let isp =
+            get_isp_with_client_and_url(&client, &server.url("/json"), 1).expect("get_isp failed");
         assert_eq!(isp, isp_value.to_string());
 
         mock.assert();
-        unsafe { std::env::remove_var("CHECK_VPN_TEST_URL"); }
+        unsafe {
+            std::env::remove_var("CHECK_VPN_TEST_URL");
+        }
     }
 
     #[test]
     fn large_response_rejected_due_to_size_header() {
         let server = MockServer::start();
-        unsafe { std::env::set_var("CHECK_VPN_MAX_RESPONSE_BYTES", "1024"); }
+        unsafe {
+            std::env::set_var("CHECK_VPN_MAX_RESPONSE_BYTES", "1024");
+        }
 
         let big_body = "x".repeat(2048);
         let _m = server.mock(|when, then| {
@@ -162,9 +181,14 @@ mod tests {
                 .body(big_body.clone());
         });
 
-        let client = Client::builder().timeout(Duration::from_secs(2)).build().unwrap();
+        let client = Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .unwrap();
         let res = get_isp_with_client_and_url(&client, &server.url("/json"), 1);
-        unsafe { std::env::remove_var("CHECK_VPN_MAX_RESPONSE_BYTES"); }
+        unsafe {
+            std::env::remove_var("CHECK_VPN_MAX_RESPONSE_BYTES");
+        }
         assert!(res.is_err(), "expected large response to be rejected");
     }
 
@@ -200,8 +224,12 @@ mod tests {
             });
         });
 
-        let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
-        let res = get_isp_with_client_and_url(&client, &server.url("/json"), 2).expect("expected success");
+        let client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .unwrap();
+        let res = get_isp_with_client_and_url(&client, &server.url("/json"), 2)
+            .expect("expected success");
         assert_eq!(res, "X");
     }
 }

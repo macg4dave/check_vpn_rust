@@ -1,5 +1,5 @@
-use std::fs;
 use serde::Deserialize;
+use std::fs;
 
 #[derive(Deserialize, Debug)]
 struct IpApiResponse {
@@ -15,7 +15,10 @@ fn read_examples_ip_api_json_via_json_io() {
     let s = fs::read_to_string(path).expect("failed to read examples/ip_api.json");
     let parsed: IpApiResponse = serde_json::from_str(&s).expect("failed to parse json");
     assert_eq!(parsed.status.as_deref(), Some("success"));
-    assert!(parsed.isp.is_some(), "expected isp present in examples/ip_api.json");
+    assert!(
+        parsed.isp.is_some(),
+        "expected isp present in examples/ip_api.json"
+    );
 }
 
 #[test]
@@ -24,12 +27,18 @@ fn json_io_read_and_roundtrip() {
     use serde::Serialize;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
-    struct Small { a: i32, b: String }
+    struct Small {
+        a: i32,
+        b: String,
+    }
 
     let tmp = std::env::temp_dir().join("check_vpn_json_io_test.json");
     let path = tmp.to_str().expect("temp path utf8");
 
-    let v = Small { a: 42, b: "hello".to_string() };
+    let v = Small {
+        a: 42,
+        b: "hello".to_string(),
+    };
     json_io::write_json(&v, path).expect("write_json failed");
     let read: Small = json_io::read_json(path).expect("read_json failed");
     assert_eq!(v, read);
@@ -43,11 +52,18 @@ fn json_io_streaming_reader_writer() {
     use serde::Serialize;
 
     #[derive(Serialize, Deserialize, Debug, PartialEq)]
-    struct Small { a: i32, b: String }
+    struct Small {
+        a: i32,
+        b: String,
+    }
 
-    let v = Small { a: 7, b: "stream".to_string() };
+    let v = Small {
+        a: 7,
+        b: "stream".to_string(),
+    };
     let mut buf: Vec<u8> = Vec::new();
     json_io::write_json_to_writer(&v, &mut buf).expect("write_json_to_writer failed");
-    let read: Small = json_io::read_json_from_reader(buf.as_slice()).expect("read_json_from_reader failed");
+    let read: Small =
+        json_io::read_json_from_reader(buf.as_slice()).expect("read_json_from_reader failed");
     assert_eq!(v, read);
 }

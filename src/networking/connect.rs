@@ -1,7 +1,7 @@
 use super::NetworkingError;
+use log::trace;
 use std::net::{SocketAddr, TcpStream, ToSocketAddrs};
 use std::time::Duration;
-use log::trace;
 
 /// Resolve `addr` (may yield multiple SocketAddrs) and attempt to connect to
 /// each address with the provided `timeout`. Returns Ok(true) if any address
@@ -58,7 +58,11 @@ mod tests {
         // Use high loopback port unlikely to be in use on CI.
         let addr = "127.0.0.1:65000".to_string();
         let res = try_connect(&addr, Duration::from_millis(TEST_TIMEOUT_MS));
-        assert!(matches!(res, Ok(false)), "expected Ok(false), got: {:?}", res);
+        assert!(
+            matches!(res, Ok(false)),
+            "expected Ok(false), got: {:?}",
+            res
+        );
     }
 
     #[test]
@@ -67,6 +71,10 @@ mod tests {
         // This should trigger a name-resolution error rather than a TCP timeout.
         let addr = "nonexistent.invalid.tld:12345";
         let res = try_connect(addr, Duration::from_millis(TEST_TIMEOUT_MS));
-        assert!(matches!(res, Err(super::NetworkingError::DnsResolve(_))), "expected DnsResolve, got: {:?}", res);
+        assert!(
+            matches!(res, Err(super::NetworkingError::DnsResolve(_))),
+            "expected DnsResolve, got: {:?}",
+            res
+        );
     }
 }

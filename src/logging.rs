@@ -30,7 +30,9 @@ fn set_rust_log_if_unset(level: &str) {
         // Some cross-compilation targets or older toolchains expose
         // environment mutation as `unsafe`. Keep this call inside an
         // `unsafe` block so the module remains compatible across targets.
-        unsafe { std::env::set_var("RUST_LOG", level); }
+        unsafe {
+            std::env::set_var("RUST_LOG", level);
+        }
     }
 }
 
@@ -61,10 +63,14 @@ mod tests {
     // Helpers to mutate env in a way compatible with targets that mark these
     // functions unsafe. Tests wrap calls in `unsafe` to mirror production.
     fn remove_rust_log() {
-        unsafe { std::env::remove_var("RUST_LOG"); }
+        unsafe {
+            std::env::remove_var("RUST_LOG");
+        }
     }
     fn set_rust_log(v: &str) {
-        unsafe { std::env::set_var("RUST_LOG", v); }
+        unsafe {
+            std::env::set_var("RUST_LOG", v);
+        }
     }
 
     #[test]

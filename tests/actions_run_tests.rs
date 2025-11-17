@@ -1,4 +1,4 @@
-use check_vpn::actions::{Action, run_action};
+use check_vpn::actions::{run_action, Action};
 
 #[test]
 fn run_action_dry_run_variants_do_not_panic() {

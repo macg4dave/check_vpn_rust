@@ -29,8 +29,10 @@ pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
 #[cfg(all(feature = "xml_quick", feature = "xml_pretty"))]
 pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
     let compact = quick_xml::se::to_string(value)?;
-    let pretty = compact.replace("><", ">
-<");
+    let pretty = compact.replace(
+        "><", ">
+<",
+    );
     Ok(pretty)
 }
 

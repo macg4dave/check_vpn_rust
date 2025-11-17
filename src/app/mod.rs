@@ -60,7 +60,8 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
     // Optional metrics server (moved to `src/metrics.rs`).
     let mut metrics_handle: Option<std::thread::JoinHandle<()>> = None;
     if args.enable_metrics {
-        metrics_handle = crate::metrics::start_metrics_server(&args.metrics_addr, keep_running.clone());
+        metrics_handle =
+            crate::metrics::start_metrics_server(&args.metrics_addr, keep_running.clone());
     }
 
     debug!("Starting main check loop (interval = {} sec)", eff.interval);
@@ -87,8 +88,11 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
                     ) {
                         error!("Reloaded config failed validation, keeping previous: {}", e);
                     } else {
+                        // Update both the base config and effective merged config
                         current_cfg = new_config;
                         eff = new_eff;
+                        // Suppress unused variable warning - current_cfg is kept for potential future use
+                        let _ = &current_cfg;
                         debug!("Reloaded configuration successfully");
                         if eff.run_once {
                             debug!("Config now has run_once=true, will exit after this iteration");
@@ -96,7 +100,10 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    debug!("Failed to reload config from disk (will continue with previous): {}", e);
+                    debug!(
+                        "Failed to reload config from disk (will continue with previous): {}",
+                        e
+                    );
                 }
             }
         }

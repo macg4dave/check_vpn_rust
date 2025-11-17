@@ -11,7 +11,8 @@ pub fn build_health_response() -> Vec<u8> {
 }
 
 pub fn build_metrics_response() -> Vec<u8> {
-    let body = "# HELP check_vpn_up 1 if the service is up\n# TYPE check_vpn_up gauge\ncheck_vpn_up 1\n";
+    let body =
+        "# HELP check_vpn_up 1 if the service is up\n# TYPE check_vpn_up gauge\ncheck_vpn_up 1\n";
     let resp = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
         body.len(), body

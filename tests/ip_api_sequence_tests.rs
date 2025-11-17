@@ -1,6 +1,9 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
 use std::thread;
 use std::time::Duration;
 
@@ -23,10 +26,10 @@ impl SequenceServer {
 
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_clone = Arc::clone(&counter);
-    let stop = Arc::new(AtomicBool::new(false));
-    let stop_clone = Arc::clone(&stop);
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = Arc::clone(&ready);
+        let stop = Arc::new(AtomicBool::new(false));
+        let stop_clone = Arc::clone(&stop);
+        let ready = Arc::new(AtomicBool::new(false));
+        let ready_clone = Arc::clone(&ready);
 
         let handle = thread::spawn(move || {
             // Signal that the server thread has started and is ready to accept.
@@ -77,10 +80,12 @@ impl SequenceServer {
         while !ready.load(Ordering::SeqCst) && start.elapsed() < Duration::from_millis(500) {
             thread::sleep(Duration::from_millis(5));
         }
-    SequenceServer { url, stop, handle }
+        SequenceServer { url, stop, handle }
     }
 
-    fn url(&self) -> &str { &self.url }
+    fn url(&self) -> &str {
+        &self.url
+    }
 
     fn stop(self) {
         // Signal and then poke the listener by making a best-effort connection

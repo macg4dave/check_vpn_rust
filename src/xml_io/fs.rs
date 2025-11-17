@@ -8,7 +8,11 @@ use std::time::Instant;
 pub fn read_xml<T: DeserializeOwned>(path: &str) -> Result<T> {
     let started = Instant::now();
     let contents = crate::fs_ops::read_to_string(path, "xml")?;
-    log::debug!("xml_io::read_xml reading path={}, bytes={}", path, contents.len());
+    log::debug!(
+        "xml_io::read_xml reading path={}, bytes={}",
+        path,
+        contents.len()
+    );
     #[cfg(feature = "xml_tracing")]
     let span = tracing::info_span!("xml_read", path, size = contents.len());
     #[cfg(feature = "xml_tracing")]
@@ -25,7 +29,11 @@ pub fn read_xml<T: DeserializeOwned>(path: &str) -> Result<T> {
         }
     };
 
-    log::debug!("xml_io::read_xml parsed OK path={} in {:?}", path, started.elapsed());
+    log::debug!(
+        "xml_io::read_xml parsed OK path={} in {:?}",
+        path,
+        started.elapsed()
+    );
     Ok(parsed)
 }
 
@@ -39,6 +47,11 @@ pub fn write_xml<T: Serialize>(value: &T, path: &str) -> Result<()> {
 
     let xml = super::backend::serialize_xml(value).context("failed to serialize to xml")?;
     crate::fs_ops::write_string(path, &xml, "xml")?;
-    log::debug!("xml_io::write_xml wrote path={} bytes={} in {:?}", path, xml.len(), started.elapsed());
+    log::debug!(
+        "xml_io::write_xml wrote path={} bytes={} in {:?}",
+        path,
+        xml.len(),
+        started.elapsed()
+    );
     Ok(())
 }

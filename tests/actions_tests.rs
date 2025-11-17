@@ -1,5 +1,8 @@
 use check_vpn::actions::{parse_action, Action};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use check_vpn::config::EffectiveConfig;
 
@@ -72,7 +75,10 @@ fn perform_check_triggers_action_when_isp_matches() {
 
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
     assert!(res.is_ok());
-    assert!(called.load(Ordering::SeqCst), "expected action to be triggered");
+    assert!(
+        called.load(Ordering::SeqCst),
+        "expected action to be triggered"
+    );
 }
 
 #[test]
@@ -89,7 +95,10 @@ fn perform_check_does_not_trigger_action_when_isp_differs() {
 
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
     assert!(res.is_ok());
-    assert!(!called.load(Ordering::SeqCst), "expected no action when ISP differs");
+    assert!(
+        !called.load(Ordering::SeqCst),
+        "expected no action when ISP differs"
+    );
 }
 
 #[test]
@@ -109,5 +118,8 @@ fn perform_check_handles_get_isp_error_without_exiting_when_nonfatal() {
     // Should return Ok(()) and not call run_action
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
     assert!(res.is_ok());
-    assert!(!called.load(Ordering::SeqCst), "action should not be called on get_isp error when non-fatal");
+    assert!(
+        !called.load(Ordering::SeqCst),
+        "action should not be called on get_isp error when non-fatal"
+    );
 }

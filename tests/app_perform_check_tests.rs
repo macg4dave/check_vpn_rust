@@ -1,10 +1,13 @@
 use std::net::TcpListener;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread;
 
-use check_vpn::config::{Config, EffectiveConfig};
-use check_vpn::cli::Args;
 use check_vpn::app::perform_check;
+use check_vpn::cli::Args;
+use check_vpn::config::{Config, EffectiveConfig};
 
 /// Test helper to create a live TCP listener and return the port
 fn create_test_listener() -> (TcpListener, u16) {
@@ -121,7 +124,10 @@ fn perform_check_with_args_config_runs_action_when_isp_matches() {
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");
 
-    assert!(ran.load(Ordering::SeqCst), "expected action to run when ISP matches");
+    assert!(
+        ran.load(Ordering::SeqCst),
+        "expected action to run when ISP matches"
+    );
 }
 
 #[test]
@@ -155,7 +161,10 @@ fn perform_check_with_args_config_does_not_run_action_when_isp_differs() {
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");
 
-    assert!(!ran.load(Ordering::SeqCst), "did not expect action to run when ISP differs");
+    assert!(
+        !ran.load(Ordering::SeqCst),
+        "did not expect action to run when ISP differs"
+    );
 }
 
 #[test]
@@ -189,6 +198,12 @@ fn perform_check_handles_get_isp_error_gracefully() {
 
     // Should not panic/exit; perform_check logs and returns Ok
     let res = perform_check(&eff, get_isp, run_action);
-    assert!(res.is_ok(), "perform_check should return Ok on get_isp error in non-fatal mode");
-    assert!(!ran.load(Ordering::SeqCst), "action should not run when get_isp fails");
+    assert!(
+        res.is_ok(),
+        "perform_check should return Ok on get_isp error in non-fatal mode"
+    );
+    assert!(
+        !ran.load(Ordering::SeqCst),
+        "action should not run when get_isp fails"
+    );
 }

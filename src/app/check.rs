@@ -2,8 +2,8 @@ use anyhow::Result;
 use log::{error, info, warn};
 
 use crate::actions;
-use crate::networking;
 use crate::config::EffectiveConfig;
+use crate::networking;
 
 /// Perform a single connectivity+ISP check using injected dependencies.
 ///
@@ -34,9 +34,18 @@ where
     FRun: Fn(&actions::Action, bool),
 {
     // Convert endpoints into a slice of &str for the networking API.
-    let endpoints_ref: Vec<&str> = eff.connectivity_endpoints.iter().map(|s| s.as_str()).collect();
+    let endpoints_ref: Vec<&str> = eff
+        .connectivity_endpoints
+        .iter()
+        .map(|s| s.as_str())
+        .collect();
 
-    match networking::is_online_with_retries(&endpoints_ref, eff.connectivity_timeout_secs, &eff.connectivity_ports, eff.connectivity_retries) {
+    match networking::is_online_with_retries(
+        &endpoints_ref,
+        eff.connectivity_timeout_secs,
+        &eff.connectivity_ports,
+        eff.connectivity_retries,
+    ) {
         Ok(true) => {
             // Connectivity appears fine, determine ISP.
             match get_isp_fn() {

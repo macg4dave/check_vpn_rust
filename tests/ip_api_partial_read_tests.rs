@@ -1,5 +1,5 @@
-use std::net::TcpListener;
 use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::thread;
 use std::time::Duration;
 
@@ -21,7 +21,10 @@ fn truncated_json_returns_error() {
         }
     });
 
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(2)).build().unwrap();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap();
     let res = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1);
     let _ = handle.join();
     assert!(res.is_err(), "expected parse error for truncated JSON");
@@ -50,7 +53,10 @@ fn slow_chunked_response_times_out() {
         }
     });
 
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(1)).build().unwrap();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
     let res = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1);
     let _ = handle.join();
     assert!(res.is_err(), "expected timeout for very slow response");
