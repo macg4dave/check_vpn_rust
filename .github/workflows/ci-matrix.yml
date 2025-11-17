@@ -1,53 +1,115 @@
-name: CI - matrix build
+name: CI Matrix
 
 on:
   push:
+    branches: [ main ]
   pull_request:
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   matrix-build:
+    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
         with:
-          toolchain: stable
-          override: true
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Build on macOS
-        if: matrix.os == 'macos-latest'
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Build release
+        run: cargo build --release --verbose
+
+      - name: Create tarball (Unix)
+        if: matrix.os != 'windows-latest'
         run: |
-          cargo build --release
-          tar -czf target/release/checkvpn-macos.tar.gz -C target/release check_vpn || true
+          cd target/release
+          tar -czf check_vpn-${{ matrix.os }}.tar.gz check_vpn
+          cd ../..
 
-      - name: Build on Windows (PowerShell)
+      - name: Create zip (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          Write-Host "Running Windows build script"
-          powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Release
-
-      - name: Build Debian & Fedora via Docker (on ubuntu)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Debian
-          docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
-          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_debian bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-debian.tar.gz -C target/release check_vpn* || true"
-          # Fedora
-          docker build -t check_vpn_fedora -f contrib/Dockerfile.fedora .
-          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_fedora bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-fedora.tar.gz -C target/release check_vpn* || true"
+          cd target/release
+          Compress-Archive -Path check_vpn.exe -DestinationPath check_vpn-${{ matrix.os }}.zip
+          cd ../..
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.os }}-artifacts
+          name: check_vpn-${{ matrix.os }}
           path: |
             target/release/*.tar.gz
             target/release/*.zip
+          if-no-files-found: ignore
+
+  docker-builds:
+    name: Docker Builds (Debian & Fedora)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and test in Debian container
+        run: |
+          docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
+          docker run --rm check_vpn_debian cargo test
+
+      - name: Build Debian release
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_debian bash -c "cargo build --release"
+          cd target/release
+          tar -czf check_vpn-debian.tar.gz check_vpn || true
+          cd ../..
+
+      - name: Build and test in Fedora container
+        run: |
+          docker build -t check_vpn_fedora -f contrib/Dockerfile.fedora .
+          docker run --rm check_vpn_fedora cargo test
+
+      - name: Build Fedora release
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/work -w /work check_vpn_fedora bash -c "cargo build --release"
+          cd target/release
+          tar -czf check_vpn-fedora.tar.gz check_vpn || true
+          cd ../..
+
+      - name: Upload Docker build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: check_vpn-docker-builds
+          path: target/release/*.tar.gz
+          if-no-files-found: ignore
