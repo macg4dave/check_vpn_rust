@@ -1,251 +1,400 @@
-# check_vpn (Rust)
+# check_vpn — A Tiny, Powerful VPN Watchdog
 
-[![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
+A compact Rust-powered tool that does one job exceptionally well: **instantly detect when your VPN drops and take action automatically.**  
+A lightweight binary you can trust on servers, desktops, and homelabs.
 
-This repository contains a small Rust utility that checks if a VPN appears to be lost by checking the public ISP reported by ip-api.com. If the ISP matches a configured value (the ISP used when VPN is lost), the program runs an action such as rebooting or reconnecting the VPN.
+If you rely on a VPN for privacy, automation, or secure routing, this tool keeps an eye on your connection 24/7 and reacts the moment your VPN slips with near‑zero overhead.
 
-This is a port of an existing `check_vpn.sh` script to Rust so you get a single compiled binary and better control over logging and flags.
+## Why you want this
 
-Building for every supported system
+- **Ridiculously easy to use.** One binary, one config file, one installer.  
+- **Small but potent** — lightweight Rust binary, fast startup, tiny footprint.  
+- **Lightning fast.** Written in Rust, runs with practically zero overhead.  
+- **Instant detection** — checks your public-facing ISP and reacts the moment it changes. 
+- **Flexible responses** — reboot the machine, restart a systemd unit, or run any script/command you want.  
+- **Perfect for homelabs, seedboxes, servers, and desktops.**
 
-This project aims to be buildable on macOS, Debian (reproducible via Docker), Fedora (reproducible via Docker), and Windows (native + WSL2). Below are concise instructions for producing build artifacts on each platform. For a full guide and troubleshooting see `DEVELOPING_FULL.md` in the project root.
+# check_vpn — The No‑Nonsense VPN Watchdog  
+A tiny Rust daemon that does one thing *perfectly*: **instantly detect when your VPN dies and take action before anything leaks.**
 
-Prerequisites (common)
-- Install Rust via rustup: `curl https://sh.rustup.rs -sSf | sh` and run `rustup default stable`.
-- If your build touches native libraries (OpenSSL, libcurl) install the platform-specific dev packages (see `DEVELOPING_FULL.md`).
+It’s brutally simple, rock‑solid, and built for people who actually rely on their VPN — homelabbers, seedboxes, small servers, power users, and anyone who hates downtime and surprises.
 
-Quick host build (works on macOS, Linux, WSL2)
+Forget bloated “network monitors.” This is a **single binary**, near‑zero overhead, and absolutely ruthless at catching VPN dropouts.
 
+---
+
+[![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions)
+[![Releases](https://img.shields.io/github/v/release/macg4dave/check_vpn_rust)](https://github.com/macg4dave/check_vpn_rust/releases)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Supported platforms & requirements
+
+- Supported: Linux (systemd) and macOS (launchd).
+- Rust: Rust stable is required; see `DEVELOPING.md` for exact toolchain notes and optional build dependencies.
+- macOS build notes: you may need `openssl`, `pkg-config`, and `curl` installed (see Developer Notes below).
+
+Table of contents
+
+- Quick Start
+- Configuration (default locations and examples)
+- CLI examples
+- Running as a service (systemd / launchd)
+- Troubleshooting
+- Developer notes
+- Contributing
+- Security & Privacy
+- License
+
+---
+
+## Quick Start (in under 30 seconds)
+
+### 1. Build or download
 ```bash
-# Build release binary on the host
 cargo build --release
+# Output: target/release/check_vpn
+```
+Or grab a prebuilt binary from Releases.
 
-# Result: target/release/check_vpn (on Unix) or target\release\check_vpn.exe (on Windows)
+### 2. Test without triggering actions  
+```bash
+./check_vpn --dry-run
 ```
 
-macOS (native)
-- Recommended: build on a Mac or use the GitHub Actions `macos-latest` runner.
-- Local steps on macOS:
+### 3. Install (zero thinking required)
+
+**System-wide (recommended for servers):**
+```bash
+sudo ./scripts/install.sh
+```
+
+**User-only (no root needed):**
+```bash
+./scripts/install.sh
+```
+
+Installer handles:
+- copying the binary  
+- placing your config  
+- installing + enabling service (systemd or launchd)
+
+---
+
+## Minimal XML Configuration
+
+Place it at either:
+- `/etc/check_vpn/config.xml` (system)
+- `$HOME/.config/check_vpn/config.xml` (user)
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+  <!-- How often to check, in seconds -->
+  <interval>60</interval>
+
+  <!-- Your “non‑VPN” ISP name from ip-api.com -->
+  <isp_to_check>Your Public ISP Here</isp_to_check>
+
+  <!-- Action when VPN is lost: reboot | restart-unit | command -->
+  <vpn_lost_action_type>reboot</vpn_lost_action_type>
+
+  <!-- Argument for that action -->
+  <vpn_lost_action_arg>/sbin/shutdown -r now</vpn_lost_action_arg>
+
+  <!-- For testing without executing actions -->
+  <dry_run>false</dry_run>
+</config>
+```
+
+Actions you can trigger:
+- **reboot** (full system restart)  
+- **restart-unit** (systemd service)  
+- **command** (any shell command or script)
+
+---
+
+## Handy Command Examples
+
+Verbose dry-run:
+```bash
+./check_vpn --config /etc/check_vpn/config.xml --dry-run --log-verbose 3
+```
+
+Run normally (continuous watchdog):
+```bash
+./check_vpn
+```
+
+---
+
+## Installer Flags (for automation / CI)
+
+- `--binary <path>`
+- `--config <path>`
+- `--service <path>`
+- `--mode <interactive|system|user|auto>`
+- `--yes` (non-interactive)
+- `--no-start`
+- `--dry-run`
+
+Ideal for scripted installs or cluster deployments.
+
+---
+
+## Running as a service (systemd / launchd)
+
+Below are minimal examples showing how to run `check_vpn` as a system service. The repository includes example service files in `contrib/`:
+
+- `contrib/check_vpn.service` (systemd)
+- `contrib/check_vpn.plist` (launchd)
+
+Systemd (system-wide) example — place as `/etc/systemd/system/check_vpn.service`:
+
+```ini
+[Unit]
+Description=check_vpn watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/check_vpn --config /etc/check_vpn/config.xml
+Restart=on-failure
+RestartSec=10
+User=root
+SyslogIdentifier=check_vpn
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
 
 ```bash
-brew install openssl pkg-config curl # if needed
-export OPENSSL_DIR="$(brew --prefix openssl)"
-cargo build --release
+sudo systemctl daemon-reload
+sudo systemctl enable --now check_vpn.service
 ```
 
-Debian / Fedora (reproducible via Docker)
-- Use the Dockerfiles in `contrib/` to build artifacts in clean environments. This is the recommended way to produce Linux release tarballs.
-- Manual example (Debian):
+If you prefer a per-user systemd unit, set `ExecStart` to point at the user config (`$HOME/.config/check_vpn/config.xml`) and enable it in the user systemd scope.
+
+Launchd (macOS) example — place as `/Library/LaunchDaemons/com.macg4dave.check_vpn.plist` and ensure root ownership:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>Label</key>
+    <string>com.macg4dave.check_vpn</string>
+    <key>ProgramArguments</key>
+    <array>
+      <string>/usr/local/bin/check_vpn</string>
+      <string>--config</string>
+      <string>/Library/Application Support/check_vpn/config.xml</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/var/log/check_vpn.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/check_vpn.err</string>
+  </dict>
+</plist>
+```
+
+Load the plist (macOS):
 
 ```bash
-docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
-docker run --rm -v "$PWD":/work -w /work check_vpn_debian \
-	bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-debian.tar.gz -C target/release check_vpn* || true"
-```
-
-- We provide convenience scripts and Makefile targets:
-	- `make debian-build-release` and `scripts/build-debian-docker.ps1`
-	- `make fedora-build-release` and `scripts/build-fedora-docker.ps1`
-
-Windows (native MSVC)
-- Recommended: use the MSVC toolchain and Visual Studio Build Tools (C++ workload).
-- Use the provided PowerShell helper to build and package a Windows release:
-
-```powershell
-# From repository root in PowerShell (native Windows)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Release
-# Artifact: target\release\checkvpn-windows.zip
-```
-
-Windows (WSL2)
-- Use WSL2 for Linux-native builds or to run the Docker-based Debian/Fedora flows. Make sure Docker Desktop WSL integration is enabled if you call Docker from WSL.
-
-Makefile & helper scripts
-- The repository ships a `Makefile` with convenience targets: `all`, `release`, `debian-build-release`, `fedora-build-release`, `test-all-docker`, and `windows-test-all-docker`.
-- Windows-friendly helpers are in `scripts/*.ps1`; POSIX helpers are in `scripts/*.sh`.
-
-CI (GitHub Actions)
-- We recommend using the included matrix workflow (`.github/workflows/ci-matrix.yml`) which builds on `ubuntu-latest`, `macos-latest`, and `windows-latest`.
-- macOS artifacts should be produced on the macOS runner; Debian/Fedora artifacts are produced inside Docker on the Ubuntu runner.
-
-Run the program (dry-run)
-
-```bash
-# After building on your platform
-target/release/check_vpn --dry-run
-```
-
-Or run with a specific config file:
-
-```bash
-target/release/check_vpn --config /path/to/check_vpn.xml --dry-run
-```
-
-Common options
-- `--interval <seconds>`: seconds between checks (default 60)
-- `--isp-to-check`: ISP string that indicates VPN is lost
-- `--vpn-lost-action`: shell command to run when the VPN is lost
-- `--dry-run`: log the action instead of executing it
-- `-c, --config <FILE>`: Path to an XML config file to load (overrides env var and default lookup)
-- `--connectivity-timeout <secs>`: timeout for connectivity checks (default 2)
-- `--connectivity-retries <n>`: number of attempts for connectivity checks before declaring offline (default 1)
-
-
-Features
-VPN Status Check: Determines if the VPN is active by checking the external ISP.
-Automatic Action on VPN Loss: Executes a specified command when the VPN is disconnected, e.g., restart the VPN service, run a script or reboot.
-Internet Connectivity Check: Only checks VPN status if there is internet access.
-
-Configuration
-The program reads configuration from XML (see `examples/check_vpn.xml`) or from command-line flags. A new optional field `connectivity_retries` controls how many times the program will retry connectivity probes before concluding the internet is down. This can also be overridden with the CLI flag `--connectivity-retries`.
-
-Exit codes
-- `2` — configuration validation failed on startup. The program prints each validation error as a separate log line before exiting.
- - `3` — DNS/name resolution failure occurred while attempting connectivity checks.
- - `4` — Generic connectivity failure (unreachable/timeout) when considered fatal.
- - `5` — Failed to determine ISP from the IP API when considered fatal.
-
-By default the program only exits with non-zero codes for configuration validation errors. When invoking with `--run-once` it will also exit with the connectivity/ISP exit codes described above. Use `--exit-on-error` to force the process to exit with the same codes even in long-running mode (useful for container health checks or external monitors).
-
-log_file="/var/log/check_vpn/check_vpn.log" # Log file path log_verbose=1 # Verbosity level: 1=ERROR, 2=WARN, 3=INFO, 4=DEBUG
-
-Testing
--------
-
-Some tests in this repository exercise real network endpoints and are marked ignored by default to avoid flakiness in CI or when running offline. Use the following commands to run tests that require network access.
-
-Run all tests (mocked and unit tests):
-
-```powershell
-cargo test
-```
-
-Run only ignored tests (these include real-network integration tests):
-
-```powershell
-cargo test -- --ignored
-```
-
-Run a single ignored test (example):
-
-```powershell
-cargo test --test networking_testsreal real_ip_api_returns_200_and_parses -- --ignored
+sudo chown root:wheel /Library/LaunchDaemons/com.macg4dave.check_vpn.plist
+sudo launchctl load /Library/LaunchDaemons/com.macg4dave.check_vpn.plist
 ```
 
 Notes:
-- Mocked HTTP tests (using `httpmock`) cover common ip-api behaviors: 200, 500, 429, timeouts, and malformed responses. These run by default.
-- Real-network integration tests are kept under `tests/*real.rs` and are ignored by default. Enable them when you have network access and want end-to-end verification.
-- If you want to run only a subset of tests, use `cargo test <pattern>` or `cargo test --test <testfile>` as usual.
+- The examples above assume the binary is installed to `/usr/local/bin` and the system config is under `/etc/check_vpn` or `/Library/Application Support/check_vpn`. Adjust paths to match your installation (the install scripts in `scripts/` and `contrib/` may already do this).
+- Actions that reboot the machine or restart system services require appropriate privileges; run the service as root or use the user-level configuration where appropriate.
 
-Testing in containers and CI
----------------------------
+---
 
-You can run the test suite inside a container (useful for reproducing CI environments) or configure CI workflows to run both unit/mocked tests and, optionally, real-network integration tests.
+## Troubleshooting
 
-Example Dockerfile (run tests inside a Rust container):
+### Install the service (quick snippets)
 
-```dockerfile
-FROM rust:1.73-slim
-WORKDIR /usr/src/check_vpn
-COPY . .
+If you prefer the repo installer, it accepts flags for automation. Example (system mode):
 
-# Install build tools for dependencies if needed (deb-based image)
-RUN apt-get update && apt-get install -y pkg-config libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Run tests (default tests only)
-RUN cargo test --verbose
-
-# To run ignored tests (real network), execute at runtime with -- --ignored
-# docker build -t check_vpn_tests .
-# docker run --rm check_vpn_tests
-# or run the ignored tests via an interactive container:
-# docker run --rm -it check_vpn_tests bash -c "cargo test -- --ignored"
+```bash
+# from the repository root
+sudo ./scripts/install.sh --binary /usr/local/bin/check_vpn \
+  --config /etc/check_vpn/config.xml \
+  --service /etc/systemd/system/check_vpn.service \
+  --mode system --yes
 ```
 
-GitHub Actions example (run default tests on push, and a nightly job for ignored tests):
+Manual systemd install (if you want to copy files yourself):
 
-Create `.github/workflows/ci.yml` with:
-
-```yaml
-name: CI
-
-on:
-	push:
-		branches: [ main ]
-	pull_request:
-		branches: [ main ]
-	schedule:
-		- cron: '0 3 * * *' # nightly run for optional integration tests (UTC)
-
-jobs:
-	test:
-		runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v4
-			- name: Install Rust
-				uses: dtolnay/gh-actions-rs@v1
-				with:
-					profile: minimal
-					toolchain: stable
-			- name: Cache cargo
-				uses: actions/cache@v4
-				with:
-					path: |
-						~/.cargo/registry
-						~/.cargo/git
-						target
-					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-			- name: Run tests (unit & mocked)
-				run: cargo test --verbose
-
-	# Optional job for running ignored real-network tests (scheduled or manual)
-	real_tests:
-		if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-		runs-on: ubuntu-latest
-		steps:
-			- uses: actions/checkout@v4
-			- name: Install Rust
-				uses: dtolnay/gh-actions-rs@v1
-				with:
-					profile: minimal
-					toolchain: stable
-			- name: Cache cargo
-				uses: actions/cache@v4
-				with:
-					path: |
-						~/.cargo/registry
-						~/.cargo/git
-						target
-					key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-real
-			- name: Run ignored real-network tests
-				# These tests are marked #[ignore]; run them explicitly
-				run: cargo test -- --ignored --nocapture
+```bash
+sudo install -Dm755 target/release/check_vpn /usr/local/bin/check_vpn
+sudo mkdir -p /etc/check_vpn
+sudo cp contrib/check_vpn.service /etc/systemd/system/check_vpn.service
+sudo cp /path/to/your/config.xml /etc/check_vpn/config.xml
+sudo systemctl daemon-reload
+sudo systemctl enable --now check_vpn.service
 ```
 
-Notes and safety
-- Running ignored real-network tests in CI can cause external network traffic and may occasionally fail due to remote service changes. Keep them in a separate scheduled or manually-triggered job.
-- If tests require environment variables or secrets (e.g., private endpoints), add them as GitHub Secrets and pass them to the workflow using `env:` on the step.
-- Use `-- --ignored` to execute ignored tests; use `cargo test <pattern>` to run a single test or file.
+Manual launchd install (macOS):
 
-If you want, I can add the GitHub Actions workflow file to the repository and/or a Dockerfile under `contrib/` so you can run the containerized tests easily.
-
-Testing seam: `perform_check`
-- The single-iteration check logic is implemented in a test-friendly function re-exported as `check_vpn::app::perform_check`.
-- `perform_check` is designed for dependency injection: in tests you can pass closures or mocks for the ISP lookup and the action runner so tests avoid real network calls and external side effects.
-
-Example unit-test sketch:
-
-```rust
-let mut action_ran = false;
-let cfg = /* build a minimal Config for the check */;
-let get_isp = || -> Result<String, _> { Ok("SomeISP".to_string()) };
-let run_action = |_: &str| -> Result<(), _> { action_ran = true; Ok(()) };
-
-// Call the test seam. The exact signature is dependency-injected; this sketch shows the intent.
-check_vpn::app::perform_check(&cfg, &get_isp, &run_action).unwrap();
-assert!(action_ran);
+```bash
+sudo install -Dm755 target/release/check_vpn /usr/local/bin/check_vpn
+sudo mkdir -p "/Library/Application Support/check_vpn"
+sudo cp /path/to/your/config.xml "/Library/Application Support/check_vpn/config.xml"
+sudo cp contrib/check_vpn.plist /Library/LaunchDaemons/com.macg4dave.check_vpn.plist
+sudo chown root:wheel /Library/LaunchDaemons/com.macg4dave.check_vpn.plist
+sudo launchctl load /Library/LaunchDaemons/com.macg4dave.check_vpn.plist
 ```
 
-Notes
-- Prefer unit tests that inject mocks for `get_isp` and `run_action` (fast and deterministic).
-- Real-network integration tests are available under `tests/*real.rs` and are ignored by default; run them explicitly with `cargo test -- --ignored` when needed.
+### Verify the service is running
+
+Systemd:
+
+```bash
+sudo systemctl status check_vpn.service
+sudo journalctl -u check_vpn.service --no-pager -n 200
+```
+
+Launchd (macOS):
+
+```bash
+sudo launchctl list | grep com.macg4dave.check_vpn
+sudo launchctl list com.macg4dave.check_vpn
+# Show recent logs (macOS unified logging):
+sudo log show --predicate 'process == "check_vpn"' --last 1h
+```
+
+
+**Binary missing?**
+```bash
+cargo build --release
+```
+
+**Systemd service failing?**
+```bash
+sudo journalctl -u check_vpn.service --no-pager
+sudo systemctl status check_vpn.service
+```
+
+**macOS launchd quirks:**  
+System plists must be root-owned and placed in `/Library/LaunchDaemons/`.
+
+---
+
+## Developer Notes
+
+- Rust stable required  
+- macOS users may need:
+```bash
+brew install openssl pkg-config curl
+export OPENSSL_DIR="$(brew --prefix openssl)"
+```
+
+**Run tests:**
+```bash
+cargo test
+```
+
+**Run ignored integration tests:**
+```bash
+cargo test -- --ignored
+```
+
+Docker-based reproducible builds are included for Linux packaging.
+
+---
+
+## Packaging & Releases
+
+The repository includes produced package artifacts under `artifacts/` and helper scripts in `contrib/` and `scripts/` to build distribution packages (Deb, RPM, macOS package/plist, and installer wrappers).
+
+Where to look
+
+- Prebuilt outputs: `artifacts/` (contains `debian/`, `fedora/`, `macos/` subfolders).
+- Packaging helpers: `contrib/` (e.g. `contrib/cargo-deb.sh`, `contrib/fpm-build.sh`) and `scripts/` (Docker-based build helpers such as `scripts/docker-build.sh`).
+
+Quick example (build binary + package locally)
+
+```bash
+# 1) Build the release binary
+cargo build --release
+
+# 2) Run one of the provided packaging helpers (examples live in contrib/)
+#    Adjust the script name/flags as needed; scripts may package the built binary
+./contrib/fpm-build.sh    # builds RPM/DEB via fpm (script-specific flags may apply)
+./contrib/cargo-deb.sh    # helper to produce a .deb using cargo-deb
+```
+
+Build for different systems
+
+- Linux (x86_64): build on a Linux host or use the Docker helper `scripts/docker-build.sh` to produce reproducible artifacts.
+- Linux (musl/static): use a musl toolchain or cross compilation; consider `cross` or a Docker image that has a musl toolchain installed.
+- macOS: build on macOS (required for signing/notarization) or use a macOS GitHub Actions runner; local macOS builds need Xcode toolchain and any native deps (see Developer Notes).
+- Cross-compilation tips:
+  - Use `cargo build --target <target-triple>` for Rust cross builds (install the target with rustup).
+  - For packaging native OS packages (deb/rpm/pkg), it's usually easiest to run the packaging step on the target OS (Docker or CI runners are ideal).
+
+CI / Reproducible builds
+
+If you want automated packaging, the project contains Docker scripts and CI workflows (see `.github/workflows/` if present) — these can be adapted to produce `artifacts/` automatically on release.
+
+If you'd like, I can add a short example GitHub Actions workflow that builds release artifacts for Linux and macOS and uploads them to Releases.
+
+---
+
+## Troubleshooting — common errors
+
+1. Service won't start / permission denied
+
+   - Symptom: `systemctl start` fails with `permission denied` or `exec format error`.
+   - Fixes:
+     - Ensure `ExecStart` path points to an executable built for the target architecture and is executable (`chmod +x /usr/local/bin/check_vpn`).
+     - Check ownership and SELinux/AppArmor policies on the binary and config file.
+     - For macOS, ensure the plist is owned by `root:wheel` and placed in `/Library/LaunchDaemons/`.
+
+2. Config parse error / invalid XML
+
+   - Symptom: `check_vpn` exits quickly with a config-related error.
+   - Fixes:
+     - Validate your XML (missing closing tags, invalid characters). Use `xmllint --noout /path/to/config.xml`.
+     - Ensure the config file exists at the path given to `--config` or in the default location.
+
+3. Actions not executed (reboot/restart-unit/command doesn't run)
+
+   - Symptom: `check_vpn` reports detection but the action doesn't run.
+   - Fixes:
+     - Actions that restart services or reboot the machine require appropriate privileges. If running as a non-root user, use user-scoped units or grant the necessary privileges.
+     - Verify `vpn_lost_action_arg` is correct (e.g., `systemctl restart your.service` for `restart-unit` or a full command for `command`).
+
+4. Incorrect `isp_to_check` value / false positives
+
+   - Symptom: `check_vpn` thinks VPN is down even when it isn't.
+   - Fixes:
+     - Confirm the `isp_to_check` value by running `curl -s https://ip-api.com/json | jq -r '.isp'` from the machine.
+     - Be aware of ip-api rate limits; intermittent API failures can cause transient detection. Consider a slightly longer `interval` or a local probe endpoint for production.
+
+5. Logs are empty / not helpful
+
+   - Symptom: not enough information to diagnose a failure.
+   - Fixes:
+     - Run manually with verbosity for debugging: `./check_vpn --dry-run --log-verbose 3 --config /path/to/config.xml`.
+     - Check system logs: `sudo journalctl -u check_vpn.service` (systemd) or `sudo log show --predicate 'process == "check_vpn"' --last 1h` (macOS).
+
+
+## Contributing
+
+PRs welcome. Keep the code clean, documented, and tested. The tool stays small, sharp, and focused.
+
+---
+
+## License
+
+See `LICENSE` in the repository root.
+
