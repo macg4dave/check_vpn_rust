@@ -31,12 +31,27 @@ fn try_main() -> Result<()> {
     // requested level. This respects RUST_LOG if already set.
     check_vpn::logging::init_with_verbosity(args.verbose);
 
-    // Try to load config from disk; on error we log and fall back to defaults.
-    let cfg = match check_vpn::config::Config::load() {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Failed to load config, using defaults: {}", e);
-            check_vpn::config::Config::default()
+    // Try to load config from disk. If a CLI config path was provided it
+    // takes precedence; otherwise fall back to the normal lookup order.
+    let cfg = if let Some(cfg_path) = &args.config {
+        match check_vpn::config::Config::load_from_path(cfg_path.to_string_lossy().as_ref()) {
+            Ok(c) => c,
+            Err(e) => {
+                error!(
+                    "Failed to load config from {}: {}, using defaults",
+                    cfg_path.display(),
+                    e
+                );
+                check_vpn::config::Config::default()
+            }
+        }
+    } else {
+        match check_vpn::config::Config::load() {
+            Ok(c) => c,
+            Err(e) => {
+                error!("Failed to load config, using defaults: {}", e);
+                check_vpn::config::Config::default()
+            }
         }
     };
 

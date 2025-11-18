@@ -137,6 +137,7 @@ fn missing_required_field_uses_default_on_merge() {
         run_once: false,
         exit_on_error: false,
         verbose: 0,
+        config: None,
         enable_metrics: false,
         metrics_addr: "0.0.0.0:9090".to_string(),
     };

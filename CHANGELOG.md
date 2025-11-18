@@ -15,3 +15,5 @@
  - Tests: make negative connectivity case deterministic by testing a high-numbered loopback port instead of relying on external networks.
  - Remove legacy `src/cli.rs` file and tidy module layout.
  - Minor portability fixes: wrap environment variable mutation calls in `unsafe` blocks where required by some targets.
+
+- Add CLI flag `-c, --config <FILE>` to allow specifying a custom XML config path on the command line. When provided this path takes precedence over the `CHECK_VPN_CONFIG` env var and the default lookup order. (PR: local)

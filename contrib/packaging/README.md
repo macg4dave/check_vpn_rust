@@ -26,6 +26,17 @@ Usage notes
 	# resulting .deb will be under target/debian/
 	```
 
+Note about configuration
+------------------------
+
+Packages install a configuration template to `/etc/check_vpn/config.xml`. Users may override the config path at runtime in three ways (listed in precedence):
+
+1. Passing `-c` / `--config <FILE>` on the command line
+2. Setting the `CHECK_VPN_CONFIG` environment variable
+3. Relying on the installed default `/etc/check_vpn/config.xml` or a local `./check_vpn.xml`
+
+Packagers may wish to place their configuration under `/etc` as a template and document the CLI override for administrators who prefer per-instance config files.
+
 - RPM packages: `contrib/fpm-build.sh` will include these scripts using `--after-install` and `--before-remove` when building an RPM with `fpm`. Example (requires `fpm` installed):
 
 	```sh

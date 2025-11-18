@@ -75,12 +75,18 @@ Run the program (dry-run)
 target/release/check_vpn --dry-run
 ```
 
+Or run with a specific config file:
+
+```bash
+target/release/check_vpn --config /path/to/check_vpn.xml --dry-run
+```
+
 Common options
 - `--interval <seconds>`: seconds between checks (default 60)
 - `--isp-to-check`: ISP string that indicates VPN is lost
 - `--vpn-lost-action`: shell command to run when the VPN is lost
 - `--dry-run`: log the action instead of executing it
-- `--config-file`: Overrides config.xml path
+- `-c, --config <FILE>`: Path to an XML config file to load (overrides env var and default lookup)
 - `--connectivity-timeout <secs>`: timeout for connectivity checks (default 2)
 - `--connectivity-retries <n>`: number of attempts for connectivity checks before declaring offline (default 1)
 

@@ -43,6 +43,8 @@ else
   echo "/etc/check_vpn/config.xml already exists; leaving it in place"
 fi
 
+echo "Note: the runtime config file can be overridden by passing -c/--config to the binary or by setting CHECK_VPN_CONFIG env var"
+
 echo "Creating runtime dirs and logdir"
 mkdir -p /var/log/check_vpn
 chown -R "$USER":"$GROUP" /etc/check_vpn || true

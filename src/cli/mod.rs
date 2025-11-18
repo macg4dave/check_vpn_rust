@@ -5,6 +5,7 @@
 //! future submodules (parsing helpers, tests) while keeping the crate root tidy.
 
 use clap::Parser;
+use std::path::PathBuf;
 
 /// Command-line arguments for `check_vpn`.
 ///
@@ -66,6 +67,10 @@ pub struct Args {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
     pub verbose: u8,
 
+    /// Path to an XML config file to load (overrides env var and default lookup)
+    #[arg(short = 'c', long = "config", value_name = "FILE")]
+    pub config: Option<PathBuf>,
+
     /// Enable a simple HTTP health/metrics endpoint (useful for container deployments)
     #[arg(long = "enable-metrics", action = clap::ArgAction::SetTrue)]
     pub enable_metrics: bool,
@@ -94,6 +99,7 @@ impl Args {
 #[cfg(test)]
 mod tests {
     use super::Args;
+    use std::path::PathBuf;
     use clap::Parser;
 
     #[test]
@@ -135,5 +141,14 @@ mod tests {
         assert!(!args.dry_run);
         assert!(!args.enable_metrics);
         assert!(!args.exit_on_error);
+    }
+
+    #[test]
+    fn parse_args_config_path() {
+        let argv = vec!["check_vpn", "--config", "/tmp/test_config.xml"];
+        let args = Args::parse_from(argv);
+        assert!(args.config.is_some());
+        let p: PathBuf = args.config.unwrap();
+        assert_eq!(p, PathBuf::from("/tmp/test_config.xml"));
     }
 }

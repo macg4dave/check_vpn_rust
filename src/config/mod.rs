@@ -237,7 +237,7 @@ impl Config {
         Ok(Config::default())
     }
 
-    fn load_from_path(path: &str) -> Result<Self> {
+    pub fn load_from_path(path: &str) -> Result<Self> {
         // keep this helper for backwards compat if other callers used it; delegate to xml_io
         let c: Config =
             crate::xml_io::read_xml(path).context("failed to read config via xml_io")?;
