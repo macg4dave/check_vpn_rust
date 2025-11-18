@@ -23,7 +23,6 @@
 pub mod cli;
 pub mod ip_api;
 pub mod json_io;
-pub mod metrics;
 pub mod networking;
 pub mod xml_io;
 

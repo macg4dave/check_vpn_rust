@@ -216,8 +216,11 @@ impl Config {
     /// Load configuration from XML file. Order of lookup:
     /// 1. `CHECK_VPN_CONFIG` env var path
     /// 2. `./check_vpn.xml`
-    /// 3. `/etc/check_vpn/config.xml`
-    ///    If no file is found, returns the default config.
+    /// 3. macOS: `~/Library/Preferences/check_vpn/config.xml`
+    /// 4. Linux (Debian/Fedora/etc): `~/.config/check_vpn/config.xml`
+    /// 5. `/etc/check_vpn/config.xml` (system-wide)
+    ///
+    /// If no file is found, returns the default config.
     pub fn load() -> Result<Self> {
         if let Ok(path) = std::env::var("CHECK_VPN_CONFIG") {
             return crate::xml_io::read_xml(&path).context("failed to read config via xml_io");
@@ -229,6 +232,36 @@ impl Config {
             return Self::load_from_path(local.to_str().unwrap());
         }
 
+        // macOS: prefer a per-user config under ~/Library/Preferences
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let mac_path = std::path::Path::new(&home)
+                    .join("Library")
+                    .join("Preferences")
+                    .join("check_vpn")
+                    .join("config.xml");
+                if mac_path.exists() {
+                    return Self::load_from_path(mac_path.to_str().unwrap());
+                }
+            }
+        }
+
+        // Linux: follow XDG-like per-user config location ~/.config/check_vpn/config.xml
+        #[cfg(target_os = "linux")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let xdg_path = std::path::Path::new(&home)
+                    .join(".config")
+                    .join("check_vpn")
+                    .join("config.xml");
+                if xdg_path.exists() {
+                    return Self::load_from_path(xdg_path.to_str().unwrap());
+                }
+            }
+        }
+
+        // Fallback to system-wide config
         let etc = std::path::Path::new("/etc/check_vpn/config.xml");
         if etc.exists() {
             return Self::load_from_path(etc.to_str().unwrap());

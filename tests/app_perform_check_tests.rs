@@ -107,9 +107,7 @@ fn perform_check_with_args_config_runs_action_when_isp_matches() {
         connectivity_retries: None,
         run_once: false,
         verbose: 0,
-        config: None,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
+            config: None,
         exit_on_error: false,
     };
 
@@ -145,9 +143,7 @@ fn perform_check_with_args_config_does_not_run_action_when_isp_differs() {
         connectivity_retries: None,
         run_once: false,
         verbose: 0,
-        config: None,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
+            config: None,
         exit_on_error: false,
     };
 
@@ -183,9 +179,7 @@ fn perform_check_handles_get_isp_error_gracefully() {
         connectivity_retries: None,
         run_once: false,
         verbose: 0,
-        config: None,
-        enable_metrics: false,
-        metrics_addr: "127.0.0.1:0".to_string(),
+            config: None,
         exit_on_error: false,
     };
 

@@ -229,18 +229,6 @@ Notes and safety
 
 If you want, I can add the GitHub Actions workflow file to the repository and/or a Dockerfile under `contrib/` so you can run the containerized tests easily.
 
-## Metrics endpoint & testing seam
-
-Metrics endpoint
-- When enabled via configuration or CLI the program starts a small HTTP server bound to the configured address. It exposes two simple endpoints useful for monitoring and health checks:
-	- `/health` — returns HTTP 200 when the process is running; suitable for container liveness/readiness probes.
-	- `/metrics` — returns a small plain-text metrics payload intended for scraping by Prometheus or simple monitoring tools (contains basic runtime/check information).
-
-Example (when metrics are configured to bind to `127.0.0.1:9090`):
-
-- Health: `http://127.0.0.1:9090/health`
-- Metrics: `http://127.0.0.1:9090/metrics`
-
 Testing seam: `perform_check`
 - The single-iteration check logic is implemented in a test-friendly function re-exported as `check_vpn::app::perform_check`.
 - `perform_check` is designed for dependency injection: in tests you can pass closures or mocks for the ISP lookup and the action runner so tests avoid real network calls and external side effects.

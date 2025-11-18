@@ -138,8 +138,6 @@ fn missing_required_field_uses_default_on_merge() {
         exit_on_error: false,
         verbose: 0,
         config: None,
-        enable_metrics: false,
-        metrics_addr: "0.0.0.0:9090".to_string(),
     };
 
     let eff = cfg.merge_with_args(&args);

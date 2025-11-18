@@ -71,13 +71,7 @@ pub struct Args {
     #[arg(short = 'c', long = "config", value_name = "FILE")]
     pub config: Option<PathBuf>,
 
-    /// Enable a simple HTTP health/metrics endpoint (useful for container deployments)
-    #[arg(long = "enable-metrics", action = clap::ArgAction::SetTrue)]
-    pub enable_metrics: bool,
-
-    /// Address to bind the health/metrics endpoint (default: 0.0.0.0:9090)
-    #[arg(long = "metrics-addr", default_value = "0.0.0.0:9090")]
-    pub metrics_addr: String,
+    // Metrics flags removed — metrics server is out of scope for this build.
 
     /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
@@ -135,11 +129,8 @@ mod tests {
     fn defaults_and_metrics_addr() {
         let argv = vec!["check_vpn"];
         let args = Args::parse_from(argv);
-        // default metric address provided by clap default_value
-        assert_eq!(args.metrics_addr, "0.0.0.0:9090");
         // defaults for booleans are false
         assert!(!args.dry_run);
-        assert!(!args.enable_metrics);
         assert!(!args.exit_on_error);
     }
 

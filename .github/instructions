@@ -9,7 +9,7 @@ Use this file as the single source-of-truth for how to interact with the project
 - Project: check_vpn (Rust)
 - Goal: regularly verify that a VPN is active (via ISP detection / connectivity checks) and run a configured action if VPN is lost.
 - Main language: Rust (edition 2021). Build and test via `cargo`.
-- Config: XML (`check_vpn.xml` or `/etc/check_vpn/config.xml`), with CLI overrides.
+- Config: XML (`check_vpn.xml`, per-user config, or `/etc/check_vpn/config.xml`), with CLI overrides.
 - Scheduling: supports built-in polling (interval in config or CLI) and `--run-once` for systemd timer usage.
 
 ## High-level assistant contract
@@ -89,7 +89,9 @@ If any gate fails and the assistant can fix it within three quick iterations, it
 
 ## Config editing and runtime behavior notes
 
-- The program reads config in this order: `CHECK_VPN_CONFIG` env var -> `./check_vpn.xml` -> `/etc/check_vpn/config.xml` -> defaults.
+- The program reads config in this order: `CHECK_VPN_CONFIG` env var -> `./check_vpn.xml` ->
+	macOS: `~/Library/Preferences/check_vpn/config.xml` -> Linux: `~/.config/check_vpn/config.xml` ->
+	`/etc/check_vpn/config.xml` -> defaults.
 - Interval changes in the XML are picked up by the long-running daemon on the next iteration; `--run-once` is for timer-driven runs.
 - When implementing new scheduling behavior, ensure Windows compatibility (avoid Linux-only APIs).
 
