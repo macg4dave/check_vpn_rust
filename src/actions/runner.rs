@@ -45,7 +45,10 @@ impl RealActionRunner {
 
     fn do_restart_unit(&self, unit: &str, dry_run: bool) -> Result<()> {
         if dry_run {
-            info!("[dry-run] would request restart of unit '{}' via systemd D-Bus", unit);
+            info!(
+                "[dry-run] would request restart of unit '{}' via systemd D-Bus",
+                unit
+            );
             return Ok(());
         }
 

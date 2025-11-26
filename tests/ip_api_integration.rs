@@ -11,13 +11,19 @@ fn ip_api_success() {
     let body = r#"{"isp":"Integration ISP"}"#;
     let _m = server.mock(|when, then| {
         when.method(GET).path("/json");
-        then.status(200).header("content-type", "application/json").body(body);
+        then.status(200)
+            .header("content-type", "application/json")
+            .body(body);
     });
 
-    let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     let url = format!("{}/json", server.url(""));
 
-    let isp = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1).expect("expected success");
+    let isp =
+        check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1).expect("expected success");
     assert_eq!(isp, "Integration ISP");
 }
 
@@ -31,7 +37,10 @@ fn ip_api_retries_behaviour() {
         then.status(500).body("internal");
     });
 
-    let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     let url = format!("{}/json", server.url(""));
 
     // ask for 2 retries to exercise retry loop
@@ -53,7 +62,10 @@ fn ip_api_timeout_behaviour() {
     });
 
     // Client timeout shorter than server delay
-    let client = Client::builder().timeout(Duration::from_secs(1)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(1))
+        .build()
+        .unwrap();
     let url = format!("{}/json", server.url(""));
 
     let res = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1);
@@ -70,7 +82,10 @@ fn ip_api_malformed_response() {
         then.status(200).body("not-json");
     });
 
-    let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     let url = format!("{}/json", server.url(""));
 
     let res = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1);
@@ -86,11 +101,13 @@ fn ip_api_429_behaviour() {
         then.status(429);
     });
 
-    let client = Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
     let url = format!("{}/json", server.url(""));
 
     // 429 should be treated like a retryable server error; with retries=1 it should ultimately error
     let res = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1);
     assert!(res.is_err());
 }
-

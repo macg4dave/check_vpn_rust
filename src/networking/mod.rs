@@ -1,6 +1,6 @@
-use std::time::Duration;
-use std::thread::sleep;
 use log::{debug, trace};
+use std::thread::sleep;
+use std::time::Duration;
 mod connect;
 mod error;
 pub use error::NetworkingError;
@@ -18,7 +18,10 @@ pub const DEFAULT_PORTS: [u16; 3] = [443u16, 53u16, 80u16];
 /// as a lightweight "ping" (avoids raw socket privileges).
 /// Backwards-compatible simple API: `is_online(endpoints, timeout_secs)` uses
 /// `DEFAULT_PORTS` for addresses without an explicit port.
-pub fn is_online<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64) -> Result<bool, NetworkingError> {
+pub fn is_online<S: AsRef<str>>(
+    endpoints: &[S],
+    timeout_secs: u64,
+) -> Result<bool, NetworkingError> {
     // Backwards-compatible: single attempt (no retries)
     is_online_with_retries(endpoints, timeout_secs, &DEFAULT_PORTS, 1)
 }
@@ -26,14 +29,23 @@ pub fn is_online<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64) -> Result<bo
 /// More flexible API which accepts a slice of ports to try when an endpoint
 /// doesn't include a port. Use this when you need to tighten or change the
 /// port list at runtime.
-pub fn is_online_with_ports<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16]) -> Result<bool, NetworkingError> {
+pub fn is_online_with_ports<S: AsRef<str>>(
+    endpoints: &[S],
+    timeout_secs: u64,
+    ports: &[u16],
+) -> Result<bool, NetworkingError> {
     is_online_with_retries(endpoints, timeout_secs, ports, 1)
 }
 
 /// Like `is_online_with_ports` but retry `retries` times with a small backoff
 /// between attempts. This helps against transient network races or services
 /// that appear shortly after the check begins.
-pub fn is_online_with_retries<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64, ports: &[u16], retries: usize) -> Result<bool, NetworkingError> {
+pub fn is_online_with_retries<S: AsRef<str>>(
+    endpoints: &[S],
+    timeout_secs: u64,
+    ports: &[u16],
+    retries: usize,
+) -> Result<bool, NetworkingError> {
     let timeout = Duration::from_secs(timeout_secs);
     // Ensure at least one attempt is performed; keeps loop logic simple.
     let attempts = retries.max(1);
@@ -55,7 +67,10 @@ pub fn is_online_with_retries<S: AsRef<str>>(endpoints: &[S], timeout_secs: u64,
         // to allow transient failures to recover.
         for addr in candidates {
             for attempt in 1..=attempts {
-                debug!("Attempting connect to {} (attempt {}/{})", addr, attempt, attempts);
+                debug!(
+                    "Attempting connect to {} (attempt {}/{})",
+                    addr, attempt, attempts
+                );
                 match connect::try_connect(&addr, timeout) {
                     Ok(true) => return Ok(true),
                     Ok(false) => {

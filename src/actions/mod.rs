@@ -23,7 +23,10 @@ pub fn parse_action(action_type: &str, arg: &str) -> Action {
         "restart-unit" => Action::RestartUnit(arg.to_string()),
         "command" => Action::Command(arg.to_string()),
         other => {
-            warn!("Unknown action type '{}', falling back to command with given arg", other);
+            warn!(
+                "Unknown action type '{}', falling back to command with given arg",
+                other
+            );
             Action::Command(arg.to_string())
         }
     }
@@ -47,8 +50,14 @@ mod tests {
     #[test]
     fn parse_action_known_types() {
         assert_eq!(parse_action("reboot", ""), Action::Reboot);
-        assert_eq!(parse_action("restart-unit", "ssh.service"), Action::RestartUnit("ssh.service".to_string()));
-        assert_eq!(parse_action("command", "echo hi"), Action::Command("echo hi".to_string()));
+        assert_eq!(
+            parse_action("restart-unit", "ssh.service"),
+            Action::RestartUnit("ssh.service".to_string())
+        );
+        assert_eq!(
+            parse_action("command", "echo hi"),
+            Action::Command("echo hi".to_string())
+        );
     }
 
     #[test]
@@ -62,7 +71,11 @@ mod tests {
         let runner = RealActionRunner::new();
         // Dry-run should not attempt system calls and should return Ok(())
         assert!(runner.execute(&Action::Reboot, true).is_ok());
-        assert!(runner.execute(&Action::RestartUnit("unit.service".into()), true).is_ok());
-        assert!(runner.execute(&Action::Command("echo hi".into()), true).is_ok());
+        assert!(runner
+            .execute(&Action::RestartUnit("unit.service".into()), true)
+            .is_ok());
+        assert!(runner
+            .execute(&Action::Command("echo hi".into()), true)
+            .is_ok());
     }
 }

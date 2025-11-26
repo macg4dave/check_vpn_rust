@@ -15,7 +15,8 @@ pub fn read_to_string<P: AsRef<Path>>(path: P, kind: &str) -> Result<String> {
 
 pub fn write_string<P: AsRef<Path>>(path: P, contents: &str, kind: &str) -> Result<()> {
     let p = path.as_ref();
-    fs::write(p, contents).with_context(|| format!("failed to write {} file: {}", kind, p.display()))
+    fs::write(p, contents)
+        .with_context(|| format!("failed to write {} file: {}", kind, p.display()))
 }
 
 /// Convenience helper used when a caller already has an owned `String` and
@@ -41,7 +42,8 @@ pub fn create_file_for_write<P: AsRef<Path>>(path: P, kind: &str) -> Result<File
 /// Return the metadata for a path with helpful context.
 pub fn metadata<P: AsRef<Path>>(path: P, kind: &str) -> Result<std::fs::Metadata> {
     let p = path.as_ref();
-    p.metadata().with_context(|| format!("failed to stat {} file: {}", kind, p.display()))
+    p.metadata()
+        .with_context(|| format!("failed to stat {} file: {}", kind, p.display()))
 }
 
 /// Ensure the parent directory for `path` exists, creating it (and parents)
@@ -51,8 +53,13 @@ pub fn ensure_parent_dir_exists<P: AsRef<Path>>(path: P, kind: &str) -> Result<(
     let p = path.as_ref();
     if let Some(parent) = p.parent() {
         if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create parent dir for {}: {}", kind, parent.display()))?;
+            std::fs::create_dir_all(parent).with_context(|| {
+                format!(
+                    "failed to create parent dir for {}: {}",
+                    kind,
+                    parent.display()
+                )
+            })?;
         }
     }
     Ok(())
@@ -71,16 +78,35 @@ pub fn atomic_write<P: AsRef<Path>>(path: P, contents: &str, kind: &str) -> Resu
         .file_name()
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "tmpfile".to_string());
-    let unique = format!("{}.{}.{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0u128), file_name);
+    let unique = format!(
+        "{}.{}.{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0u128),
+        file_name
+    );
     let tmp_name = p.with_file_name(format!(".{}.tmp", unique));
 
     // Write to the temp file
-    std::fs::write(&tmp_name, contents)
-        .with_context(|| format!("failed to write temporary {} file: {}", kind, tmp_name.display()))?;
+    std::fs::write(&tmp_name, contents).with_context(|| {
+        format!(
+            "failed to write temporary {} file: {}",
+            kind,
+            tmp_name.display()
+        )
+    })?;
 
     // Move into place (atomic on most platforms when on same filesystem)
-    std::fs::rename(&tmp_name, p)
-        .with_context(|| format!("failed to rename temporary {} file to final path: {} -> {}", kind, tmp_name.display(), p.display()))?;
+    std::fs::rename(&tmp_name, p).with_context(|| {
+        format!(
+            "failed to rename temporary {} file to final path: {} -> {}",
+            kind,
+            tmp_name.display(),
+            p.display()
+        )
+    })?;
 
     Ok(contents.len())
 }
@@ -98,7 +124,7 @@ mod tests {
         // parent shouldn't exist yet
         assert!(!nested.parent().unwrap().exists());
 
-    ensure_parent_dir_exists(&nested, "test").unwrap();
+        ensure_parent_dir_exists(&nested, "test").unwrap();
         assert!(nested.parent().unwrap().exists());
 
         // create the file and check metadata

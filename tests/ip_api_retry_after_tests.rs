@@ -1,5 +1,5 @@
-use std::net::TcpListener;
 use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -29,13 +29,20 @@ fn retry_after_respected_and_eventually_succeeds() {
         }
     });
 
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(5)).build().unwrap();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .unwrap();
 
     let start = Instant::now();
-    let isp = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 2).expect("expected eventual success");
+    let isp = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 2)
+        .expect("expected eventual success");
     let elapsed = start.elapsed();
     assert_eq!(isp, "Retry ISP");
-    assert!(elapsed >= Duration::from_secs(1), "expected at least Retry-After delay");
+    assert!(
+        elapsed >= Duration::from_secs(1),
+        "expected at least Retry-After delay"
+    );
 
     let _ = handle.join();
 }

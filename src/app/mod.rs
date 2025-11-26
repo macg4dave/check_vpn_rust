@@ -9,7 +9,6 @@ use crate::actions;
 use crate::cli::Args;
 use crate::config::Config;
 use crate::ip_api;
-use std::net::TcpStream;
 
 mod check;
 
@@ -57,11 +56,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         info!("Received termination signal, shutting down...");
     })?;
 
-    // Optional metrics server (moved to `src/metrics.rs`).
-    let mut metrics_handle: Option<std::thread::JoinHandle<()>> = None;
-    if args.enable_metrics {
-        metrics_handle = crate::metrics::start_metrics_server(&args.metrics_addr, keep_running.clone());
-    }
+    // Metrics server removed: out of scope for this build.
 
     debug!("Starting main check loop (interval = {} sec)", eff.interval);
 
@@ -87,8 +82,11 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
                     ) {
                         error!("Reloaded config failed validation, keeping previous: {}", e);
                     } else {
+                        // Update both the base config and effective merged config
                         current_cfg = new_config;
                         eff = new_eff;
+                        // Suppress unused variable warning - current_cfg is kept for potential future use
+                        let _ = &current_cfg;
                         debug!("Reloaded configuration successfully");
                         if eff.run_once {
                             debug!("Config now has run_once=true, will exit after this iteration");
@@ -96,7 +94,10 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
                     }
                 }
                 Err(e) => {
-                    debug!("Failed to reload config from disk (will continue with previous): {}", e);
+                    debug!(
+                        "Failed to reload config from disk (will continue with previous): {}",
+                        e
+                    );
                 }
             }
         }
@@ -115,11 +116,6 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
 
     info!("Exiting check_vpn run loop");
 
-    // Ensure metrics server exits cleanly if present.
-    if let Some(h) = metrics_handle {
-        // Wake the listener in case it's blocked in accept
-        let _ = TcpStream::connect(args.metrics_addr.replace("http://", ""));
-        let _ = h.join();
-    }
+    // no-op: metrics server removed
     Ok(())
 }

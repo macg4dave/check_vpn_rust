@@ -1,4 +1,6 @@
 IMAGE_NAME := check_vpn_tests
+ARTIFACT_DIR := artifacts
+UNAME_S := $(shell uname -s)
 
 # Default: build host, Debian, Fedora, and Windows artifacts. macOS build runs
 # only when on macOS. Windows build runs only on Windows.
@@ -11,6 +13,13 @@ _maybe-macos:
 ifeq ($(OS),Windows_NT)
 _maybe-windows:
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\build-windows.ps1 -Release
+	# Move Windows zip to artifacts/windows (only runs on Windows)
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "\
+if (Test-Path 'target/release/checkvpn-windows.zip') { \
+  New-Item -ItemType Directory -Force -Path '$(ARTIFACT_DIR)/windows' | Out-Null; \
+  Move-Item -Path 'target/release/checkvpn-windows.zip' -Destination '$(ARTIFACT_DIR)/windows/'; \
+  Write-Host 'Moved Windows artifact to $(ARTIFACT_DIR)/windows/'; \
+} else { Write-Host 'No Windows artifact found to move'; }"
 else
 _maybe-windows:
 	@echo "Skipping Windows build: not on Windows. To build Windows artifacts run scripts/build-windows.ps1 on Windows or WSL."
@@ -64,21 +73,51 @@ fedora-test-ignored:
 # into the container so build artifacts are written to the host `target/`
 # directory.
 debian-build:
-	docker build -t $(DEBIAN_IMAGE) -f contrib/Dockerfile.debian .
-	docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(DEBIAN_IMAGE) sh -c "cargo build"
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		docker build -t $(DEBIAN_IMAGE) -f contrib/Dockerfile.debian .; \
+		docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(DEBIAN_IMAGE) sh -c "cargo build"; \
+	else \
+		echo "Skipping debian-build: docker not available"; \
+	fi'
 
 debian-build-release:
-	docker build -t $(DEBIAN_IMAGE) -f contrib/Dockerfile.debian .
-	docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(DEBIAN_IMAGE) sh -c "cargo build --release"
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		docker build -t $(DEBIAN_IMAGE) -f contrib/Dockerfile.debian .; \
+		docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(DEBIAN_IMAGE) sh -c "cargo build --release"; \
+		mkdir -p $(ARTIFACT_DIR)/debian; \
+		tar -czf $(ARTIFACT_DIR)/debian/check_vpn-debian.tar.gz -C target/release check_vpn || true; \
+		cp -f target/release/check_vpn $(ARTIFACT_DIR)/debian/ || true; \
+	else \
+		echo "Skipping debian-build-release: docker not available"; \
+	fi'
+	# Copy debian release binaries to artifacts/debian
+	@mkdir -p $(ARTIFACT_DIR)/debian
+	@tar -czf $(ARTIFACT_DIR)/debian/check_vpn-debian.tar.gz -C target/release check_vpn || true
+	@cp -f target/release/check_vpn $(ARTIFACT_DIR)/debian/ || true
 
 # Build the project inside the Fedora test image.
 fedora-build:
-	docker build -t $(FEDORA_IMAGE) -f contrib/Dockerfile.fedora .
-	docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(FEDORA_IMAGE) sh -c "cargo build"
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		docker build -t $(FEDORA_IMAGE) -f contrib/Dockerfile.fedora .; \
+		docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(FEDORA_IMAGE) sh -c "cargo build"; \
+	else \
+		echo "Skipping fedora-build: docker not available"; \
+	fi'
 
 fedora-build-release:
-	docker build -t $(FEDORA_IMAGE) -f contrib/Dockerfile.fedora .
-	docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(FEDORA_IMAGE) sh -c "cargo build --release"
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		docker build -t $(FEDORA_IMAGE) -f contrib/Dockerfile.fedora .; \
+		docker run --rm -v $(CURDIR):/usr/src/check_vpn -w /usr/src/check_vpn $(FEDORA_IMAGE) sh -c "cargo build --release"; \
+		mkdir -p $(ARTIFACT_DIR)/fedora; \
+		tar -czf $(ARTIFACT_DIR)/fedora/check_vpn-fedora.tar.gz -C target/release check_vpn || true; \
+		cp -f target/release/check_vpn $(ARTIFACT_DIR)/fedora/ || true; \
+	else \
+		echo "Skipping fedora-build-release: docker not available"; \
+	fi'
+	# Copy fedora release binaries to artifacts/fedora
+	@mkdir -p $(ARTIFACT_DIR)/fedora
+	@tar -czf $(ARTIFACT_DIR)/fedora/check_vpn-fedora.tar.gz -C target/release check_vpn || true
+	@cp -f target/release/check_vpn $(ARTIFACT_DIR)/fedora/ || true
 
 
 .PHONY: dev build release fmt clippy clean build-macos windows-build
@@ -88,9 +127,22 @@ dev:
 
 build:
 	cargo build
+	# Package debug build into artifacts
+	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)/debug
+	@cp -f target/debug/check_vpn $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)/check_vpn-debug || true
 
 release:
 	cargo build --release
+
+	# Place a packaged release into artifacts/<platform>
+	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)
+	@if [ "$(UNAME_S)" = "Darwin" ]; then \
+		tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; \
+		cp -f target/release/check_vpn $(ARTIFACT_DIR)/macos/ || true; \
+	else \
+		tar -czf $(ARTIFACT_DIR)/linux/check_vpn-linux.tar.gz -C target/release check_vpn || true; \
+		cp -f target/release/check_vpn $(ARTIFACT_DIR)/linux/ || true; \
+	fi
 
 fmt:
 	cargo fmt --all
@@ -100,11 +152,15 @@ clippy:
 
 clean:
 	cargo clean
+	@echo "Removing artifacts/ dir"
+	@rm -rf $(ARTIFACT_DIR) || true
 
 # Only attempt a macOS-native build when running on macOS. This keeps
 # CI and local Linux/Windows builds from failing when `uname` != Darwin.
 build-macos:
 	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then cargo build --release; else echo "Skipping macOS build: not on macOS"; fi'
+	# When running on macOS also copy package to artifacts/macos
+	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then mkdir -p $(ARTIFACT_DIR)/macos && tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; fi'
 
 # Helper target to remind Windows users to run the PowerShell script directly.
 windows-build:

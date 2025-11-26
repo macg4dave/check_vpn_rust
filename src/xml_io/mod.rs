@@ -24,7 +24,10 @@ mod tests {
     fn roundtrip_file() {
         let tmp = NamedTempFile::new().expect("tempfile");
         let path = tmp.path().to_str().unwrap().to_string();
-        let v = TestStruct { name: "x".into(), value: 3 };
+        let v = TestStruct {
+            name: "x".into(),
+            value: 3,
+        };
         write_xml(&v, &path).expect("write_xml");
         let got: TestStruct = read_xml(&path).expect("read_xml");
         assert_eq!(got, v);

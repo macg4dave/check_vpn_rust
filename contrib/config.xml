@@ -25,8 +25,4 @@
 
   <connectivity_timeout_secs>2</connectivity_timeout_secs>
   <connectivity_retries>1</connectivity_retries>
-
-  <!-- Metrics binding (optional) -->
-  <enable_metrics>false</enable_metrics>
-  <metrics_addr>127.0.0.1:9090</metrics_addr>
 </check_vpn>

@@ -12,7 +12,10 @@ use std::time::Instant;
 pub fn read_json_from_reader<R: Read, T: DeserializeOwned>(rdr: R) -> Result<T> {
     let started = Instant::now();
     let parsed = serde_json::from_reader(rdr).context("failed to deserialize json from reader")?;
-    log::debug!("json_io::read_json_from_reader done in {:?}", started.elapsed());
+    log::debug!(
+        "json_io::read_json_from_reader done in {:?}",
+        started.elapsed()
+    );
     Ok(parsed)
 }
 
@@ -23,6 +26,9 @@ pub fn write_json_to_writer<W: Write, T: Serialize>(value: &T, mut wr: W) -> Res
     serde_json::to_writer_pretty(&mut wr, value).context("failed to serialize json to writer")?;
     #[cfg(not(feature = "json_pretty"))]
     serde_json::to_writer(&mut wr, value).context("failed to serialize json to writer")?;
-    log::debug!("json_io::write_json_to_writer wrote in {:?}", started.elapsed());
+    log::debug!(
+        "json_io::write_json_to_writer wrote in {:?}",
+        started.elapsed()
+    );
     Ok(())
 }

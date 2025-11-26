@@ -31,7 +31,10 @@ mod tests {
         let tmp = NamedTempFile::new().expect("tempfile");
         let path = tmp.path();
 
-        let value = TestStruct { a: "x".into(), b: 42 };
+        let value = TestStruct {
+            a: "x".into(),
+            b: 42,
+        };
         write_json(&value, path.to_str().unwrap()).expect("write_json");
 
         let got: TestStruct = read_json(path.to_str().unwrap()).expect("read_json");
@@ -40,7 +43,10 @@ mod tests {
 
     #[test]
     fn stream_reader_writer_roundtrip() {
-        let value = TestStruct { a: "hey".into(), b: 7 };
+        let value = TestStruct {
+            a: "hey".into(),
+            b: 7,
+        };
         let mut buf = Vec::new();
         write_json_to_writer(&value, &mut buf).expect("write to writer");
         let cur = Cursor::new(buf);
@@ -52,7 +58,10 @@ mod tests {
     fn read_json_from_file_api() {
         let tmp = NamedTempFile::new().expect("tempfile");
         let path = tmp.path();
-        let value = TestStruct { a: "y".into(), b: 99 };
+        let value = TestStruct {
+            a: "y".into(),
+            b: 99,
+        };
         write_json_to_file(&value, path).expect("write_json_to_file");
         let got: TestStruct = read_json_from_file(path).expect("read_json_from_file");
         assert_eq!(got, value);

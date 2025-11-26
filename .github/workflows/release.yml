@@ -4,59 +4,137 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch: {}
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  package-and-publish:
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+  build-and-upload:
+    name: Build and Upload ${{ matrix.target }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: check_vpn
+            asset_name: check_vpn-linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: check_vpn
+            asset_name: check_vpn-macos-x86_64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: check_vpn
+            asset_name: check_vpn-macos-aarch64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: check_vpn.exe
+            asset_name: check_vpn-windows-x86_64.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }} --verbose
+
+      - name: Create tarball (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.artifact_name }}
+          mv ${{ matrix.asset_name }}.tar.gz ../../..
+
+      - name: Create zip (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cd target/${{ matrix.target }}/release
+          Compress-Archive -Path ${{ matrix.artifact_name }} -DestinationPath ${{ matrix.asset_name }}.zip
+          Move-Item ${{ matrix.asset_name }}.zip ../../..
+
+      - name: Upload Release Asset (Unix)
+        if: matrix.os != 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset_name }}.tar.gz
+
+      - name: Upload Release Asset (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.asset_name }}.zip
+
+  build-packages:
+    name: Build Linux Packages
+    needs: create-release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-      - name: Build release
-        run: cargo build --release
-      - name: Build .deb (cargo-deb)
-        run: |
-          cargo install cargo-deb || true
-          if command -v cargo-deb >/dev/null 2>&1; then
-            cargo deb --no-strip || true
-          else
-            echo "cargo-deb not available; skipping deb build"
-          fi
-      - name: Build .rpm (fpm)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Build .deb package
+        run: cargo deb --no-strip
+
+      - name: Install fpm for RPM building
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby-dev build-essential rpm
-          sudo gem install --no-document fpm || true
-          chmod +x contrib/fpm-build.sh || true
-          ./contrib/fpm-build.sh "${{ github.ref_name }}" || true
+          sudo gem install --no-document fpm
 
-      - name: Create GitHub release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: "Automated release for ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
+      - name: Build release binary for RPM
+        run: cargo build --release
 
-      - name: Upload .deb artifact
-        if: always()
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: target/debian/*.deb
-          asset_name: check_vpn_${{ github.ref_name }}.deb
-          asset_content_type: application/octet-stream
+      - name: Build .rpm package
+        run: |
+          chmod +x contrib/fpm-build.sh
+          ./contrib/fpm-build.sh "${{ github.ref_name }}"
 
-      - name: Upload .rpm artifact
-        if: always()
-        uses: actions/upload-release-asset@v1
+      - name: Find package files
+        id: find_packages
+        run: |
+          DEB_FILE=$(find target/debian -name "*.deb" | head -n 1)
+          RPM_FILE=$(find . -maxdepth 1 -name "*.rpm" | head -n 1)
+          echo "deb_file=${DEB_FILE}" >> $GITHUB_OUTPUT
+          echo "rpm_file=${RPM_FILE}" >> $GITHUB_OUTPUT
+
+      - name: Upload .deb package
+        if: steps.find_packages.outputs.deb_file != ''
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./*.rpm
-          asset_name: check_vpn_${{ github.ref_name }}.rpm
-          asset_content_type: application/octet-stream
+          files: ${{ steps.find_packages.outputs.deb_file }}
+
+      - name: Upload .rpm package
+        if: steps.find_packages.outputs.rpm_file != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.find_packages.outputs.rpm_file }}

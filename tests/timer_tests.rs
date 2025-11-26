@@ -1,5 +1,8 @@
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use std::time::Duration;
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 
 /// Ensure the timer invokes the provided callback repeatedly.
 #[test]
@@ -46,7 +49,10 @@ fn timer_stop_stops_invocations() {
 
 #[test]
 fn timer_zero_interval_behaves_reasonably() {
-    use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
     use std::time::Duration;
 
     let counter = Arc::new(AtomicUsize::new(0));
@@ -61,5 +67,9 @@ fn timer_zero_interval_behaves_reasonably() {
     handle.stop();
 
     let val = counter.load(Ordering::SeqCst);
-    assert!(val >= 1, "expected at least one tick for zero-interval timer, got {}", val);
+    assert!(
+        val >= 1,
+        "expected at least one tick for zero-interval timer, got {}",
+        val
+    );
 }

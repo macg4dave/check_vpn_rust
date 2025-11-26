@@ -5,6 +5,7 @@
 //! future submodules (parsing helpers, tests) while keeping the crate root tidy.
 
 use clap::Parser;
+use std::path::PathBuf;
 
 /// Command-line arguments for `check_vpn`.
 ///
@@ -66,13 +67,11 @@ pub struct Args {
     #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count)]
     pub verbose: u8,
 
-    /// Enable a simple HTTP health/metrics endpoint (useful for container deployments)
-    #[arg(long = "enable-metrics", action = clap::ArgAction::SetTrue)]
-    pub enable_metrics: bool,
+    /// Path to an XML config file to load (overrides env var and default lookup)
+    #[arg(short = 'c', long = "config", value_name = "FILE")]
+    pub config: Option<PathBuf>,
 
-    /// Address to bind the health/metrics endpoint (default: 0.0.0.0:9090)
-    #[arg(long = "metrics-addr", default_value = "0.0.0.0:9090")]
-    pub metrics_addr: String,
+    // Metrics flags removed — metrics server is out of scope for this build.
 
     /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
@@ -94,6 +93,7 @@ impl Args {
 #[cfg(test)]
 mod tests {
     use super::Args;
+    use std::path::PathBuf;
     use clap::Parser;
 
     #[test]
@@ -129,11 +129,17 @@ mod tests {
     fn defaults_and_metrics_addr() {
         let argv = vec!["check_vpn"];
         let args = Args::parse_from(argv);
-        // default metric address provided by clap default_value
-        assert_eq!(args.metrics_addr, "0.0.0.0:9090");
         // defaults for booleans are false
         assert!(!args.dry_run);
-        assert!(!args.enable_metrics);
         assert!(!args.exit_on_error);
+    }
+
+    #[test]
+    fn parse_args_config_path() {
+        let argv = vec!["check_vpn", "--config", "/tmp/test_config.xml"];
+        let args = Args::parse_from(argv);
+        assert!(args.config.is_some());
+        let p: PathBuf = args.config.unwrap();
+        assert_eq!(p, PathBuf::from("/tmp/test_config.xml"));
     }
 }
