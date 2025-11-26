@@ -1,5 +1,5 @@
-use anyhow::Result;
 use log::error;
+use anyhow::Result;
 use std::process::ExitCode;
 
 /// Entry point for the binary.
@@ -31,27 +31,25 @@ fn try_main() -> Result<()> {
     // requested level. This respects RUST_LOG if already set.
     check_vpn::logging::init_with_verbosity(args.verbose);
 
-    // Try to load config from disk. If a CLI config path was provided it
-    // takes precedence; otherwise fall back to the normal lookup order.
-    let cfg = if let Some(cfg_path) = &args.config {
-        match check_vpn::config::Config::load_from_path(cfg_path.to_string_lossy().as_ref()) {
-            Ok(c) => c,
-            Err(e) => {
-                error!(
-                    "Failed to load config from {}: {}, using defaults",
-                    cfg_path.display(),
-                    e
-                );
-                check_vpn::config::Config::default()
-            }
-        }
-    } else {
-        match check_vpn::config::Config::load() {
-            Ok(c) => c,
-            Err(e) => {
-                error!("Failed to load config, using defaults: {}", e);
-                check_vpn::config::Config::default()
-            }
+    // If wizard requested, run it and exit.
+    if args.init {
+        return check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch);
+    }
+
+    // Generate shell completions when requested and exit.
+    if let Some(shell) = args.generate_completions.clone() {
+        return check_vpn::completions::generate_completions(
+            &shell,
+            args.completions_output.as_deref(),
+        );
+    }
+
+    // Try to load config from disk; on error we log and fall back to defaults.
+    let cfg = match check_vpn::config::Config::load() {
+        Ok(c) => c,
+        Err(e) => {
+            error!("Failed to load config, using defaults: {}", e);
+            check_vpn::config::Config::default()
         }
     };
 

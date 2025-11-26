@@ -14,4 +14,16 @@
 
   <!-- If true, don't actually execute actions (useful for testing) -->
   <dry_run>true</dry_run>
+
+  <!-- Provider settings: enable/disable built-ins -->
+  <enable_ip_api>true</enable_ip_api>
+  <enable_ifconfig_co>true</enable_ifconfig_co>
+
+  <!-- Optional: custom provider URLs to query before built-ins -->
+  <!-- Example: <provider_urls><url>https://ifconfig.co/json</url><url>https://ipinfo.io/json</url></provider_urls> -->
+  <!-- This element is optional; leave it out for defaults. -->
+
+  <!-- Single custom JSON server and key override (queried first if present) -->
+  <!-- <custom_json_server>https://thisip.com/json</custom_json_server> -->
+  <!-- <custom_json_key>asn</custom_json_key> -->
 </config>

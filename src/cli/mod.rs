@@ -76,6 +76,47 @@ pub struct Args {
     /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
     pub exit_on_error: bool,
+
+    /// Disable the ip-api.com provider (enabled by default). Use when rate-limited.
+    #[arg(long = "disable-ip-api", action = clap::ArgAction::SetTrue)]
+    pub disable_ip_api: bool,
+
+    /// Disable the ifconfig.co provider (enabled by default).
+    #[arg(long = "disable-ifconfig-co", action = clap::ArgAction::SetTrue)]
+    pub disable_ifconfig_co: bool,
+
+    /// Custom provider JSON endpoints returning at least an `isp` or `asn_org` field.
+    /// May be repeated or comma-delimited. When provided, these are queried first in
+    /// the order given before built-in providers.
+    #[arg(long = "provider-url", num_args = 1.., value_delimiter = ',')]
+    pub provider_urls: Option<Vec<String>>,
+
+    /// Single custom JSON server to query (convenience for one-off custom source)
+    #[arg(long = "custom-json-server")]
+    pub custom_json_server: Option<String>,
+
+    /// Specific JSON key to extract from the custom server (e.g. asn, org, isp)
+    #[arg(long = "custom-json-key")]
+    pub custom_json_key: Option<String>,
+
+    /// Wizard mode: generate a config file interactively and exit
+    #[arg(long = "init", action = clap::ArgAction::SetTrue)]
+    pub init: bool,
+    /// Output path for generated config (defaults to ./check_vpn.xml)
+    #[arg(long = "init-output")]
+    pub init_output: Option<String>,
+    /// Skip fetching current ISP during init (leave placeholder instead)
+    #[arg(long = "init-no-fetch", action = clap::ArgAction::SetTrue)]
+    pub init_no_fetch: bool,
+
+    /// Generate shell completions for the given shell (bash or zsh). Writes to
+    /// stdout by default or to `--completions-output <PATH>` when provided.
+    #[arg(long = "generate-completions")]
+    pub generate_completions: Option<String>,
+    /// Output path for shell completions (optional). When omitted completions
+    /// are emitted to stdout.
+    #[arg(long = "completions-output")]
+    pub completions_output: Option<String>,
 }
 
 impl Args {
@@ -132,6 +173,38 @@ mod tests {
         // defaults for booleans are false
         assert!(!args.dry_run);
         assert!(!args.exit_on_error);
+        // provider disables default false
+        assert!(!args.disable_ip_api);
+        assert!(!args.disable_ifconfig_co);
+    }
+
+    #[test]
+    fn parse_provider_flags_and_urls() {
+        let argv = vec![
+            "check_vpn",
+            "--disable-ip-api",
+            "--provider-url",
+            "http://example.test/json1,http://example.test/json2",
+            "--custom-json-server",
+            "http://single.example/json",
+            "--custom-json-key",
+            "asn",
+            "--init",
+            "--init-output",
+            "./gen.xml",
+            "--init-no-fetch",
+        ];
+        let args = Args::parse_from(argv);
+        assert!(args.disable_ip_api);
+        assert!(!args.disable_ifconfig_co);
+        let urls = args.provider_urls.clone().unwrap();
+        assert_eq!(urls.len(), 2);
+        assert_eq!(urls[0], "http://example.test/json1");
+        assert_eq!(args.custom_json_server.as_ref().unwrap(), "http://single.example/json");
+        assert_eq!(args.custom_json_key.as_ref().unwrap(), "asn");
+        assert!(args.init);
+        assert_eq!(args.init_output.as_ref().unwrap(), "./gen.xml");
+        assert!(args.init_no_fetch);
     }
 
     #[test]

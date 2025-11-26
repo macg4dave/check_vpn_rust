@@ -19,33 +19,50 @@
 //! // perform_check(&effective_config, get_isp, run_action).unwrap();
 //! ```
 
-// Core modules using standard Rust module system
+// Core modules. Some modules are inline-included to avoid duplicate-module
+// compilation issues during an ongoing directory-style refactor — the
+// include! usage is deliberate and safe. Prefer directory modules where the
+// layout is stable.
 pub mod cli;
-pub mod ip_api;
-pub mod json_io;
 pub mod networking;
-pub mod xml_io;
+pub mod providers;
+pub mod init_wizard;
+pub mod completions;
 
-// Application logic
-pub mod app;
+pub mod ip_api {
+	include!("ip_api/mod.rs");
+}
+
+pub mod metrics;
+
+pub mod app {
+	include!("app.rs");
+}
+
+pub mod xml_io {
+	include!("xml_io/mod.rs");
+}
+
+pub mod json_io {
+	include!("json_io/mod.rs");
+}
 
 // Shared helpers and modules
-pub mod actions;
-pub mod config;
 pub mod fs_ops;
+pub mod actions;
 pub mod logging;
-
-// Timer module (single file, included for consistency)
+pub mod config;
 pub mod timer {
-    include!("timer.rs");
+	include!("timer.rs");
 }
 
 // Convenience re-exports for common items used throughout tests and the
 // examples in README. Keeping these re-exports stable makes the top-level
 // crate more ergonomic to use.
-pub use actions::parse_action;
 pub use actions::Action;
-pub use config::Config;
+pub use actions::parse_action;
 pub use ip_api::get_isp;
-pub use networking::NetworkingError;
+pub use providers::{VpnIdentity};
 pub use timer::{start_timer, TimerHandle};
+pub use networking::NetworkingError;
+pub use config::Config;
