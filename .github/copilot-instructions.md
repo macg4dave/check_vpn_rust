@@ -1,3 +1,59 @@
+```instructions
+# AI Agent Instructions — `check_vpn` (concise template)
+
+Purpose: Provide a compact, actionable guide and prompt templates so an AI coding agent can safely and effectively make code, test, or doc changes in this repository.
+
+Note: The canonical, detailed assistant contract lives in `.github/ASSISTANT_INSTRUCTIONS_CLEAN.md`. Use that file for repository-specific rules, workflows, and the full checklist.
+
+Principles
+- Be explicit: include the goal, success criteria, files to touch, and constraints.
+- Keep changes minimal: prefer the smallest patch that satisfies acceptance criteria.
+- Prefer test-first: add or update tests when behavior changes.
+
+Quick repo facts
+- Language: Rust (single-binary CLI/daemon).
+- Tests: run with `cargo test` (integration tests may use env overrides).
+- Important files: `src/main.rs`, `src/app/*`, `src/ip_api/*`, `src/actions/*`, `tests/*`.
+
+How to ask (required checklist)
+- What I want: one-sentence goal.
+- Files to change: list of paths (or "all necessary files").
+- Tests to run: `cargo test` or specific test name(s).
+- Acceptance criteria: e.g., "All tests pass locally", "Add unit test X", or "No API changes".
+- Constraints: e.g., "no reboots", "dry-run only", "max 3 files changed".
+- Output format: "Provide an `apply_patch` diff and short test output".
+
+Prompt templates (copy/adapt)
+
+1) Fix a failing test
+- Task: Fix failing test `tests/<file>::<name>`.
+- Template: "Fix the failing test `tests/...::...`. Paste the failing `cargo test` output. Change only `src/...` to make the test pass. Run `cargo test` and return an `apply_patch` plus the `cargo test` output. Limit edits to the minimal files required."
+
+2) Implement a small feature + tests
+- Template: "Add feature: `<short description>`. CLI/API contract: `<example input>` → `<expected output>`. Files to update: `src/...`, add test `tests/...`. Acceptance: `cargo test` passes and new test verifies behavior."
+
+3) Refactor for testability
+- Template: "Refactor `src/...` to make function `foo` injectable. Do not change public API. Provide a compact refactor patch and one unit test demonstrating injection."
+
+4) Documentation or README change
+- Template: "Update `README.md` section `<section>` with a short usage example (≤200 words). Include a one-line command example."
+
+Formatting and outputs
+- Return code edits as `apply_patch` diffs (minimal, single-file per change when possible).
+- Include a 1–3 line rationale and the `cargo test` output after edits.
+
+Safety & non-destructive rules
+- Do not perform system reboots or modify system services without explicit approval.
+- For side-effecting actions, prefer `dry_run` or tests that mock `ActionRunner`.
+
+Acceptance criteria examples
+- Bugfix: "All tests pass (`cargo test`); only `src/ip_api/client.rs` changed; include test output." 
+- Feature: "New CLI flag `--status` implemented; unit test added; `cargo test` passes."
+
+Next steps
+- If you want, I can rewrite this file to a different tone or create GitHub-issue ready checklists for each template.
+
+```
 # Project — Copilot / AI Agent Instructions (Template)
 ## Enter project info here
 Purpose: Provide concise, project-wide context and expectations for an AI coding agent working in this Rust repository.
