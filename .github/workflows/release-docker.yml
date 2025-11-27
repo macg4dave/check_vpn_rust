@@ -1,0 +1,91 @@
+name: Release (Docker-based) - single tag v0.5b
+
+on:
+  push:
+    tags:
+      - 'v0.5b'
+
+jobs:
+  package-and-publish:
+    name: Build and publish release artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show runner info
+        run: |
+          uname -a
+          docker --version || true
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build multi-arch Docker images and push to GHCR
+        env:
+          PLATFORMS: linux/amd64,linux/arm64
+          REPO: ghcr.io/${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Logging into GHCR using GITHUB_TOKEN"
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
+
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
+          docker buildx build --platform ${PLATFORMS} \
+            --tag "${REPO}:v${{ github.ref_name }}" \
+            --tag "${REPO}:latest" \
+            --push .
+
+      - name: Build packages (Docker-based)
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Packaging using Docker-based images for tag ${TAG_NAME}"
+          chmod +x ./scripts/build-all-packages.sh
+          ./scripts/build-all-packages.sh --platforms linux/amd64,linux/arm64 --version "${TAG_NAME}"
+
+      - name: List built artifacts
+        run: |
+          echo 'Debian artifacts:'
+          ls -la release/debian || true
+          echo 'Fedora artifacts:'
+          ls -la release/fedora || true
+
+      - name: Install GitHub CLI
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y curl apt-transport-https gnupg
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Create or ensure GitHub release is present
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Authenticate gh using GITHUB_TOKEN
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token || true
+          gh release create "${TAG_NAME}" --title "v0.5b" --notes "Single canonical release v0.5b (reproducible Docker-based artifacts)" || true
+
+      - name: Upload release artifacts
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          for f in release/debian/*.deb; do
+            [ -f "$f" ] || continue
+            gh release upload "${TAG_NAME}" "$f" --clobber || true
+          done
+
+          for f in release/fedora/*.rpm; do
+            [ -f "$f" ] || continue
+            gh release upload "${TAG_NAME}" "$f" --clobber || true
+          done

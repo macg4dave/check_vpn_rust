@@ -1,0 +1,13 @@
+name: ARCHIVED — legacy CI (moved to Docker-only workflows)
+
+on:
+  workflow_dispatch: {}
+
+description: |
+  This workflow has been archived and its automatic triggers removed. The
+  repository now uses the simplified Docker-only workflows:
+    - .github/workflows/docker-builds.yml
+    - .github/workflows/release-docker.yml
+
+  Use this file for historical purposes — it is intentionally inert and will
+  only run when manually invoked.
