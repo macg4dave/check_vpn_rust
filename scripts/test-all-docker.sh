@@ -11,7 +11,7 @@ fi
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker CLI not found in PATH; install Docker Desktop or Docker Engine and ensure it's runnable from this shell." >&2
-  echo "On Windows + WSL: enable WSL integration in Docker Desktop and run this script from the WSL distro or from PowerShell where Docker is available." >&2
+  echo "On Windows + WSL: enable WSL integration in Docker Desktop and run this script from the WSL distro or from a Windows shell where Docker is available." >&2
   echo "See: https://docs.docker.com/desktop/windows/wsl/" >&2
   exit 1
 fi
@@ -29,10 +29,17 @@ images=(
   "check_vpn_tests_fedora:contrib/Dockerfile.fedora"
 )
 
+# Make paths robust — ensure we run from the repository root so relative
+# Dockerfile paths like `contrib/Dockerfile` resolve correctly when the
+# script is executed from another working directory.
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+cd "$repo_root"
+
 for entry in "${images[@]}"; do
   name=${entry%%:*}
   file=${entry#*:}
-  echo "\n=== Building image: $name (Dockerfile: $file) ==="
+  printf "\n=== Building image: %s (Dockerfile: %s) ===\n" "$name" "$file"
   docker build -t "$name" -f "$file" .
 
   echo "=== Running tests in $name ==="
