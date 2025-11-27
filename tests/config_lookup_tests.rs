@@ -1,20 +1,15 @@
 use std::fs;
 use std::io::Write;
+mod support;
 
 // Ensure a clean environment for tests that manipulate HOME
 fn with_temp_home<F: FnOnce(&tempfile::TempDir)>(f: F) {
     let td = tempfile::tempdir().expect("create tempdir");
     let home = td.path().to_str().unwrap().to_string();
-    let orig_home = std::env::var("HOME").ok();
-    std::env::set_var("HOME", &home);
+    let _home_guard = support::ScopedEnv::set_str("HOME", &home);
     // Run the closure
     f(&td);
-    // Restore
-    if let Some(h) = orig_home {
-        std::env::set_var("HOME", h);
-    } else {
-        std::env::remove_var("HOME");
-    }
+    // Guard will restore HOME when it is dropped
 }
 
 #[test]
@@ -47,10 +42,11 @@ fn test_config_lookup_order_user_and_system() {
         fs::write(&etc_cfg, "<config><interval>999</interval></config>").unwrap();
 
         // 1) When CHECK_VPN_CONFIG is set, that path wins
-        std::env::set_var("CHECK_VPN_CONFIG", etc_cfg.to_str().unwrap());
+        let _cfg_guard = support::ScopedEnv::set_str("CHECK_VPN_CONFIG", etc_cfg.to_str().unwrap());
         let cfg = check_vpn::config::Config::load().expect("load via env");
         assert_eq!(cfg.interval.unwrap(), 999);
-        std::env::remove_var("CHECK_VPN_CONFIG");
+        // Drop the guard so CHECK_VPN_CONFIG is no longer set for the next phase.
+        drop(_cfg_guard);
 
         // 2) local cwd file should be preferred next
         let cfg = check_vpn::config::Config::load().expect("load local");

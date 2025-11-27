@@ -69,7 +69,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         // and continue with the previous settings.
         if !eff.run_once {
             let loaded = if let Some(path) = &args.config {
-                Config::load_from_path(path.to_str().unwrap())
+                Config::load_from_path(&path)
             } else {
                 Config::load()
             };

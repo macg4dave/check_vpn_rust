@@ -54,7 +54,7 @@ fn try_main() -> std::result::Result<(), AppError> {
     // error with the chain preserved in logs. We call `context` so the
     // underlying error has an additional message for troubleshooting.
     let cfg = if let Some(path) = args.config.as_ref() {
-        match check_vpn::config::Config::load_from_path(path.to_str().unwrap())
+        match check_vpn::config::Config::load_from_path(path.as_path())
             .context("loading configuration from --config path")
         {
             Ok(c) => c,

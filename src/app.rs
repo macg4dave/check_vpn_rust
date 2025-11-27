@@ -83,7 +83,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         // Prefer the explicit CLI --config path (if provided) so reloads use the
         // same file that was used at startup.
         let loaded = if let Some(path) = &args.config {
-            crate::config::Config::load_from_path(path.to_str().unwrap())
+            crate::config::Config::load_from_path(path.as_path())
         } else {
             crate::config::Config::load()
         };

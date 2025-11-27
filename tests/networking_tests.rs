@@ -1,5 +1,6 @@
 use httpmock::Method::GET;
 use httpmock::MockServer;
+mod support;
 
 #[test]
 fn get_isp_parses_isp_field() {
@@ -18,9 +19,7 @@ fn get_isp_parses_isp_field() {
     // Point ip_api to the mock server via env var
     // On some targets `std::env::set_var` is considered unsafe; wrap in an
     // `unsafe` block to satisfy those targets.
-    unsafe {
-        std::env::set_var("CHECK_VPN_TEST_URL", server.url("/json"));
-    }
+    let _guard = support::ScopedEnv::set_str("CHECK_VPN_TEST_URL", &server.url("/json"));
 
     // Call the function under test
     let isp = check_vpn::ip_api::get_isp().expect("get_isp failed");

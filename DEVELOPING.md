@@ -31,6 +31,16 @@ cargo build --release
 # Run tests
 cargo test
 
+Testing notes
+----------------
+- The repository includes lightweight integration test helpers in `tests/support/mod.rs`.
+  Use `support::ScopedEnv::set_str(key, value)` in integration tests to temporarily set
+  environment variables and automatically restore the previous state when the guard
+  is dropped. This avoids unsafe env mutation blocks and reduces flakiness in parallel
+  test runs.
+
+ - For unit tests that mutate global state (for example, `RUST_LOG`), prefer serializing
+   tests with `serial_test::serial` or use a local RAII guard to restore the environment.
 # Format and lint
 cargo fmt --all
 cargo clippy --all-targets --all-features

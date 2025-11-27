@@ -1,7 +1,8 @@
 use check_vpn::config::Config;
 use check_vpn::networking;
 use clap::Parser;
-use std::env;
+// env mutation is handled via tests/support::ScopedEnv
+mod support;
 use std::fs;
 
 #[test]
@@ -144,15 +145,10 @@ fn env_var_config_override() {
     let path_str = path.to_str().unwrap();
     fs::write(path_str, xml).expect("write temp xml");
 
-    // Some targets mark `set_var` as unsafe; use an unsafe block for portability.
-    unsafe {
-        env::set_var("CHECK_VPN_CONFIG", path_str);
-    }
+    // Use a scoped environment helper to ensure the env var is restored.
+    let _guard = support::ScopedEnv::set_str("CHECK_VPN_CONFIG", path_str);
     let cfg = Config::load().expect("Config::load should succeed when pointed to temp file");
-    // cleanup
-    unsafe {
-        env::remove_var("CHECK_VPN_CONFIG");
-    }
+    // cleanup is handled by the ScopedEnv drop
     let _ = fs::remove_file(path_str);
 
     assert_eq!(cfg.interval, Some(77));

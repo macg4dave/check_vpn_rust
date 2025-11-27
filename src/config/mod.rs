@@ -302,7 +302,7 @@ impl Config {
         let cwd = std::env::current_dir().context("failed to get current dir")?;
         let local = cwd.join("check_vpn.xml");
         if local.exists() {
-            return Self::load_from_path(local.to_str().unwrap());
+            return Self::load_from_path(&local);
         }
 
         // macOS: prefer a per-user config under ~/Library/Preferences
@@ -315,7 +315,7 @@ impl Config {
                     .join("check_vpn")
                     .join("config.xml");
                 if mac_path.exists() {
-                    return Self::load_from_path(mac_path.to_str().unwrap());
+                    return Self::load_from_path(&mac_path);
                 }
             }
         }
@@ -329,7 +329,7 @@ impl Config {
                     .join("check_vpn")
                     .join("config.xml");
                 if xdg_path.exists() {
-                    return Self::load_from_path(xdg_path.to_str().unwrap());
+                    return Self::load_from_path(&xdg_path);
                 }
             }
         }
@@ -337,16 +337,18 @@ impl Config {
         // Fallback to system-wide config
         let etc = std::path::Path::new("/etc/check_vpn/config.xml");
         if etc.exists() {
-            return Self::load_from_path(etc.to_str().unwrap());
+            return Self::load_from_path(&etc);
         }
 
         Ok(Config::default())
     }
 
-    pub fn load_from_path(path: &str) -> Result<Self> {
-        // keep this helper for backwards compat if other callers used it; delegate to xml_io
-        let c: Config =
-            crate::xml_io::read_xml(path).context("failed to read config via xml_io")?;
+    pub fn load_from_path(path: &std::path::Path) -> Result<Self> {
+        // Keep this helper for backwards compat but accept a `Path` so callers
+        // don't need to assume UTF-8. We convert to a string lossily for the
+        // existing xml_io helpers which currently accept &str.
+        let path_s = path.to_string_lossy().to_string();
+        let c: Config = crate::xml_io::read_xml(&path_s).context("failed to read config via xml_io")?;
         Ok(c)
     }
 }

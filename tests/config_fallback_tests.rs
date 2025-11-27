@@ -4,10 +4,9 @@ use std::fs;
 fn load_from_path_errors_on_malformed_xml() {
     // Create a malformed XML file
     let path = std::env::temp_dir().join("check_vpn_malformed.xml");
-    let path_str = path.to_str().unwrap().to_string();
-    fs::write(&path_str, "NOT XML HERE").expect("write malformed");
+    fs::write(&path, "NOT XML HERE").expect("write malformed");
 
-    let res = check_vpn::config::Config::load_from_path(&path_str);
+    let res = check_vpn::config::Config::load_from_path(&path);
     assert!(res.is_err(), "malformed xml should return an error");
 
     let _ = fs::remove_file(path);

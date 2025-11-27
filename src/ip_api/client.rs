@@ -136,6 +136,33 @@ mod tests {
     use httpmock::Method::GET;
     use httpmock::MockServer;
 
+    // A tiny RAII guard local to these tests to avoid leaving env vars set.
+    struct TestScopedEnv {
+        key: String,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl TestScopedEnv {
+        fn set_str(key: &str, value: &str) -> TestScopedEnv {
+            let prev = std::env::var_os(key);
+            std::env::set_var(key, value);
+            TestScopedEnv {
+                key: key.to_string(),
+                prev,
+            }
+        }
+    }
+
+    impl Drop for TestScopedEnv {
+        fn drop(&mut self) {
+            if let Some(prev) = self.prev.take() {
+                std::env::set_var(&self.key, prev);
+            } else {
+                std::env::remove_var(&self.key);
+            }
+        }
+    }
+
     #[test]
     fn get_isp_parses_isp_field() {
         let server = MockServer::start();
@@ -147,9 +174,7 @@ mod tests {
                 .body(format!("{{ \"isp\": \"{}\" }}", isp_value));
         });
 
-        unsafe {
-            std::env::set_var("CHECK_VPN_TEST_URL", server.url("/json"));
-        }
+        let _g = TestScopedEnv::set_str("CHECK_VPN_TEST_URL", &server.url("/json"));
 
         let client = Client::builder()
             .timeout(Duration::from_secs(2))
@@ -160,17 +185,13 @@ mod tests {
         assert_eq!(isp, isp_value.to_string());
 
         mock.assert();
-        unsafe {
-            std::env::remove_var("CHECK_VPN_TEST_URL");
-        }
+        drop(_g);
     }
 
     #[test]
     fn large_response_rejected_due_to_size_header() {
         let server = MockServer::start();
-        unsafe {
-            std::env::set_var("CHECK_VPN_MAX_RESPONSE_BYTES", "1024");
-        }
+        let _g2 = TestScopedEnv::set_str("CHECK_VPN_MAX_RESPONSE_BYTES", "1024");
 
         let big_body = "x".repeat(2048);
         let _m = server.mock(|when, then| {
@@ -186,9 +207,7 @@ mod tests {
             .build()
             .unwrap();
         let res = get_isp_with_client_and_url(&client, &server.url("/json"), 1);
-        unsafe {
-            std::env::remove_var("CHECK_VPN_MAX_RESPONSE_BYTES");
-        }
+        drop(_g2);
         assert!(res.is_err(), "expected large response to be rejected");
     }
 
