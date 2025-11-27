@@ -235,27 +235,8 @@ impl Config {
     ///
     /// Kept as an associated function for compatibility with call sites that
     /// expect `Config::validate_values(...)`.
-    #[allow(clippy::too_many_arguments)]
-    pub fn validate_values(
-        interval: u64,
-        isp: &str,
-        action_type: &str,
-        action_arg: &str,
-        connectivity_endpoints: &[String],
-        connectivity_ports: &[u16],
-        connectivity_timeout_secs: u64,
-        connectivity_retries: usize,
-    ) -> std::result::Result<(), ValidationErrors> {
-        validation::validate_values(
-            interval,
-            isp,
-            action_type,
-            action_arg,
-            connectivity_endpoints,
-            connectivity_ports,
-            connectivity_timeout_secs,
-            connectivity_retries,
-        )
+    pub fn validate_values(eff: &EffectiveConfig) -> std::result::Result<(), ValidationErrors> {
+        validation::validate_values(eff)
     }
 }
 

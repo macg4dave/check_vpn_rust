@@ -12,17 +12,11 @@ _maybe-macos:
 
 ifeq ($(OS),Windows_NT)
 _maybe-windows:
-	powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\build-windows.ps1 -Release
-	# Move Windows zip to artifacts/windows (only runs on Windows)
-	powershell -NoProfile -ExecutionPolicy Bypass -Command "\
-if (Test-Path 'target/release/checkvpn-windows.zip') { \
-  New-Item -ItemType Directory -Force -Path '$(ARTIFACT_DIR)/windows' | Out-Null; \
-  Move-Item -Path 'target/release/checkvpn-windows.zip' -Destination '$(ARTIFACT_DIR)/windows/'; \
-  Write-Host 'Moved Windows artifact to $(ARTIFACT_DIR)/windows/'; \
-} else { Write-Host 'No Windows artifact found to move'; }"
+		@echo "Skipping native Windows build in Makefile: run build steps inside WSL2 or use CI for Windows artifacts."
+		@echo "From Windows you can run WSL and then run make in the WSL shell, e.g. 'wsl make release' or run the POSIX helpers under ./scripts from WSL."
 else
 _maybe-windows:
-	@echo "Skipping Windows build: not on Windows. To build Windows artifacts run scripts/build-windows.ps1 on Windows or WSL."
+	@echo "Skipping Windows build: not on Windows. To build Windows artifacts, use CI or run builds inside WSL2 (from Windows: 'wsl make release' or open a WSL shell and run the POSIX helpers in ./scripts)."
 endif
 
 .PHONY: test-container test-container-ignored
@@ -32,7 +26,8 @@ test-all-docker:
 	./scripts/test-all-docker.sh
 
 windows-test-all-docker:
-	powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\test-all-docker.ps1
+	# On Windows, invoke the POSIX test runner inside WSL (recommended) if available.
+	@sh -c 'if command -v wsl >/dev/null 2>&1; then wsl ./scripts/test-all-docker.sh; else echo "WSL not found — run ./scripts/test-all-docker.sh from a POSIX shell or install WSL2"; fi'
 
 # Build and run the test container (runs default tests)
 test-container:
@@ -168,6 +163,6 @@ build-macos:
 	# When running on macOS also copy package to artifacts/macos
 	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then mkdir -p $(ARTIFACT_DIR)/macos && tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; fi'
 
-# Helper target to remind Windows users to run the PowerShell script directly.
+# Helper target to remind Windows users to run builds in WSL2 or the CI.
 windows-build:
-	@echo "To build on Windows run: powershell -ExecutionPolicy Bypass -File scripts/build-windows.ps1 -Release"
+	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."

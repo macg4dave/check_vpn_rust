@@ -34,16 +34,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
     let mut eff = current_cfg.merge_with_args(&args);
 
     // Validate merged configuration before we start the main loop.
-    if let Err(e) = crate::config::Config::validate_values(
-        eff.interval,
-        &eff.isp_to_check,
-        &eff.action_type,
-        &eff.action_arg,
-        &eff.connectivity_endpoints,
-        &eff.connectivity_ports,
-        eff.connectivity_timeout_secs,
-        eff.connectivity_retries,
-    ) {
+    if let Err(e) = crate::config::Config::validate_values(&eff) {
         error!("Configuration validation failed: {:?}", e);
         for part in (e.0).iter() {
             error!("  - {}", part.trim());
@@ -92,16 +83,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
                 if new_cfg != current_cfg {
                     debug!("Config file changed on disk, merging new values");
                     let new_eff = new_cfg.merge_with_args(&args);
-                    match crate::config::Config::validate_values(
-                        new_eff.interval,
-                        &new_eff.isp_to_check,
-                        &new_eff.action_type,
-                        &new_eff.action_arg,
-                        &new_eff.connectivity_endpoints,
-                        &new_eff.connectivity_ports,
-                        new_eff.connectivity_timeout_secs,
-                        new_eff.connectivity_retries,
-                    ) {
+                    match crate::config::Config::validate_values(&new_eff) {
                         Ok(()) => {
                             current_cfg = new_cfg;
                             eff = new_eff;

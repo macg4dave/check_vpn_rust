@@ -4,7 +4,7 @@ This file describes how to build and test this repository across supported OSes:
 
 Summary
 - Supported platforms: macOS, Debian, Fedora (packaged via Docker), Windows (native / WSL2)
-- CI: GitHub Actions matrix — macOS builds run on `macos-latest`, Debian/Fedora built inside Docker on `ubuntu-latest`, Windows builds run on `windows-latest` using PowerShell helper.
+- CI: GitHub Actions matrix — macOS builds run on `macos-latest`, Debian/Fedora built inside Docker on `ubuntu-latest`, Windows builds run on `windows-latest` using native Windows steps; locally prefer WSL2 or CI for packaged Windows artifacts.
 
 Prerequisites
 - Rust toolchain: install rustup from https://rustup.rs
@@ -57,30 +57,25 @@ cargo fmt --all
 cargo clippy --all-targets --all-features
 ```
 
-Windows (PowerShell)
+Windows / WSL2
 
-Use the provided PowerShell helper to build and package a Windows binary:
+If you are developing on Windows we recommend using WSL2 for parity with the Debian/Fedora build environments and for compatibility with the POSIX helpers in `./scripts`.
 
-```powershell
-# Native Windows (MSVC recommended)
-# From repo root (PowerShell)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-windows.ps1 -Release
-```
-
-If you prefer WSL2 for parity with Debian builds, open WSL and use the Linux commands below.
+- To use WSL2 from Windows: `wsl make release` or `wsl ./scripts/docker-build.sh debian build-release`
+- You can also open a WSL shell and run the POSIX scripts directly: `./scripts/test-all-docker.sh`, `./scripts/docker-build.sh` or `./scripts/build-all.sh`.
 
 Docker-based Debian/Fedora builds (recommended for reproducible Linux artifacts)
 
 These use the Dockerfiles under `contrib/`.
 
-From PowerShell (convenience scripts):
+From a POSIX shell (WSL or native):
 
-```powershell
+```bash
 # Debian
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-debian-docker.ps1
+./scripts/docker-build.sh debian build-release
 
 # Fedora
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\build-fedora-docker.ps1
+./scripts/docker-build.sh fedora build-release
 ```
 
 From a Linux shell (WSL or native):
@@ -108,7 +103,7 @@ CI behaviour
 - `ci-matrix.yml` (GitHub Actions) runs a matrix across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
 - On `ubuntu-latest`, the workflow builds Docker images from `contrib/Dockerfile.debian` and `contrib/Dockerfile.fedora`, runs `cargo build --release` inside them, and uploads tarball artifacts.
 - On `macos-latest`, the workflow runs a native `cargo build --release` and uploads the resulting binary.
-- On `windows-latest`, the workflow uses the `scripts/build-windows.ps1` helper to build and package a zip.
+On `windows-latest`, CI runs Windows-native packaging steps on the `windows-latest` runner; locally we recommend using WSL2 or CI for packaged Windows artifacts.
 
 Troubleshooting
 
@@ -119,11 +114,11 @@ Troubleshooting
 Cleaning and packaging
 
 - Use `cargo clean` to remove build artifacts.
-- The PowerShell scripts and Docker helper steps produce `.tar.gz` or `.zip` artifacts under `target/release/`.
+- The helper scripts and Docker wrapper steps produce `.tar.gz` or `.zip` artifacts under `target/release/`.
 
 If you want, I can:
 - Tidy up the `.github/workflows/` directory and keep only the chosen workflows (I left a small inert placeholder file so the old CI doesn't accidentally run).  
-- Add a `Makefile` shortcut to call the PowerShell Docker wrappers from WSL-friendly paths.
+- Add a `Makefile` shortcut to call the POSIX Docker helpers from WSL-friendly paths (for example `wsl ./scripts/docker-build.sh ...`).
 
 ---
 

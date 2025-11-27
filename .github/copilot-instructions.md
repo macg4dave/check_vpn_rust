@@ -102,7 +102,7 @@ Purpose: give an AI coding agent the minimal, practical knowledge to be producti
 - Run binary locally with config and verbose logs: `./target/debug/check_vpn --config /path/to/config.xml --dry-run --log-verbose 3`.
 
 **Packaging & installer helpers**
-- Scripts for packaging and install live under `contrib/` and `scripts/` (e.g., `contrib/fpm-build.sh`, `scripts/install-windows.ps1`, `scripts/install.sh`). Use these for distro packaging or to reproduce CI packaging behavior.
+- Scripts for packaging and install live under `contrib/` and `scripts/` (e.g., `contrib/fpm-build.sh`, `scripts/install.sh`). Use these for distro packaging or to reproduce CI packaging behavior. Windows developers should prefer running these helpers from WSL2 or a POSIX shell.
 
 **Testing notes & CI**
 - Many tests are integration-style and rely on determinism via env vars and test servers (see `tests/` and `httpmock` use in `src/ip_api` tests).
