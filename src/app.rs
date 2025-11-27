@@ -37,11 +37,11 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         eff.connectivity_timeout_secs,
         eff.connectivity_retries,
     ) {
-        error!("Configuration validation failed: {}", e);
+        error!("Configuration validation failed: {:?}", e);
         for part in (e.0).iter() {
             error!("  - {}", part.trim());
         }
-        return Err(AppError::ConfigError(e.to_string()));
+        return Err(AppError::ConfigError(e));
     }
 
     let action = actions::parse_action(&eff.action_type, &eff.action_arg);
@@ -60,7 +60,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         kr.store(false, Ordering::SeqCst);
         info!("Received termination signal, shutting down...");
     })
-    .map_err(|e| AppError::RuntimeError(e.to_string()))?;
+    .map_err(|e| AppError::RuntimeError(anyhow::anyhow!("failed to set ctrlc handler: {:?}", e)))?;
 
     // Metrics server is optional; CLI flags are not present in this build,
     // so keep a placeholder handle for symmetry with earlier implementations.
@@ -103,7 +103,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
                 }
             }
             Err(e) => {
-                debug!("Failed to reload config from disk (will continue with previous): {}", e);
+                debug!("Failed to reload config from disk (will continue with previous): {:?}", e);
             }
         }
 

@@ -3,7 +3,9 @@
 //! Provides a tiny, testable wrapper to initialize `env_logger` with a
 //! sensible default controlled by a `verbosity` parameter. If the
 //! environment variable `RUST_LOG` is already set we respect it; otherwise
-//! we set a default derived from `verbosity` before initializing the logger.
+//! we set a default derived from `verbosity` before initializing the
+//! logger. This module also configures a panic hook that logs panics
+//! at the error level so panics are visible in structured logs.
 
 /// Convert a numeric verbosity level into a `RUST_LOG` style string.
 ///
@@ -27,12 +29,8 @@ pub fn level_from_verbosity(verbosity: u8) -> &'static str {
 /// rely on `unsafe` blocks.
 fn set_rust_log_if_unset(level: &str) {
     if std::env::var_os("RUST_LOG").is_none() {
-        // Some cross-compilation targets or older toolchains expose
-        // environment mutation as `unsafe`. Keep this call inside an
-        // `unsafe` block so the module remains compatible across targets.
-        unsafe {
-            std::env::set_var("RUST_LOG", level);
-        }
+        // No RUST_LOG set: set a sensible default based on verbosity.
+        std::env::set_var("RUST_LOG", level);
     }
 }
 
@@ -43,11 +41,47 @@ fn set_rust_log_if_unset(level: &str) {
 /// This uses `env_logger::try_init()` to avoid panicking if the logger was
 /// already initialized by another test or library; failures are ignored.
 pub fn init_with_verbosity(verbosity: u8) {
+    use env_logger::Env;
+    use std::io::Write;
+
     let level = level_from_verbosity(verbosity);
     set_rust_log_if_unset(level);
-    // try_init returns Err if a logger is already installed; that's fine for
-    // our purposes (tests or external embedding). Ignore the error.
-    let _ = env_logger::try_init();
+
+    // Build a formatted logger that includes timestamp and level. If the
+    // environment variable RUST_LOG is set, that will take precedence.
+    let env = Env::default().default_filter_or(level);
+    let mut builder = env_logger::Builder::from_env(env);
+    builder.format(|buf, record| {
+        writeln!(
+            buf,
+            "{} {:<5} [{}] {}",
+            buf.timestamp_millis(),
+            record.level(),
+            record.target(),
+            record.args()
+        )
+    });
+    let _ = builder.try_init();
+
+    // Install a panic hook that logs panic information. This helps ensure
+    // panics are visible even if the default hook is later overridden.
+    let _ = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|info| {
+        // Log panic info at error level with message and optional location
+        let payload_msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            s.to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "Unknown panic payload".to_string()
+        };
+
+        if let Some(location) = info.location() {
+            log::error!("panic occurred: {} at {}:{}", payload_msg, location.file(), location.line());
+        } else {
+            log::error!("panic occurred: {}", payload_msg);
+        }
+    }));
 }
 
 /// Backwards-compatible default initializer (info level unless RUST_LOG set).

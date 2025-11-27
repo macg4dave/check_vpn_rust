@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::fmt;
+use thiserror::Error;
 
 /// Networking-specific errors returned by connectivity helpers.
 ///
@@ -7,21 +6,12 @@ use std::fmt;
 /// sub-modules later without causing large diffs in the parent `networking`
 /// module. The error variants intentionally store `String` payloads to avoid
 /// binding the public API to concrete external error types.
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum NetworkingError {
     /// DNS or name resolution failed for the provided address (original error string)
+    #[error("DNS resolution failed: {0}")]
     DnsResolve(String),
     /// Generic I/O error (propagated from underlying socket ops)
+    #[error("I/O error: {0}")]
     Io(String),
 }
-
-impl fmt::Display for NetworkingError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            NetworkingError::DnsResolve(s) => write!(f, "DNS resolution failed: {}", s),
-            NetworkingError::Io(s) => write!(f, "I/O error: {}", s),
-        }
-    }
-}
-
-impl Error for NetworkingError {}

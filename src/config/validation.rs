@@ -1,16 +1,15 @@
-use std::fmt;
+use thiserror::Error;
 
 /// ValidationErrors represents one or more config validation problems.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Error)]
+#[error("{0:?}")]
 pub struct ValidationErrors(pub Vec<String>);
 
-impl fmt::Display for ValidationErrors {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.join("; "))
-    }
-}
+// The `thiserror::Error` derive provides a `Display` implementation; we prefer
+// the Debug representation for the vector contents so tests/searches still find
+// the individual messages.
 
-impl std::error::Error for ValidationErrors {}
+// `thiserror::Error` provides the std::error::Error impl via derive.
 
 /// Validate effective configuration values. Returns Ok(()) if valid or Err(errors).
 #[allow(clippy::too_many_arguments)]

@@ -40,7 +40,7 @@ pub fn run_action(action: &Action, dry_run: bool) -> anyhow::Result<()> {
     match runner.execute(action, dry_run) {
         Ok(()) => Ok(()),
         Err(e) => {
-            error!("Action execution failed: {}", e);
+            error!("Action execution failed: {:?}", e);
             Err(e)
         }
     }

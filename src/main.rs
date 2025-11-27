@@ -1,4 +1,5 @@
 use log::error;
+use anyhow::Context;
 use std::process::ExitCode;
 use check_vpn::error_types::{AppError, exit_code_for_error};
 
@@ -13,7 +14,9 @@ fn main() -> ExitCode {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             // Log the error (logger should have been set up by `try_main`).
-            error!("fatal error running app: {}", e);
+            // Log a debug representation of the error, which helps show
+            // chained causes and captures more context.
+            error!("fatal error running app: {:?}", e);
             exit_code_for_error(&e)
         }
     }
@@ -34,24 +37,27 @@ fn try_main() -> std::result::Result<(), AppError> {
     // If wizard requested, run it and exit.
     if args.init {
         check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch)
-            .map_err(|e| AppError::RuntimeError(e.to_string()))?;
+            .map_err(AppError::RuntimeError)?;
         return Ok(());
     }
 
     // Generate shell completions when requested and exit.
     if let Some(shell) = args.generate_completions.clone() {
         check_vpn::completions::generate_completions(&shell, args.completions_output.as_deref())
-            .map_err(|e| AppError::RuntimeError(e.to_string()))?;
+            .map_err(AppError::RuntimeError)?;
         return Ok(());
     }
 
     // Try to load config from disk; on error we return a typed `AppError` so the
     // binary can map it to a useful exit code.
-    let cfg = match check_vpn::config::Config::load() {
+    // Add context to configuration loading and convert into an application
+    // error with the chain preserved in logs. We call `context` so the
+    // underlying error has an additional message for troubleshooting.
+    let cfg = match check_vpn::config::Config::load().context("loading configuration") {
         Ok(c) => c,
         Err(e) => {
-            error!("Failed to load config: {}", e);
-            return Err(AppError::ConfigError(e.to_string()));
+            error!("Failed to load config: {:?}", e);
+            return Err(AppError::ConfigLoadError(e));
         }
     };
 

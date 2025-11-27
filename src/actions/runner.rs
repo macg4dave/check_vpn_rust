@@ -74,17 +74,17 @@ impl RealActionRunner {
         // Fallback to executing the external command. This is the only place we use
         // external processes; prefer D-Bus actions where possible for a pure-Rust workflow.
         match Command::new("sh").arg("-c").arg(cmd).status() {
-            Ok(s) => {
+                Ok(s) => {
                 if s.success() {
                     info!("Command executed successfully");
                     Ok(())
                 } else {
-                    error!("Command exited with status: {}", s);
+                    error!("Command exited with status: {:?}", s);
                     Ok(()) // do not treat non-zero as a hard error for now
                 }
             }
             Err(e) => {
-                error!("Failed to execute command: {}", e);
+                error!("Failed to execute command: {:?}", e);
                 Err(e).context("failed to spawn command")
             }
         }

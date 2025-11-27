@@ -1,20 +1,24 @@
 use std::process::ExitCode;
 use thiserror::Error;
+use anyhow::Error as AnyhowError;
+use crate::config::validation::ValidationErrors;
 
 /// Application-level error kinds. These are used at boundaries so the binary
 /// can map errors to meaningful exit codes and messages.
 #[derive(Debug, Error)]
 pub enum AppError {
-    #[error("configuration error: {0}")]
-    ConfigError(String),
+    #[error("configuration validation error: {0}")]
+    ConfigError(#[from] ValidationErrors),
+    #[error("configuration load error: {0}")]
+    ConfigLoadError(#[source] AnyhowError),
     #[error("runtime error: {0}")]
-    RuntimeError(String),
+    RuntimeError(#[source] AnyhowError),
     #[error("action failed: {0}")]
-    ActionFailed(String),
+    ActionFailed(#[source] AnyhowError),
     #[error("argument error: {0}")]
-    ArgsError(String),
+    ArgsError(#[source] AnyhowError),
     #[error("other error: {0}")]
-    Other(String),
+    Other(#[source] AnyhowError),
 }
 
 /// High level exit reasons which are mapped to specific numeric `ExitCode`s.
@@ -31,7 +35,7 @@ pub enum ExitReason {
 impl From<&AppError> for ExitReason {
     fn from(err: &AppError) -> Self {
         match err {
-            AppError::ConfigError(_) => ExitReason::ConfigError,
+            AppError::ConfigError(_) | AppError::ConfigLoadError(_) => ExitReason::ConfigError,
             AppError::RuntimeError(_) => ExitReason::RuntimeError,
             AppError::ActionFailed(_) => ExitReason::ActionFailed,
             AppError::ArgsError(_) => ExitReason::ArgsError,

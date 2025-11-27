@@ -19,7 +19,7 @@ pub fn start_metrics_server(addr: &str, keep_running: Arc<AtomicBool>) -> Option
         let listener = match TcpListener::bind(&addr) {
             Ok(l) => l,
             Err(e) => {
-                error!("metrics server failed to bind {}: {}", addr, e);
+                error!("metrics server failed to bind {}: {:?}", addr, e);
                 return;
             }
         };
