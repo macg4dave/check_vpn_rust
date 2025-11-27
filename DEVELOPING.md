@@ -4,7 +4,7 @@ This file describes how to build and test this repository across supported OSes:
 
 Summary
 - Supported platforms: macOS, Debian, Fedora (packaged via Docker), Windows (native / WSL2)
-- CI: GitHub Actions matrix — macOS builds run on `macos-latest`, Debian/Fedora built inside Docker on `ubuntu-latest`, Windows builds run on `windows-latest` using native Windows steps; locally prefer WSL2 or CI for packaged Windows artifacts.
+- CI: The historical GitHub Actions matrix workflow has been archived; the repository now uses two focused workflows: `docker-builds.yml` (push/PR Docker multi-arch builds) and `release-docker.yml` (tag-triggered release for v0.5b).
 
 Prerequisites
 - Rust toolchain: install rustup from https://rustup.rs
@@ -99,16 +99,16 @@ docker run --rm -v "$PWD":/work -w /work check_vpn_fedora \
 
 macOS builds
 
-- Recommended: use GitHub Actions macOS runner (`macos-latest`) to produce macOS artifacts. See `.github/workflows/ci-matrix.yml`.
+- Recommended: use GitHub Actions macOS runner (`macos-latest`) to produce macOS artifacts. For repository CI, see `.github/workflows/docker-builds.yml` and `.github/workflows/release-docker.yml`.
 - Alternative: build natively on a Mac using `cargo build --release`.
 - Cross-compiling to macOS (from Linux/Windows) is not recommended unless you have an Apple SDK and osxcross; Apple SDKs are restricted by licensing and not bundled.
 
 CI behaviour
 
-- `ci-matrix.yml` (GitHub Actions) runs a matrix across `ubuntu-latest`, `macos-latest`, and `windows-latest`.
+- The previous matrix workflow has been archived; CI now focuses on Docker-based builds (`docker-builds.yml`) and a single canonical tag release (`release-docker.yml`).
 - On `ubuntu-latest`, the workflow builds Docker images from `contrib/Dockerfile.debian` and `contrib/Dockerfile.fedora`, runs `cargo build --release` inside them, and uploads tarball artifacts.
 - On `macos-latest`, the workflow runs a native `cargo build --release` and uploads the resulting binary.
-On `windows-latest`, CI runs Windows-native packaging steps on the `windows-latest` runner; locally we recommend using WSL2 or CI for packaged Windows artifacts.
+- On `windows-latest`, CI runs Windows-native packaging steps on the `windows-latest` runner; locally we recommend using WSL2 or CI for packaged Windows artifacts.
 
 Troubleshooting
 

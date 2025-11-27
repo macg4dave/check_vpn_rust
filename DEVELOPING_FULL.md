@@ -145,7 +145,12 @@ If Docker is installed but the daemon is not running, start Docker Desktop (Wind
 
 ## CI notes (GitHub Actions)
 
-We use `ci-matrix.yml` which builds on `ubuntu-latest`, `macos-latest`, and `windows-latest`:
+The previous CI matrix workflow (`ci-matrix.yml`) has been archived. The
+repository now uses simplified CI focused on Docker-based multi-architecture
+builds and a single release workflow. Active workflows in `.github/workflows/`
+include `docker-builds.yml` (push/PR builder) and `release-docker.yml` (tag
+-triggered release for v0.5b).
+
 - On `ubuntu-latest` the workflow uses Docker to produce Debian/Fedora artifacts.
 - On `macos-latest` the workflow runs a native `cargo build --release`.
 - On `windows-latest` the CI workflow runs Windows-native packaging steps to prepare Windows artifacts; local contributors should prefer WSL2 or CI for producing packaged Windows binaries.
@@ -191,7 +196,7 @@ Alternatively the repo includes a helper script to run the full test-suite (incl
 - `Makefile` — convenience tasks for local dev and Docker builds (targets: `all`, `release`, `debian-build-release`, `fedora-build-release`, `test-all-docker`, `windows-test-all-docker`).
 - `scripts/*.sh` — POSIX shell helpers for builds and Docker operations (recommended). WSL2 users can run these from a WSL shell or via `wsl` from a Windows shell.
 - `scripts/*.sh` — POSIX shell counterparts for WSL/Linux/macOS.
-- `.github/workflows/ci-matrix.yml` — CI matrix workflow for cross-platform builds.
+- `.github/workflows/ci-matrix.yml` — archived; prefer `docker-builds.yml` and `release-docker.yml` for the current CI flow.
 
 ---
 
