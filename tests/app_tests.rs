@@ -40,8 +40,9 @@ fn perform_check_runs_action_when_isp_matches() {
     let called_clone = called.clone();
 
     let get_isp = || Ok("ISP A".to_string());
-    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");
@@ -84,8 +85,9 @@ fn perform_check_does_not_run_action_when_isp_differs() {
     let called_clone = called.clone();
 
     let get_isp = || Ok("Other ISP".to_string());
-    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");

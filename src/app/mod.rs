@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::Result as AnyhowResult;
+use crate::error_types::AppError;
 use log::{debug, error, info};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -15,7 +16,7 @@ mod check;
 pub use check::perform_check;
 
 /// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
-pub fn run(args: Args, cfg: Config) -> Result<()> {
+pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
     info!("Starting check_vpn run()");
 
     // Start with the provided config merged with CLI args.
@@ -37,7 +38,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         for part in (e.0).iter() {
             error!("  - {}", part.trim());
         }
-        std::process::exit(crate::config::EXIT_INVALID_CONFIG);
+        return Err(AppError::ConfigError(e.to_string()));
     }
 
     let action = actions::parse_action(&eff.action_type, &eff.action_arg);
@@ -55,6 +56,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         kr.store(false, Ordering::SeqCst);
         info!("Received termination signal, shutting down...");
     })?;
+    .map_err(|e| AppError::RuntimeError(e.to_string()))?;
 
     // Metrics server removed: out of scope for this build.
 

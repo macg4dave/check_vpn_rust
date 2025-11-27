@@ -71,8 +71,9 @@ fn perform_check_triggers_action_when_isp_matches() {
     let called_clone = called.clone();
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("TARGET_ISP".to_string()) };
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
@@ -88,8 +89,9 @@ fn perform_check_does_not_trigger_action_when_isp_differs() {
     let called_clone = called.clone();
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("OTHER_ISP".to_string()) };
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
@@ -107,8 +109,9 @@ fn perform_check_handles_get_isp_error_without_exiting_when_nonfatal() {
     let called_clone = called.clone();
 
     let get_isp = || -> Result<String, anyhow::Error> { Err(anyhow::anyhow!("network fail")) };
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     // Should return Ok(()) and not call run_action

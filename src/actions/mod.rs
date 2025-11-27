@@ -35,10 +35,14 @@ pub fn parse_action(action_type: &str, arg: &str) -> Action {
 /// Convenience function that mirrors the previous public API: execute the action and swallow errors.
 ///
 /// This preserves compatibility with existing call sites which expect `run_action(&Action, bool)`.
-pub fn run_action(action: &Action, dry_run: bool) {
+pub fn run_action(action: &Action, dry_run: bool) -> anyhow::Result<()> {
     let runner = RealActionRunner::new();
-    if let Err(e) = runner.execute(action, dry_run) {
-        error!("Action execution failed: {}", e);
+    match runner.execute(action, dry_run) {
+        Ok(()) => Ok(()),
+        Err(e) => {
+            error!("Action execution failed: {}", e);
+            Err(e)
+        }
     }
 }
 

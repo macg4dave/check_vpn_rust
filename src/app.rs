@@ -1,4 +1,5 @@
-use anyhow::Result;
+use crate::error_types::AppError;
+use std::result::Result;
 use log::{debug, error, info};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use crate::actions;
 use crate::cli::Args;
 use crate::config::Config;
 use crate::providers::{self, VpnInfoProvider};
-use std::net::TcpStream;
+// TcpStream previously used to wake a metrics listener; no longer required here.
 
 mod check {
     include!("app/check.rs");
@@ -18,7 +19,7 @@ mod check {
 pub use check::perform_check;
 
 /// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
-pub fn run(args: Args, cfg: Config) -> Result<()> {
+pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
     info!("Starting check_vpn run()");
 
     // Start with the provided config merged with CLI args.
@@ -40,7 +41,7 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
         for part in (e.0).iter() {
             error!("  - {}", part.trim());
         }
-        std::process::exit(crate::config::EXIT_INVALID_CONFIG);
+        return Err(AppError::ConfigError(e.to_string()));
     }
 
     let action = actions::parse_action(&eff.action_type, &eff.action_arg);
@@ -58,13 +59,12 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
     ctrlc::set_handler(move || {
         kr.store(false, Ordering::SeqCst);
         info!("Received termination signal, shutting down...");
-    })?;
+    })
+    .map_err(|e| AppError::RuntimeError(e.to_string()))?;
 
-    // Optional metrics server (moved to `src/metrics.rs`).
-    let mut metrics_handle: Option<std::thread::JoinHandle<()>> = None;
-    if args.enable_metrics {
-        metrics_handle = crate::metrics::start_metrics_server(&args.metrics_addr, keep_running.clone());
-    }
+    // Metrics server is optional; CLI flags are not present in this build,
+    // so keep a placeholder handle for symmetry with earlier implementations.
+    let metrics_handle: Option<std::thread::JoinHandle<()>> = None;
 
     // Main loop: cross-platform timer/polling. On each iteration we attempt to reload
     // the XML config and merge with CLI args so users can change timing/config without
@@ -124,8 +124,6 @@ pub fn run(args: Args, cfg: Config) -> Result<()> {
 
     // Ensure metrics server exits cleanly if present.
     if let Some(h) = metrics_handle {
-        // Wake the listener in case it's blocked in accept
-        let _ = TcpStream::connect(args.metrics_addr.replace("http://", ""));
         let _ = h.join();
     }
     Ok(())

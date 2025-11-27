@@ -1,8 +1,13 @@
+#[cfg(unix)]
 use std::fs::{self, File};
+#[cfg(unix)]
 use std::io::Write;
+#[cfg(unix)]
 use std::process::Command;
+#[cfg(unix)]
 use std::env;
 
+#[cfg(unix)]
 fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> String {
     let mut path = env::temp_dir();
     path.push(format!("check_vpn_test_{}_{}", name, std::process::id()));
@@ -10,9 +15,9 @@ fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> String {
     let mut f = File::create(&path).expect("create temp file");
     f.write_all(contents).expect("write temp file");
     if make_exec {
-        let mut perms = fs::metadata(&path).expect("meta").permissions();
         #[cfg(unix)]
         {
+            let mut perms = fs::metadata(&path).expect("meta").permissions();
             use std::os::unix::fs::PermissionsExt;
             perms.set_mode(0o755);
             fs::set_permissions(&path, perms).expect("set perms");
@@ -21,6 +26,7 @@ fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> String {
     path_str
 }
 
+#[cfg(unix)]
 fn run_installer(args: &[&str]) -> (bool, String, String) {
     let mut cmd = Command::new("bash");
     cmd.arg("scripts/install.sh");
@@ -33,6 +39,7 @@ fn run_installer(args: &[&str]) -> (bool, String, String) {
     (output.status.success(), stdout, stderr)
 }
 
+#[cfg(unix)]
 #[test]
 fn test_dry_run_user_installs_binary_and_config() {
     // create temp binary and config
@@ -50,6 +57,7 @@ fn test_dry_run_user_installs_binary_and_config() {
     assert!(out.contains("Installed config to") || out.contains("No config found"));
 }
 
+#[cfg(unix)]
 #[test]
 fn test_dry_run_service_flag_on_linux_if_applicable() {
     // create temp binary and service
@@ -78,6 +86,7 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
     }
 }
 
+#[cfg(unix)]
 #[test]
 fn test_system_install_requires_root() {
     // If tests are running as root, skip this check because it expects non-root failure.

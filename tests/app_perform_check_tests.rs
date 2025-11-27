@@ -39,14 +39,20 @@ fn perform_check_runs_action_when_isp_matches() {
         connectivity_retries: 1,
         run_once: true,
         exit_on_error: false,
+        enable_ip_api: true,
+        enable_ifconfig_co: true,
+        provider_urls: Vec::new(),
+        custom_json_server: None,
+        custom_json_key: None,
     };
 
     let called = Arc::new(AtomicBool::new(false));
     let called_clone = called.clone();
 
     let get_isp = || Ok("ISP A".to_string());
-    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");
@@ -77,14 +83,20 @@ fn perform_check_does_not_run_action_when_isp_differs() {
         connectivity_retries: 1,
         run_once: true,
         exit_on_error: false,
+        enable_ip_api: true,
+        enable_ifconfig_co: true,
+        provider_urls: Vec::new(),
+        custom_json_server: None,
+        custom_json_key: None,
     };
 
     let called = Arc::new(AtomicBool::new(false));
     let called_clone = called.clone();
 
     let get_isp = || Ok("Other ISP".to_string());
-    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _d: bool| -> anyhow::Result<()> {
         called_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     perform_check(&eff, get_isp, run_action).expect("perform_check");
@@ -109,14 +121,25 @@ fn perform_check_with_args_config_runs_action_when_isp_matches() {
         verbose: 0,
             config: None,
         exit_on_error: false,
+        disable_ip_api: false,
+        disable_ifconfig_co: false,
+        provider_urls: None,
+        custom_json_server: None,
+        custom_json_key: None,
+        init: false,
+        init_output: None,
+        init_no_fetch: false,
+        generate_completions: None,
+        completions_output: None,
     };
 
     let eff = Config::default().merge_with_args(&args);
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("ISP-TEST".to_string()) };
@@ -145,14 +168,25 @@ fn perform_check_with_args_config_does_not_run_action_when_isp_differs() {
         verbose: 0,
             config: None,
         exit_on_error: false,
+        disable_ip_api: false,
+        disable_ifconfig_co: false,
+        provider_urls: None,
+        custom_json_server: None,
+        custom_json_key: None,
+        init: false,
+        init_output: None,
+        init_no_fetch: false,
+        generate_completions: None,
+        completions_output: None,
     };
 
     let eff = Config::default().merge_with_args(&args);
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("OTHER-ISP".to_string()) };
@@ -181,14 +215,25 @@ fn perform_check_handles_get_isp_error_gracefully() {
         verbose: 0,
             config: None,
         exit_on_error: false,
+        disable_ip_api: false,
+        disable_ifconfig_co: false,
+        provider_urls: None,
+        custom_json_server: None,
+        custom_json_key: None,
+        init: false,
+        init_output: None,
+        init_no_fetch: false,
+        generate_completions: None,
+        completions_output: None,
     };
 
     let eff = Config::default().merge_with_args(&args);
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::actions::Action, _dry: bool| -> anyhow::Result<()> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Err(anyhow::anyhow!("no isp")) };

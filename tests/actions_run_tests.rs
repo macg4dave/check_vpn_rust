@@ -4,11 +4,11 @@ use check_vpn::actions::{run_action, Action};
 fn run_action_dry_run_variants_do_not_panic() {
     // All variants should be callable in dry-run mode without attempting external or D-Bus actions.
     let a1 = Action::Reboot;
-    run_action(&a1, true);
+    run_action(&a1, true).expect("dry-run reboot should not error");
 
     let a2 = Action::RestartUnit("example.service".to_string());
-    run_action(&a2, true);
+    run_action(&a2, true).expect("dry-run restart unit should not error");
 
     let a3 = Action::Command("/bin/true".to_string());
-    run_action(&a3, true);
+    run_action(&a3, true).expect("dry-run command should not error");
 }

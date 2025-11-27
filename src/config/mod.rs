@@ -182,7 +182,7 @@ impl Config {
             .provider_urls
             .clone()
             .or_else(|| self.provider_urls.clone())
-            .unwrap_or_else(|| Vec::new());
+            .unwrap_or_default();
 
         let custom_json_server = args
             .custom_json_server

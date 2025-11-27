@@ -47,6 +47,8 @@ pub mod json_io {
 	include!("json_io/mod.rs");
 }
 
+pub mod error_types;
+
 // Shared helpers and modules
 pub mod fs_ops;
 pub mod actions;

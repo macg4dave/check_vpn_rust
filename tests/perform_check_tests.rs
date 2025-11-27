@@ -15,8 +15,9 @@ fn perform_check_runs_action_when_isp_matches() {
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::Action, _dry: bool| -> Result<(), anyhow::Error> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("ISP-TEST".to_string()) };
@@ -35,8 +36,9 @@ fn perform_check_does_not_run_action_when_isp_differs() {
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::Action, _dry: bool| -> Result<(), anyhow::Error> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Ok("OTHER-ISP".to_string()) };
@@ -55,8 +57,9 @@ fn perform_check_handles_get_isp_error_gracefully() {
 
     let ran = Arc::new(AtomicBool::new(false));
     let ran_clone = ran.clone();
-    let run_action = move |_a: &check_vpn::Action, _dry: bool| {
+    let run_action = move |_a: &check_vpn::Action, _dry: bool| -> Result<(), anyhow::Error> {
         ran_clone.store(true, Ordering::SeqCst);
+        Ok(())
     };
 
     let get_isp = || -> Result<String, anyhow::Error> { Err(anyhow::anyhow!("no isp")) };

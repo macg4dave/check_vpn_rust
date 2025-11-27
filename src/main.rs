@@ -1,6 +1,6 @@
 use log::error;
-use anyhow::Result;
 use std::process::ExitCode;
+use check_vpn::error_types::{AppError, exit_code_for_error};
 
 /// Entry point for the binary.
 ///
@@ -14,7 +14,7 @@ fn main() -> ExitCode {
         Err(e) => {
             // Log the error (logger should have been set up by `try_main`).
             error!("fatal error running app: {}", e);
-            ExitCode::from(1)
+            exit_code_for_error(&e)
         }
     }
 }
@@ -23,7 +23,7 @@ fn main() -> ExitCode {
 /// failure. This function is separate from `main` to make the startup logic
 /// testable in isolation (if desired) and to avoid directly calling
 /// `std::process::exit` from deep inside the code.
-fn try_main() -> Result<()> {
+fn try_main() -> std::result::Result<(), AppError> {
     // Parse CLI and load config (CLI takes precedence when merging within app).
     let args = check_vpn::cli::Args::parse_args();
 
@@ -33,23 +33,25 @@ fn try_main() -> Result<()> {
 
     // If wizard requested, run it and exit.
     if args.init {
-        return check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch);
+        check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch)
+            .map_err(|e| AppError::RuntimeError(e.to_string()))?;
+        return Ok(());
     }
 
     // Generate shell completions when requested and exit.
     if let Some(shell) = args.generate_completions.clone() {
-        return check_vpn::completions::generate_completions(
-            &shell,
-            args.completions_output.as_deref(),
-        );
+        check_vpn::completions::generate_completions(&shell, args.completions_output.as_deref())
+            .map_err(|e| AppError::RuntimeError(e.to_string()))?;
+        return Ok(());
     }
 
-    // Try to load config from disk; on error we log and fall back to defaults.
+    // Try to load config from disk; on error we return a typed `AppError` so the
+    // binary can map it to a useful exit code.
     let cfg = match check_vpn::config::Config::load() {
         Ok(c) => c,
         Err(e) => {
-            error!("Failed to load config, using defaults: {}", e);
-            check_vpn::config::Config::default()
+            error!("Failed to load config: {}", e);
+            return Err(AppError::ConfigError(e.to_string()));
         }
     };
 

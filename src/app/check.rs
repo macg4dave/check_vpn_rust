@@ -1,4 +1,5 @@
-use anyhow::Result;
+use anyhow::Result as AnyhowResult;
+use crate::error_types::AppError;
 use log::{error, info, warn};
 
 use crate::actions;
@@ -28,10 +29,10 @@ pub fn perform_check<FGet, FRun>(
     eff: &EffectiveConfig,
     get_isp_fn: FGet,
     run_action_fn: FRun,
-) -> Result<()>
+)-> Result<(), AppError>
 where
-    FGet: Fn() -> Result<String>,
-    FRun: Fn(&actions::Action, bool),
+    FGet: Fn() -> AnyhowResult<String>,
+    FRun: Fn(&actions::Action, bool) -> AnyhowResult<()>,
 {
     // Convert endpoints into a slice of &str for the networking API.
     let endpoints_ref: Vec<&str> = eff
@@ -54,7 +55,10 @@ where
                         // ISP matches the one we're watching for -> VPN likely lost.
                         warn!("VPN Lost (ISP: {})", isp);
                         let action = actions::parse_action(&eff.action_type, &eff.action_arg);
-                        run_action_fn(&action, eff.dry_run);
+                        if let Err(e) = run_action_fn(&action, eff.dry_run) {
+                            error!("Action execution failed: {}", e);
+                            return Err(AppError::ActionFailed(e.to_string()));
+                        }
                     } else {
                         info!("VPN active (ISP: {})", isp);
                     }
@@ -65,16 +69,27 @@ where
                     // the application may want to translate this into a process-exit.
                     // We do not exit here to keep this function testable; callers
                     // (e.g., `run`) can decide to exit based on eff flags.
+                    if eff.run_once || eff.exit_on_error {
+                        return Err(AppError::RuntimeError(e.to_string()));
+                    }
                 }
             }
         }
         Ok(false) => {
             error!("Internet appears to be down (connectivity checks failed)");
             // Caller decides whether to exit when run_once/exit_on_error is set.
+            if eff.run_once || eff.exit_on_error {
+                return Err(AppError::RuntimeError(
+                    "connectivity check failed (offline)".to_string(),
+                ));
+            }
         }
         Err(e) => {
             error!("Connectivity check failed: {}", e);
             // Caller decides whether to exit when run_once/exit_on_error is set.
+            if eff.run_once || eff.exit_on_error {
+                return Err(AppError::RuntimeError(e.to_string()));
+            }
         }
     }
 
