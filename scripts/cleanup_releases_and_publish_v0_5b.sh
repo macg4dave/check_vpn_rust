@@ -13,6 +13,7 @@ cd "$REPO_DIR"
 
 DRY_RUN=1
 FORCE=0
+ACTION=
 
 while [ $# -gt 0 ]; do
   case "$1" in
