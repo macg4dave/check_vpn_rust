@@ -1,0 +1,13 @@
+name: ARCHIVED — legacy CI (moved to Docker-only workflows)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  noop:
+    name: Archived (manual only)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Noop
+        run: |
+          echo "ARCHIVED: legacy CI (disabled) - use docker-builds.yml and release-docker.yml"
