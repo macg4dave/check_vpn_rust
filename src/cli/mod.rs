@@ -77,6 +77,12 @@ pub struct Args {
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
     pub exit_on_error: bool,
 
+    /// Fail the process (non-zero exit) if a config load/reload fails.
+    /// When enabled, a failed hot-reload will cause the daemon to exit instead
+    /// of silently keeping the previous configuration.
+    #[arg(long = "strict-config", action = clap::ArgAction::SetTrue)]
+    pub strict_config: bool,
+
     /// Disable the ip-api.com provider (enabled by default). Use when rate-limited.
     #[arg(long = "disable-ip-api", action = clap::ArgAction::SetTrue)]
     pub disable_ip_api: bool,
@@ -150,6 +156,7 @@ mod tests {
             "TestISP",
             "--interval",
             "120",
+            "--strict-config",
         ];
 
         let args = Args::parse_from(argv);
@@ -164,6 +171,7 @@ mod tests {
         assert!(args.exit_on_error);
         assert_eq!(args.isp_to_check.unwrap(), "TestISP");
         assert_eq!(args.interval.unwrap(), 120);
+        assert!(args.strict_config);
     }
 
     #[test]
@@ -173,6 +181,7 @@ mod tests {
         // defaults for booleans are false
         assert!(!args.dry_run);
         assert!(!args.exit_on_error);
+        assert!(!args.strict_config);
         // provider disables default false
         assert!(!args.disable_ip_api);
         assert!(!args.disable_ifconfig_co);

@@ -53,13 +53,49 @@ fn try_main() -> std::result::Result<(), AppError> {
     // Add context to configuration loading and convert into an application
     // error with the chain preserved in logs. We call `context` so the
     // underlying error has an additional message for troubleshooting.
-    let cfg = match check_vpn::config::Config::load().context("loading configuration") {
-        Ok(c) => c,
-        Err(e) => {
-            error!("Failed to load config: {:?}", e);
-            return Err(AppError::ConfigLoadError(e));
-        }
-    };
+        let cfg = if let Some(path) = args.config.as_ref() {
+            match check_vpn::config::Config::load_from_path(path.to_str().unwrap())
+                .context("loading configuration from --config path")
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    // Try to include a hint about which config path (if any) was being used
+                    let cfg_path = args
+                        .config
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                        .unwrap_or_else(|| "(no explicit config path set; looked up defaults)".to_string());
+
+                    error!(
+                        "Failed to load config (path = {}): {:?}. If this is unintended, fix the XML or use --config to specify a different file.",
+                        cfg_path,
+                        e
+                    );
+                    return Err(AppError::ConfigLoadError(e));
+                }
+            }
+        } else {
+            match check_vpn::config::Config::load().context("loading configuration via lookup") {
+                Ok(c) => c,
+                Err(e) => {
+                    // Try to include a hint about which config path (if any) was being used
+                    let cfg_path = args
+                        .config
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                        .unwrap_or_else(|| "(no explicit config path set; looked up defaults)".to_string());
+
+                    error!(
+                        "Failed to load config (path = {}): {:?}. If this is unintended, fix the XML or use --config to specify a different file.",
+                        cfg_path,
+                        e
+                    );
+                    return Err(AppError::ConfigLoadError(e));
+                }
+            }
+        };
 
     // Delegate to the main application logic. `app::run` returns an anyhow::Result
     // so we simply propagate any error upwards for `main` to convert to an

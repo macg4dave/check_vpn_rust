@@ -68,7 +68,12 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         // config, merge with args, and validate. On any error, emit a warning
         // and continue with the previous settings.
         if !eff.run_once {
-            match Config::load() {
+            let loaded = if let Some(path) = &args.config {
+                Config::load_from_path(path.to_str().unwrap())
+            } else {
+                Config::load()
+            };
+            match loaded {
                 Ok(new_config) => {
                     let new_eff = new_config.merge_with_args(&args);
                     // We should validate the new config before using it.
@@ -96,10 +101,27 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
                     }
                 }
                 Err(e) => {
-                    debug!(
-                        "Failed to reload config from disk (will continue with previous): {:?}",
-                        e
-                    );
+                    // If the user requested strict behavior, bail out so the
+                    // service doesn't continue with potentially invalid settings.
+                    if args.strict_config {
+                        error!(
+                            "Failed to reload config from disk and --strict-config is set; exiting: {:?}",
+                            e
+                        );
+                        return Err(AppError::ConfigLoadError(e));
+                    } else {
+                        let cfg_path_hint = args
+                            .config
+                            .as_ref()
+                            .map(|p| p.display().to_string())
+                            .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                            .unwrap_or_else(|| "(no explicit config path set; looked up defaults)".to_string());
+                        debug!(
+                            "Failed to reload config from disk (path = {}, will continue with previous): {:?}; to fail on reload problems, start with --strict-config",
+                            cfg_path_hint,
+                            e
+                        );
+                    }
                 }
             }
         }
