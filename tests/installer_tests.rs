@@ -1,8 +1,6 @@
 #[cfg(unix)]
-use std::fs::{self, File};
+use std::fs;
 mod support;
-#[cfg(unix)]
-use std::io::Write;
 #[cfg(unix)]
 use std::process::Command;
 

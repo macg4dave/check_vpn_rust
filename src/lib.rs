@@ -1,3 +1,4 @@
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 //! check_vpn — small CLI tool and library to verify external IP / ISP and
 //! optionally run actions when the public IP changes (useful for VPN checks).
 //!

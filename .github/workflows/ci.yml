@@ -58,6 +58,27 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+      - name: Fail CI for panic! usages outside test-only files
+        run: |
+          set -euo pipefail
+          # Inspect all source files for panic! usage. If a file contains
+          # panic! but is not a test-only file (no #[cfg(test)] marker), fail.
+          files=$(git ls-files 'src/**/*.rs')
+          found=0
+          for f in $files; do
+            if grep -n "panic!" "$f" >/dev/null 2>&1; then
+              if ! grep -q "#\[cfg(test)\]" "$f"; then
+                echo "Found panic! in non-test file: $f"
+                grep -n "panic!" "$f" || true
+                found=1
+              fi
+            fi
+          done
+          if [ "$found" -ne 0 ]; then
+            echo "panic! usage found in non-test files; remove or wrap in #[cfg(test)]" >&2
+            exit 1
+          fi
+
       - name: Run tests with all features
         run: cargo test --all-features --verbose
 
@@ -125,6 +146,11 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Enforce no unwrap/expect in library code
+        run: |
+          # Run clippy against the library target only and fail when unwrap/expect are used
+          cargo clippy --lib --all-features -- -D clippy::unwrap_used -D clippy::expect_used
 
   build:
     name: Build

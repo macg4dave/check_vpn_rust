@@ -50,7 +50,8 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
                             sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
                             continue;
                         }
-                        return Err(anyhow::anyhow!("non-success status: {}", status));
+                        // Exhausted retries — fall through to final unified error return
+                        break;
                     }
 
                     // Retry on server errors
@@ -60,7 +61,8 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
                             sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
                             continue;
                         }
-                        return Err(anyhow::anyhow!("non-success status: {}", status));
+                        // Exhausted retries — fall through to final unified error return
+                        break;
                     }
 
                     return Err(anyhow::anyhow!("non-success status: {}", status));
@@ -100,7 +102,14 @@ pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -
         }
     }
 
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("failed to query ip api")))
+    // Return the last recorded error (with added context) if present, otherwise
+    // return a generic error describing the failure to query the service.
+    if let Some(e) = last_err {
+        // Preserve the original error and add contextual information.
+        Err(e.context(format!("failed to query ip api after {} attempt(s)", retries)))
+    } else {
+        Err(anyhow::anyhow!("failed to query ip api: no attempts performed"))
+    }
 }
 
 fn parse_retry_after_secs(resp: &reqwest::blocking::Response) -> Option<u64> {
@@ -250,5 +259,30 @@ mod tests {
         let res = get_isp_with_client_and_url(&client, &server.url("/json"), 2)
             .expect("expected success");
         assert_eq!(res, "X");
+    }
+
+    #[test]
+    fn retries_exhausted_returns_error_with_context() {
+        // Server always returns 500; with limited retries this should
+        // cause get_isp_with_client_and_url to eventually return an error
+        // containing useful context.
+        let server = MockServer::start();
+        let _m = server.mock(|when, then| {
+            when.method(GET).path("/json");
+            then.status(500).body("internal error");
+        });
+
+        let client = Client::builder()
+            .timeout(Duration::from_secs(2))
+            .build()
+            .unwrap();
+
+        let res = get_isp_with_client_and_url(&client, &server.url("/json"), 2);
+        assert!(res.is_err(), "expected an error when retries are exhausted");
+        let err = res.unwrap_err();
+        let s = format!("{}", err);
+        // Ensure our added context is present in the returned error
+        assert!(s.contains("failed to query ip api"), "error missing context: {}", s);
+        assert!(s.contains("2"), "error should mention attempts in: {}", s);
     }
 }

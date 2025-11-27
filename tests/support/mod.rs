@@ -12,7 +12,9 @@ use std::time::Duration;
 // Re-export smaller helper modules so tests import the single `support` module.
 pub mod env_helpers;
 pub mod temp_helpers;
+#[allow(unused_imports)]
 pub use env_helpers::*;
+#[allow(unused_imports)]
 pub use temp_helpers::*;
 
 /// Bind an ephemeral TCP listener on localhost and return it plus its port.

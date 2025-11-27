@@ -337,7 +337,7 @@ impl Config {
         // Fallback to system-wide config
         let etc = std::path::Path::new("/etc/check_vpn/config.xml");
         if etc.exists() {
-            return Self::load_from_path(&etc);
+            return Self::load_from_path(etc);
         }
 
         Ok(Config::default())

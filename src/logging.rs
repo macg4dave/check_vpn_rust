@@ -41,7 +41,10 @@ fn set_rust_log_if_unset(level: &str) {
 /// This uses `env_logger::try_init()` to avoid panicking if the logger was
 /// already initialized by another test or library; failures are ignored.
 pub fn init_with_verbosity(verbosity: u8) {
-    use std::io::Write;
+    // `Write` is only needed for the env_logger formatting below, which is
+    // compiled when `feature = "observability"` is NOT enabled. Move the
+    // import into that cfg block to avoid unused-import warnings when the
+    // observability path is active.
 
     let level = level_from_verbosity(verbosity);
 
@@ -65,8 +68,11 @@ pub fn init_with_verbosity(verbosity: u8) {
         // Construct a subscriber that prints events with timestamps and the level.
         // We don't set a global panic hook here; the existing hook below will
         // still run and emit errors through `tracing::error!`.
-        let fmt_layer = fmt::layer()
-            .with_timer(fmt::time::ChronoLocal::rfc3339())
+        // Use the crate-provided `SystemTime` timestamp provider by default
+        // to avoid enabling optional features such as `chrono` in the
+        // tracing-subscriber dependency. This keeps the default build
+        // lightweight while still providing timestamps.
+        let fmt_layer = fmt::layer().with_timer(fmt::time::time())
             .with_writer(std::io::stderr);
 
         let _ = tracing_subscriber::registry().with(filter).with(fmt_layer).try_init();
@@ -75,6 +81,7 @@ pub fn init_with_verbosity(verbosity: u8) {
     #[cfg(not(feature = "observability"))]
     {
         use env_logger::Env;
+        use std::io::Write;
 
         set_rust_log_if_unset(level);
 

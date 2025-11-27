@@ -51,19 +51,15 @@ pub fn validate_values(
 
     // Validate semantics of action args to avoid shell-injection or unsafe values.
     // restart-unit must be a single unit name (no whitespace, no shell metacharacters).
-    if action_type == "restart-unit" {
-        if !is_valid_unit_name(action_arg) {
-            errors.push("vpn_lost_action_arg for restart-unit contains invalid characters".to_string());
-        }
+    if action_type == "restart-unit" && !is_valid_unit_name(action_arg) {
+        errors.push("vpn_lost_action_arg for restart-unit contains invalid characters".to_string());
     }
 
     // command args must not contain obvious shell meta-characters; the runner
     // executes commands directly without a shell trampoline, so we reject
     // inputs that look like shell pipelines, redirections, or multiple commands.
-    if action_type == "command" {
-        if !is_safe_command_string(action_arg) {
-            errors.push("vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string());
-        }
+    if action_type == "command" && !is_safe_command_string(action_arg) {
+        errors.push("vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string());
     }
 
     // Connectivity checks: endpoints and ports must be present and timeout/retries sensible
