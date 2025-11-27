@@ -26,6 +26,10 @@ PATTERNS=(
 EXIT_CODE=0
 
 for f in $STAGED_FILES; do
+  # skip scanning the repository's own hook scripts
+  case "$f" in
+    .githooks/*) continue ;;
+  esac
   # Only scan text files; skip binaries
   if git show :"$f" | grep -qI .; then
     for p in "${PATTERNS[@]}"; do
