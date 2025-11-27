@@ -1,0 +1,25 @@
+/* Example polkit rule to allow the 'checkvpn' service account to request reboots
+ * and restart units via D-Bus without having full root privileges.
+ *
+ * Drop this file into /etc/polkit-1/rules.d/50-check_vpn.rules and adapt the
+ * username and scope as appropriate. PolicyKit/Javascript rules are evaluated
+ * by the polkit daemon; check your distribution docs for the exact action IDs
+ * and behaviour if in doubt.
+ */
+
+polkit.addRule(function(action, subject) {
+    if (subject.user == 'checkvpn') {
+        // Permit checkvpn user to request a reboot via logind
+        if (action.id == 'org.freedesktop.login1.reboot') {
+            return polkit.Result.YES;
+        }
+
+        // Permit checkvpn user to manage (restart) systemd units via systemd D-Bus
+        if (action.id == 'org.freedesktop.systemd1.manage-units') {
+            return polkit.Result.YES;
+        }
+    }
+
+    // Default: don't alter policy
+    return polkit.Result.NO;
+});

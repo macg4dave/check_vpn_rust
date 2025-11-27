@@ -1,0 +1,53 @@
+# Debian-based Dockerfile for testing the project
+# This image uses a plain Debian base, installs a Rust toolchain via rustup,
+# installs system build deps, and runs `cargo test --verbose` by default.
+
+# syntax = docker/dockerfile:1.4
+
+FROM debian:bookworm-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies required to build and run the tests
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       build-essential \
+       ca-certificates \
+       curl \
+       git \
+       pkg-config \
+       libssl-dev \
+       libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install rustup (non-interactive) and the stable toolchain
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+    && /root/.cargo/bin/rustc --version
+
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+WORKDIR /usr/src/check_vpn
+
+# Minimal copy pattern — copy manifests first and seed a small dummy src to
+# let cargo fetch/build dependencies into a cached layer. This keeps the
+# build context small if `.dockerignore` is present and allows faster rebuilds.
+COPY Cargo.toml Cargo.lock ./
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
+    --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
+    mkdir -p src && printf 'fn main() { println!("build-cache"); }\n' > src/main.rs \
+    && cargo build --release || true
+
+# Copy full project and run tests by default.
+COPY src ./src
+COPY tests/support ./tests/support
+COPY examples ./examples
+
+# Final build step uses cache mounts to avoid re-downloading; this also
+# ensures the image contains compiled artifacts for faster test runs.
+RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
+    --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
+    --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
+    cargo build --release
+
+CMD ["cargo", "test", "--verbose"]

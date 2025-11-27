@@ -1,0 +1,13 @@
+#!/bin/sh
+# Maintainer pre-remove script for packages
+# Arguments: <package> <version>
+
+set -e
+
+# Stop the service prior to removal and disable
+if systemctl is-active --quiet check_vpn.service >/dev/null 2>&1; then
+  systemctl stop check_vpn.service || true
+fi
+systemctl disable --now check_vpn.service || true
+
+exit 0

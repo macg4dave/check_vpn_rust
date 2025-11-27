@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+  <!-- Interval in seconds between checks -->
+  <interval>60</interval>
+
+  <!-- ISP string indicating VPN is lost (match exact ISP string returned by ip-api.com) -->
+  <isp_to_check>Hutchison 3G UK Ltd</isp_to_check>
+
+  <!-- Action to perform when VPN is lost: reboot | restart-unit | command -->
+  <vpn_lost_action_type>reboot</vpn_lost_action_type>
+
+  <!-- Argument for the action: unit name for restart-unit, command string for command -->
+  <vpn_lost_action_arg>/sbin/shutdown -r now</vpn_lost_action_arg>
+
+  <!-- If true, don't actually execute actions (useful for testing) -->
+  <dry_run>true</dry_run>
+
+  <!-- Provider settings: enable/disable built-ins -->
+  <enable_ip_api>true</enable_ip_api>
+  <enable_ifconfig_co>true</enable_ifconfig_co>
+
+  <!-- Optional: custom provider URLs to query before built-ins -->
+  <!-- Example: <provider_urls><url>https://ifconfig.co/json</url><url>https://ipinfo.io/json</url></provider_urls> -->
+  <!-- This element is optional; leave it out for defaults. -->
+
+  <!-- Single custom JSON server and key override (queried first if present) -->
+  <!-- <custom_json_server>https://thisip.com/json</custom_json_server> -->
+  <!-- <custom_json_key>asn</custom_json_key> -->
+</config>

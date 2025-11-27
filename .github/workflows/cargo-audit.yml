@@ -1,0 +1,61 @@
+name: Cargo Audit — weekly schedule
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    # run weekly at UTC Monday 02:00
+    - cron: '0 2 * * 1'
+  workflow_dispatch: {}
+
+jobs:
+  cargo-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo git
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo bin
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-audit
+        run: |
+          set -euo pipefail
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            cargo install --locked cargo-audit
+          fi
+
+      - name: Run cargo audit and capture log
+        run: |
+          set -euo pipefail
+          cargo audit 2>&1 | tee audit.log || true
+
+      - name: Upload cargo-audit log
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-log
+          path: audit.log
+
+      - name: Fail if vulnerabilities were found
+        run: |
+          # cargo-audit returns non-zero when vulnerabilities are found — ensure the job fails if any are present
+          set -e
+          cargo audit

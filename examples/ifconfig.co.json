@@ -1,0 +1,17 @@
+{
+  "ip": "148.252.129.62",
+  "ip_decimal": 2499576126,
+  "country": "United Kingdom",
+  "country_iso": "GB",
+  "country_eu": false,
+  "latitude": 51.4964,
+  "longitude": -0.1224,
+  "time_zone": "Europe/London",
+  "asn": "AS25135",
+  "asn_org": "Vodafone Limited",
+  "user_agent": {
+    "product": "Wget",
+    "version": "2.2.0",
+    "raw_value": "Wget/2.2.0"
+  }
+}
