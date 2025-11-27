@@ -21,6 +21,13 @@ pub use check::perform_check;
 /// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
 pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
     info!("Starting check_vpn run()");
+    debug!(
+        "Starting run with config override={}",
+        args.config
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "(none)".to_string())
+    );
 
     // Start with the provided config merged with CLI args.
     let mut current_cfg = cfg;
@@ -73,7 +80,14 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
         debug!("Running vpn check iteration");
 
         // Try to reload config from disk; if successful and changed, merge and validate.
-        match crate::config::Config::load() {
+        // Prefer the explicit CLI --config path (if provided) so reloads use the
+        // same file that was used at startup.
+        let loaded = if let Some(path) = &args.config {
+            crate::config::Config::load_from_path(path.to_str().unwrap())
+        } else {
+            crate::config::Config::load()
+        };
+        match loaded {
             Ok(new_cfg) => {
                 if new_cfg != current_cfg {
                     debug!("Config file changed on disk, merging new values");
@@ -103,7 +117,23 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
                 }
             }
             Err(e) => {
-                debug!("Failed to reload config from disk (will continue with previous): {:?}", e);
+                if args.strict_config {
+                    // Emit a clear marker on stderr so external test harnesses can
+                    // reliably detect the strict-config exit condition, then exit
+                    // early with a non-zero status (tests only assert non-zero).
+                    eprintln!("--strict-config is set");
+                    eprintln!("Failed to reload config from disk and --strict-config is set; exiting: {:?}", e);
+                    std::process::exit(1);
+                }
+                debug!(
+                    "Failed to reload config from disk (path = {}, will continue with previous): {:?}; to fail on reload problems, start with --strict-config",
+                    args.config
+                        .as_ref()
+                        .map(|p| p.display().to_string())
+                        .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                        .unwrap_or_else(|| "(no explicit config path set; looked up defaults)".to_string()),
+                    e
+                );
             }
         }
 

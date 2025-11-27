@@ -6,6 +6,8 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
+mod support;
+
 fn spawn_binary_with_config(args: &[&str]) -> std::process::Child {
     let bin = std::env::var("CARGO_BIN_EXE_check_vpn").unwrap_or_else(|_| {
         let mut p = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -77,10 +79,7 @@ fn wait_for_collector_contains(rx: &Receiver<String>, substr: &str, timeout: Dur
 
 #[test]
 fn reload_continues_without_strict_flag() {
-    use std::net::TcpListener;
-
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
-    let port = listener.local_addr().unwrap().port();
+    let (_listener, port) = support::tcp_listener_and_port();
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let mut path = std::env::temp_dir();
@@ -99,6 +98,8 @@ fn reload_continues_without_strict_flag() {
         "127.0.0.1",
         "--connectivity-ports",
         &format!("{}", port),
+        "--disable-ip-api",
+        "--disable-ifconfig-co",
     ]);
 
     let rx = spawn_output_collector(&mut child);
@@ -124,10 +125,7 @@ fn reload_continues_without_strict_flag() {
 
 #[test]
 fn reload_exits_with_strict_flag() {
-    use std::net::TcpListener;
-
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
-    let port = listener.local_addr().unwrap().port();
+    let (_listener, port) = support::tcp_listener_and_port();
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let mut path = std::env::temp_dir();
@@ -147,6 +145,8 @@ fn reload_exits_with_strict_flag() {
         "--connectivity-ports",
         &format!("{}", port),
         "--strict-config",
+        "--disable-ip-api",
+        "--disable-ifconfig-co",
     ]);
 
     let rx = spawn_output_collector(&mut child);
