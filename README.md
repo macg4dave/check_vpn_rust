@@ -115,3 +115,12 @@ This project is licensed under the terms of the `LICENSE` file in the project ro
 ---
 
 For more examples and advanced configuration, consult the repository `contrib/` and `docs/` directories.
+
+## CI and releases
+
+
+This repository uses a simplified CI pipeline. Pull requests and main-branch
+pushes build multi-architecture Docker images only. Full test and linting
+checks are expected to be run locally by contributors before pushing. Releases
+are produced from the single canonical tag `v0.5b` which generates multi-arch
+packages via Docker and uploads them to GitHub Releases.
