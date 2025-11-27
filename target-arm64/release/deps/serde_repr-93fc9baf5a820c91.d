@@ -1,0 +1,6 @@
+/workdir/target-arm64/release/deps/serde_repr-93fc9baf5a820c91.d: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/parse.rs
+
+/workdir/target-arm64/release/deps/libserde_repr-93fc9baf5a820c91.so: /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/lib.rs /root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/parse.rs
+
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/lib.rs:
+/root/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_repr-0.1.20/src/parse.rs:

@@ -115,6 +115,32 @@ fedora-build-release:
 	@cp -f target/release/check_vpn $(ARTIFACT_DIR)/fedora/ || true
 
 
+.PHONY: package-debian package-fedora package-all
+# Build platform packages (Debian .deb and Fedora .rpm) using the reproducible
+# Docker packaging images and scripts in scripts/build-all-packages.sh.
+# Accepts an optional VERSION environment variable (e.g. `make package-all VERSION=1.2.3`).
+package-all:
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		./scripts/build-all-packages.sh --version "$${VERSION:-}"; \
+	else \
+		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker"; \
+	fi'
+
+package-debian:
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		./scripts/build-all-packages.sh --skip-fedora --version "$${VERSION:-}"; \
+	else \
+		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker --skip-fedora"; \
+	fi'
+
+package-fedora:
+	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
+		./scripts/build-all-packages.sh --skip-debian --version "$${VERSION:-}"; \
+	else \
+		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker --skip-debian"; \
+	fi'
+
+
 .PHONY: dev build release fmt clippy clean build-macos windows-build
 # Local convenience targets for native development
 dev:

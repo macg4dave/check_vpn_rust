@@ -5,6 +5,7 @@ set -euo pipefail
 # Usage: sudo ./contrib/fpm-build.sh [version]
 
 VERSION=${1:-0.1.0}
+TARGET_DIR=${CARGO_TARGET_DIR:-target}
 PKG_NAME=check_vpn
 BUILD_DIR=$(mktemp -d)
 DESTDIR=$BUILD_DIR/root
@@ -14,11 +15,16 @@ mkdir -p "$DESTDIR"/usr/bin
 mkdir -p "$DESTDIR"/etc/check_vpn
 mkdir -p "$DESTDIR"/lib/systemd/system
 
-echo "Building release"
-cargo build --release
+echo "Building release (target dir: ${TARGET_DIR})"
+if [ -n "${CARGO_TARGET_DIR:-}" ]; then
+  # Use the CARGO_TARGET_DIR env var if provided (for per-arch target dirs)
+  CARGO_TARGET_DIR="${TARGET_DIR}" cargo build --release
+else
+  cargo build --release
+fi
 
 echo "Copying files"
-cp target/release/check_vpn "$DESTDIR"/usr/bin/
+cp "${TARGET_DIR}"/release/check_vpn "$DESTDIR"/usr/bin/
 cp contrib/config.xml "$DESTDIR"/etc/check_vpn/config.xml
 cp contrib/check_vpn.service "$DESTDIR"/lib/systemd/system/check_vpn.service
 

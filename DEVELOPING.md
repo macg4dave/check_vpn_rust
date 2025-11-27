@@ -86,6 +86,11 @@ docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
 docker run --rm -v "$PWD":/work -w /work check_vpn_debian \
   bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-debian.tar.gz -C target/release check_vpn* || true"
 
+Note: The Dockerfile and helper scripts send the repository as the build context (COPY . .). If your workspace contains large build artifacts like `target/` the build context size can exceed 20GB and Docker BuildKit or the daemon may fail. To avoid this:
+
+- Ensure a `.dockerignore` exists at the repository root which excludes `target/` and other large directories.
+- If for some reason you need to include large files, you can bypass the safety check by setting `DOCKER_BUILD_ALLOW_LARGE=1` in your environment before running the helper scripts.
+
 # Fedora
 docker build -t check_vpn_fedora -f contrib/Dockerfile.fedora .
 docker run --rm -v "$PWD":/work -w /work check_vpn_fedora \

@@ -2,6 +2,7 @@
 name = "check_vpn"
 version = "0.1.0"
 edition = "2021"
+description = "VPN monitoring and automatic reconnect"
 
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
@@ -49,17 +50,14 @@ json_pretty = []
 
 [package.metadata.deb]
 maintainer = "packager@example.com"
-description = "check_vpn: VPN monitoring and automatic reconnect"
 assets = [
-	"target/release/check_vpn=/usr/bin/",
-	"contrib/config.xml=/etc/check_vpn/config.xml",
-	"contrib/check_vpn.service=/lib/systemd/system/check_vpn.service",
-	"contrib/systemd/check_vpn.service.d/hardening.conf=/lib/systemd/system/check_vpn.service.d/hardening.conf",
-	"contrib/systemd/check_vpn.service.d/limits.conf=/lib/systemd/system/check_vpn.service.d/limits.conf",
-	"contrib/logrotate.conf=/etc/logrotate.d/check_vpn",
+	["target/release/check_vpn", "/usr/bin/check_vpn", "0755"],
+	["contrib/config.xml", "/etc/check_vpn/config.xml", "0644"],
+	["contrib/check_vpn.service", "/lib/systemd/system/check_vpn.service", "0644"],
+	["contrib/systemd/check_vpn.service.d/hardening.conf", "/lib/systemd/system/check_vpn.service.d/hardening.conf", "0644"],
+	["contrib/systemd/check_vpn.service.d/limits.conf", "/lib/systemd/system/check_vpn.service.d/limits.conf", "0644"],
+	["contrib/logrotate.conf", "/etc/logrotate.d/check_vpn", "0644"]
 ]
 
-[package.metadata.deb.scripts]
-postinst = "contrib/packaging/postinst"
-prerm = "contrib/packaging/prerm"
+maintainer-scripts = "contrib/packaging"
 

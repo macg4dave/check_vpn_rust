@@ -40,6 +40,25 @@ for entry in "${images[@]}"; do
   name=${entry%%:*}
   file=${entry#*:}
   printf "\n=== Building image: %s (Dockerfile: %s) ===\n" "$name" "$file"
+
+  # Guard: stop early if the workspace is enormous (BuildKit / daemon build context
+  # issues often occur when the repo contains `target/` or other large artifacts).
+  if [ "${DOCKER_BUILD_ALLOW_LARGE:-}" != "1" ]; then
+    # If the repository has a .dockerignore that excludes 'target/', skip the heavy-size check
+    if [ -f .dockerignore ] && grep -qE '^target(/|$)' .dockerignore; then
+      echo ".dockerignore contains 'target/' — skipping repo-size check."
+    else
+      size_mb=$(du -sm . | awk '{print $1}')
+    max_mb=20480
+    if [ "$size_mb" -ge "$max_mb" ]; then
+      echo "ERROR: repository size is ${size_mb}MB (>= ${max_mb}MB)." >&2
+      echo "Docker will send your whole repo as the build context which may fail with BuildKit for very large contexts." >&2
+      echo "Suggested fixes: add a .dockerignore to exclude 'target/' or other large files, or set DOCKER_BUILD_ALLOW_LARGE=1 to bypass this check." >&2
+      exit 1
+    fi
+  fi
+  fi
+
   docker build -t "$name" -f "$file" .
 
   echo "=== Running tests in $name ==="
