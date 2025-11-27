@@ -82,13 +82,14 @@ impl RealActionRunner {
             info!("Reboot requested via logind");
             Ok(())
         } else {
-            info!("D-Bus unavailable; running shell fallback for reboot");
-            match Command::new("sh")
-                .arg("-c")
-                .arg("systemctl reboot --no-block || reboot")
+            info!("D-Bus unavailable; running explicit fallback for reboot");
+            // Try systemctl first, then fallback to the reboot binary.
+            match Command::new("systemctl")
+                .arg("reboot")
+                .arg("--no-block")
                 .status()
             {
-                Ok(s) => {
+                        Ok(s) => {
                     if s.success() {
                         info!("Fallback reboot command executed successfully");
                     } else {
@@ -98,7 +99,23 @@ impl RealActionRunner {
                 }
                 Err(e) => {
                     error!("Failed to execute fallback reboot command: {:?}", e);
-                    Err(e).context("failed to spawn reboot fallback command")
+                    // try fallback reboot binary if systemctl is missing or failed to spawn
+                    match Command::new("reboot").status() {
+                        Ok(r) => {
+                            if r.success() {
+                                info!("Fallback reboot binary executed successfully");
+                                Ok(())
+                            } else {
+                                error!("Fallback reboot binary returned non-zero: {:?}", r);
+                                Err(anyhow::anyhow!("reboot returned non-zero status"))
+                                    .context("failed to run any reboot fallback")
+                            }
+                        }
+                        Err(e2) => {
+                            error!("Failed to execute fallback reboot binary: {:?}", e2);
+                            Err(e2).context("failed to spawn reboot fallback command")
+                        }
+                    }
                 }
             }
         }
@@ -133,9 +150,14 @@ impl RealActionRunner {
             info!("Requested restart of unit '{}'", unit);
             Ok(())
         } else {
-            info!("D-Bus unavailable; running shell fallback for restart");
-            let command = format!("systemctl restart {}", unit);
-            match Command::new("sh").arg("-c").arg(command).status() {
+            info!("D-Bus unavailable; running explicit fallback for restart");
+            // Basic validation: unit name must not contain whitespace or obvious
+            // shell meta-characters.
+            if !crate::config::validation::is_valid_unit_name(unit) {
+                error!("Refusing to restart unit with unsafe unit name: '{}'", unit);
+                return Err(anyhow::anyhow!("unsafe unit name").context("invalid unit name"));
+            }
+            match Command::new("systemctl").arg("restart").arg(unit).status() {
                 Ok(s) => {
                     if s.success() {
                         info!("Fallback restart command executed successfully");
@@ -158,9 +180,25 @@ impl RealActionRunner {
             return Ok(());
         }
 
-        // Fallback to executing the external command. This is the only place we use
-        // external processes; prefer D-Bus actions where possible for a pure-Rust workflow.
-        match Command::new("sh").arg("-c").arg(cmd).status() {
+        // Fallback to executing the external command. We will not use a shell
+        // trampoline — instead split the command on whitespace into an executable
+        // and its arguments and execute directly. Also perform a lightweight
+        // validation to reject strings that contain obvious shell meta-characters.
+        if !crate::config::validation::is_safe_command_string(cmd) {
+            error!("Command contains forbidden shell meta-characters; refusing to run");
+            return Err(anyhow::anyhow!("command contains forbidden shell meta-characters").context("unsafe command"));
+        }
+
+        let mut parts = cmd.split_whitespace();
+        let prog = match parts.next() {
+            Some(p) => p,
+            None => {
+                error!("Empty command passed to runner");
+                return Err(anyhow::anyhow!("empty command").context("no executable found"));
+            }
+        };
+
+        match Command::new(prog).args(parts).status() {
             Ok(s) => {
                 if s.success() {
                     info!("Command executed successfully");

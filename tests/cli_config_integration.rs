@@ -1,5 +1,4 @@
-use std::fs;
-use std::io::Write;
+mod support;
 use std::process::{Command, Stdio};
 
 // This is a simple integration test that spawns the built binary with
@@ -10,14 +9,8 @@ use std::process::{Command, Stdio};
 fn binary_accepts_config_flag() {
     // create a small config xml file
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "check_vpn_it_{}.xml",
-        std::time::Instant::now().elapsed().as_nanos()
-    ));
-    let path_str = path.to_str().unwrap().to_string();
-    let mut f = fs::File::create(&path_str).expect("create temp xml");
-    f.write_all(xml.as_bytes()).expect("write xml");
+    let (_td, p) = support::temp_dir_with_file("cli_it", "check_vpn_it.xml", xml.as_bytes());
+    let path_str = p.to_str().unwrap().to_string();
 
     // Build path to the test binary in target/debug
     // We assume the binary is already built by the test harness invocation; if not,
@@ -45,7 +38,7 @@ fn binary_accepts_config_flag() {
     let output = cmd.output().expect("spawn check_vpn");
 
     // cleanup temp file
-    let _ = fs::remove_file(&path_str);
+    // TempDir `_td` drops and cleans up
 
     // Binary should exit with code 0 when run-once + dry-run; ensure it started
     // and didn't crash with a missing flag error.

@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::Write;
+// write handled by temporary helper
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -82,14 +82,8 @@ fn reload_continues_without_strict_flag() {
     let (_listener, port) = support::tcp_listener_and_port();
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "check_vpn_it_reload_{}.xml",
-        Instant::now().elapsed().as_nanos()
-    ));
-    let path_str = path.to_str().unwrap().to_string();
-    let mut f = fs::File::create(&path_str).expect("create temp xml");
-    f.write_all(xml.as_bytes()).expect("write xml");
+    let (_td, p) = support::temp_dir_with_file("reload", "check_vpn_it_reload.xml", xml.as_bytes());
+    let path_str = p.to_str().unwrap().to_string();
 
     let mut child = spawn_binary_with_config(&[
         "--config",
@@ -128,7 +122,7 @@ fn reload_continues_without_strict_flag() {
     }
 
     let _ = child.kill();
-    let _ = fs::remove_file(&path_str);
+    // TempDir `_td` drops and cleans up
 }
 
 #[test]
@@ -136,14 +130,8 @@ fn reload_exits_with_strict_flag() {
     let (_listener, port) = support::tcp_listener_and_port();
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "check_vpn_it_reload_strict_{}.xml",
-        Instant::now().elapsed().as_nanos()
-    ));
-    let path_str = path.to_str().unwrap().to_string();
-    let mut f = fs::File::create(&path_str).expect("create temp xml");
-    f.write_all(xml.as_bytes()).expect("write xml");
+    let (_td, p) = support::temp_dir_with_file("reload_strict", "check_vpn_it_reload_strict.xml", xml.as_bytes());
+    let path_str = p.to_str().unwrap().to_string();
 
     let mut child = spawn_binary_with_config(&[
         "--config",
@@ -205,5 +193,5 @@ fn reload_exits_with_strict_flag() {
         stdout,
         stderr
     );
-    let _ = fs::remove_file(&path_str);
+    // TempDir `_td` drops and cleans up
 }

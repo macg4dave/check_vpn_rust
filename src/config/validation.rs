@@ -49,6 +49,23 @@ pub fn validate_values(
         );
     }
 
+    // Validate semantics of action args to avoid shell-injection or unsafe values.
+    // restart-unit must be a single unit name (no whitespace, no shell metacharacters).
+    if action_type == "restart-unit" {
+        if !is_valid_unit_name(action_arg) {
+            errors.push("vpn_lost_action_arg for restart-unit contains invalid characters".to_string());
+        }
+    }
+
+    // command args must not contain obvious shell meta-characters; the runner
+    // executes commands directly without a shell trampoline, so we reject
+    // inputs that look like shell pipelines, redirections, or multiple commands.
+    if action_type == "command" {
+        if !is_safe_command_string(action_arg) {
+            errors.push("vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string());
+        }
+    }
+
     // Connectivity checks: endpoints and ports must be present and timeout/retries sensible
     if connectivity_endpoints.is_empty() {
         errors.push("connectivity_endpoints must include at least one endpoint".to_string());
@@ -73,6 +90,54 @@ pub fn validate_values(
     } else {
         Err(ValidationErrors(errors))
     }
+}
+
+/// Check whether `s` is a valid-looking systemd unit name.
+///
+/// The function is exported for use by other modules so they can perform the
+/// same conservative validation rules used by config parsing.
+pub(crate) fn is_valid_unit_name(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() || s.len() > 255 {
+        return false;
+    }
+    // disallow whitespace or control characters
+    if s.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    // allow alphanumeric plus these characters: . _ - @ /
+    for c in s.chars() {
+        match c {
+            'A'..='Z' | 'a'..='z' | '0'..='9' | '.' | '-' | '_' | '@' => {}
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// Lightweight check to ensure a `command` configuration string does not
+/// contain obvious shell metacharacters that would require a shell trampoline.
+pub(crate) fn is_safe_command_string(s: &str) -> bool {
+    let s = s.trim();
+    if s.is_empty() || s.len() > 2048 {
+        return false;
+    }
+    // Reject obvious shell meta characters or newlines which could be used to
+    // chain additional commands or perform redirections.
+    let forbidden = [';', '|', '&', '>', '<', '`', '$', '\n', '\r'];
+    if s.chars().any(|c| forbidden.contains(&c)) {
+        return false;
+    }
+    // Basic program token check: ensure first token (program) does not contain
+    // whitespace or control chars.
+    if let Some(first) = s.split_whitespace().next() {
+        if first.chars().any(|c| c.is_control() || c.is_whitespace()) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    true
 }
 
 #[cfg(test)]
@@ -177,5 +242,48 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("vpn_lost_action_arg must be provided"));
+    }
+
+    #[test]
+    fn validate_bad_unit_name() {
+        let endpoints = vec!["8.8.8.8".to_string()];
+        let ports = vec![networking::DEFAULT_PORTS[0]];
+        // include shell-like characters which should be rejected
+        let res = validate_values(
+            60,
+            "ISP",
+            "restart-unit",
+            "ssh.service; rm -rf /",
+            &endpoints,
+            &ports,
+            networking::DEFAULT_TIMEOUT_SECS,
+            networking::DEFAULT_RETRIES,
+        );
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("vpn_lost_action_arg for restart-unit contains invalid characters"));
+    }
+
+    #[test]
+    fn validate_bad_command_arg_contains_metachar() {
+        let endpoints = vec!["8.8.8.8".to_string()];
+        let ports = vec![networking::DEFAULT_PORTS[0]];
+        let res = validate_values(
+            60,
+            "ISP",
+            "command",
+            "rm -rf /; sleep 1",
+            &endpoints,
+            &ports,
+            networking::DEFAULT_TIMEOUT_SECS,
+            networking::DEFAULT_RETRIES,
+        );
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("vpn_lost_action_arg for command contains forbidden shell meta-characters"));
     }
 }

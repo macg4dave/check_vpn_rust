@@ -58,6 +58,87 @@ pub mod timer {
     include!("timer.rs");
 }
 
+// High-level entry helper designed for tests and embedding. This extracts the
+// logic that `src/main.rs` previously kept internal so tests can invoke the
+// same startup/arg handling path without depending on the binary's `main`.
+/// Run the application given a pre-parsed set of CLI arguments. Mirrors the
+/// behavior of the binary `try_main` and returns `Result<(), AppError>` so
+/// callers can inspect and handle failures programmatically (e.g., tests).
+pub fn try_run_with_args(args: crate::cli::Args) -> std::result::Result<(), crate::error_types::AppError> {
+    // Keep most of the original `try_main` semantics here. This is intentionally
+    // implemented at the crate root to keep the API surface small and testable.
+    use anyhow::Context;
+    use crate::error_types::AppError;
+
+    // Initialize logging early using CLI verbosity so app.run can log at the
+    // requested level. This respects RUST_LOG if already set.
+    crate::logging::init_with_verbosity(args.verbose);
+
+    // If wizard requested, run it and return early.
+    if args.init {
+        crate::init_wizard::run_init(args.init_output.as_deref(), args.init_no_fetch)
+            .map_err(AppError::RuntimeError)?;
+        return Ok(());
+    }
+
+    // Generate shell completions when requested and return early.
+    if let Some(shell) = args.generate_completions.as_deref() {
+        crate::completions::generate_completions(shell, args.completions_output.as_deref())
+            .map_err(AppError::RuntimeError)?;
+        return Ok(());
+    }
+
+    // Load configuration from the chosen source, wrapping errors as AppError.
+    let cfg = if let Some(path) = args.config.as_ref() {
+        match crate::config::Config::load_from_path(path.as_path()).context("loading configuration from --config path") {
+            Ok(c) => c,
+            Err(e) => {
+                // Provide an actionable hint including a best-effort path
+                // representation (safe for non-UTF8 paths).
+                let cfg_path = args
+                    .config
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                    .unwrap_or_else(|| {
+                        "(no explicit config path set; looked up defaults)".to_string()
+                    });
+
+                log::error!(
+                    "Failed to load config (path = {}): {:?}. If this is unintended, fix the XML or use --config to specify a different file.",
+                    cfg_path,
+                    e
+                );
+                return Err(AppError::ConfigLoadError(e));
+            }
+        }
+    } else {
+        match crate::config::Config::load().context("loading configuration via lookup") {
+            Ok(c) => c,
+            Err(e) => {
+                let cfg_path = args
+                    .config
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
+                    .unwrap_or_else(|| {
+                        "(no explicit config path set; looked up defaults)".to_string()
+                    });
+
+                log::error!(
+                    "Failed to load config (path = {}): {:?}. If this is unintended, fix the XML or use --config to specify a different file.",
+                    cfg_path,
+                    e
+                );
+                return Err(AppError::ConfigLoadError(e));
+            }
+        }
+    };
+
+    crate::app::run(args, cfg)?;
+    Ok(())
+}
+
 // Convenience re-exports for common items used throughout tests and the
 // examples in README. Keeping these re-exports stable makes the top-level
 // crate more ergonomic to use.

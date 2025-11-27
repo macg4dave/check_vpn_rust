@@ -1,8 +1,10 @@
 use httpmock::Method::GET;
 use httpmock::MockServer;
 mod support;
+use serial_test::serial;
 
 #[test]
+#[serial(env)]
 fn get_isp_parses_isp_field() {
     // Start a local mock server
     let server = MockServer::start();
@@ -16,9 +18,8 @@ fn get_isp_parses_isp_field() {
             .body(format!("{{ \"isp\": \"{}\" }}", isp_value));
     });
 
-    // Point ip_api to the mock server via env var
-    // On some targets `std::env::set_var` is considered unsafe; wrap in an
-    // `unsafe` block to satisfy those targets.
+    // Point ip_api to the mock server via env var. Use a scoped env helper
+    // so tests avoid races and do not require unsafe blocks.
     let _guard = support::ScopedEnv::set_str("CHECK_VPN_TEST_URL", &server.url("/json"));
 
     // Call the function under test

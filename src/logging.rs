@@ -114,17 +114,12 @@ mod tests {
     use super::*;
     use serial_test::serial;
 
-    // Helpers to mutate env in a way compatible with targets that mark these
-    // functions unsafe. Tests wrap calls in `unsafe` to mirror production.
+    // Helpers to mutate env in a deterministic fashion for tests.
     fn remove_rust_log() {
-        unsafe {
-            std::env::remove_var("RUST_LOG");
-        }
+        std::env::remove_var("RUST_LOG");
     }
     fn set_rust_log(v: &str) {
-        unsafe {
-            std::env::set_var("RUST_LOG", v);
-        }
+        std::env::set_var("RUST_LOG", v);
     }
 
     #[test]

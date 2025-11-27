@@ -53,6 +53,26 @@ jobs:
       - name: Run tests with all features
         run: cargo test --all-features --verbose
 
+  integration-serial:
+    name: Repeatable integration tests (serial)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run selected integration tests sequentially (single-threaded)
+        run: |
+          set -euo pipefail
+          export RUST_TEST_THREADS=1
+          # Run tests that historically flaked when run in parallel/with global env
+          cargo test --test ip_api_large_response_tests --verbose -- --test-threads=1
+          cargo test --test networking_tests --verbose -- --test-threads=1
+          cargo test --test config_lookup_tests --verbose -- --test-threads=1
+          cargo test --test config_tests --verbose -- --test-threads=1
+
   lint:
     name: Lint (clippy + fmt)
     runs-on: ubuntu-latest

@@ -1,4 +1,4 @@
-use std::time::{SystemTime, UNIX_EPOCH};
+mod support;
 // PathBuf not needed yet
 
 #[derive(serde::Deserialize, serde::Serialize, Debug, PartialEq, Eq)]
@@ -14,18 +14,13 @@ fn write_and_read_roundtrip_simple() {
         value: 42,
     };
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_test_round_{}.xml", now));
-    let path_str = path.to_str().expect("failed to get path string");
+    let (_td, p) = support::temp_dir_with_child("xml_roundtrip", "check_vpn_test_round.xml");
+    let path_str = p.to_str().expect("failed to get path string");
 
     // write and read back using xml_io helpers
     check_vpn::xml_io::write_xml(&obj, path_str).expect("write_xml failed");
     let got: TestRound = check_vpn::xml_io::read_xml(path_str).expect("read_xml failed");
-    let _ = std::fs::remove_file(path_str);
+    // `_td` drops and cleans up
 
     assert_eq!(obj, got, "roundtrip should preserve the struct");
 }
@@ -43,18 +38,12 @@ fn read_config_parses_basic_fields() {
     </config>
     "#;
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_test_config_read_{}.xml", now));
-    let path_str = path.to_str().expect("failed to get path string");
-
+    let (_td, p) = support::temp_dir_with_child("xml_read", "check_vpn_test_config_read.xml");
+    let path_str = p.to_str().expect("failed to get path string");
     std::fs::write(path_str, xml).expect("failed to write xml file");
     let cfg: check_vpn::config::Config =
         check_vpn::xml_io::read_xml(path_str).expect("read_xml failed");
-    let _ = std::fs::remove_file(path_str);
+    // `_td` drops and cleans up
 
     assert_eq!(cfg.interval, Some(123));
     assert_eq!(cfg.isp_to_check.unwrap(), "Test ISP");
@@ -76,18 +65,13 @@ fn roundtrip_example_config() {
         check_vpn::xml_io::read_xml(example_path.to_str().unwrap())
             .expect("failed to read example config");
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_example_roundtrip_{}.xml", now));
-    let path_str = path.to_str().expect("failed to get path string");
+    let (_td, p) = support::temp_dir_with_child("xml_example", "check_vpn_example_roundtrip.xml");
+    let path_str = p.to_str().expect("failed to get path string");
 
     check_vpn::xml_io::write_xml(&cfg1, path_str).expect("write_xml failed");
     let cfg2: check_vpn::config::Config =
         check_vpn::xml_io::read_xml(path_str).expect("read_xml failed");
-    let _ = std::fs::remove_file(path_str);
+    // `_td` drops and cleans up
 
     assert_eq!(
         cfg1, cfg2,
@@ -99,18 +83,13 @@ fn roundtrip_example_config() {
 fn malformed_xml_errors_gracefully() {
     // Missing closing tag for <config> and interval not closed properly
     let bad_xml = r#"<config><interval>60<interval><isp_to_check>BadISP</isp_to_check>"#;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_bad_xml_{}.xml", now));
-    let path_str = path.to_str().expect("failed to get path string");
+    let (_td, p) = support::temp_dir_with_child("xml_bad", "check_vpn_bad_xml.xml");
+    let path_str = p.to_str().expect("failed to get path string");
     std::fs::write(path_str, bad_xml).expect("failed to write bad xml");
 
     let err = check_vpn::xml_io::read_xml::<check_vpn::config::Config>(path_str)
         .expect_err("expected parse error");
-    let _ = std::fs::remove_file(path_str);
+    // `_td` drops and cleans up
 
     let msg = format!("{}", err);
     assert!(
@@ -128,17 +107,12 @@ fn malformed_xml_errors_gracefully() {
 #[test]
 fn strict_unknown_field_errors() {
     let bad_xml = r#"<config><interval>60</interval><unknownField>abc</unknownField></config>"#;
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_bad_unknown_{}.xml", now));
-    let path_str = path.to_str().expect("failed to get path string");
+    let (_td, p) = support::temp_dir_with_child("xml_bad_unknown", "check_vpn_bad_unknown.xml");
+    let path_str = p.to_str().expect("failed to get path string");
     std::fs::write(path_str, bad_xml).expect("failed to write bad xml");
     let err = check_vpn::xml_io::read_xml::<check_vpn::config::Config>(path_str)
         .expect_err("expected unknown field error");
-    let _ = std::fs::remove_file(path_str);
+    // `_td` drops and cleans up
     let msg = format!("{}", err);
     assert!(
         msg.contains("unknown"),

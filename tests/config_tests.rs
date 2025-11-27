@@ -3,7 +3,7 @@ use check_vpn::networking;
 use clap::Parser;
 // env mutation is handled via tests/support::ScopedEnv
 mod support;
-use std::fs;
+use serial_test::serial;
 
 #[test]
 fn validate_good_values() {
@@ -113,17 +113,12 @@ fn missing_required_field_uses_default_on_merge() {
     // Create XML missing the isp_to_check field; Config fields are optional and
     // merge_with_args should apply defaults for missing values.
     let xml = r#"<config><interval>30</interval></config>"#;
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "check_vpn_missing_field_{}.xml",
-        std::time::Instant::now().elapsed().as_nanos()
-    ));
-    let path_str = path.to_str().unwrap();
-    fs::write(path_str, xml).expect("write temp xml");
+    let tmpf = support::create_temp_file_with_contents("missing_field", xml.as_bytes());
+    let path_str = tmpf.path().to_str().unwrap();
 
     let cfg = check_vpn::xml_io::read_xml::<check_vpn::config::Config>(path_str)
         .expect("read xml should succeed");
-    let _ = fs::remove_file(path_str);
+    // cleanup handled by NamedTempFile drop
 
     // Build default Args via clap (no overrides). Avoid manual struct literal to remain stable when fields evolve.
     let args = check_vpn::cli::Args::parse_from(["check_vpn"].as_slice());
@@ -134,22 +129,17 @@ fn missing_required_field_uses_default_on_merge() {
 }
 
 #[test]
+#[serial(env)]
 fn env_var_config_override() {
     // Create a small config file and point CHECK_VPN_CONFIG at it
     let xml = r#"<config><interval>77</interval><isp_to_check>Env ISP</isp_to_check></config>"#;
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "check_vpn_env_override_{}.xml",
-        std::time::Instant::now().elapsed().as_nanos()
-    ));
-    let path_str = path.to_str().unwrap();
-    fs::write(path_str, xml).expect("write temp xml");
+    let (_td, p) = support::temp_dir_with_file("cfg_override", "check_vpn_env_override.xml", xml.as_bytes());
+    let path_str = p.to_str().unwrap();
 
     // Use a scoped environment helper to ensure the env var is restored.
     let _guard = support::ScopedEnv::set_str("CHECK_VPN_CONFIG", path_str);
     let cfg = Config::load().expect("Config::load should succeed when pointed to temp file");
-    // cleanup is handled by the ScopedEnv drop
-    let _ = fs::remove_file(path_str);
+    // `TempDir` `_td` is dropped and cleans up the temporary file
 
     assert_eq!(cfg.interval, Some(77));
     assert_eq!(cfg.isp_to_check.unwrap(), "Env ISP");

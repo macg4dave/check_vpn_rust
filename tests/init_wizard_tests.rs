@@ -1,9 +1,10 @@
 use std::fs;
+mod support;
 
 #[test]
 fn init_wizard_writes_file_with_defaults() {
     // Use no-fetch to avoid real network calls in tests
-    let path = std::env::temp_dir().join("check_vpn_gen_test.xml");
+    let (_td, path) = support::temp_dir_with_child("init_wizard", "check_vpn_gen_test.xml");
     let path_str = path.to_str().unwrap().to_string();
 
     // Force non-interactive mode to ensure the test never blocks on user input
@@ -18,5 +19,5 @@ fn init_wizard_writes_file_with_defaults() {
     let contents = fs::read_to_string(&path_str).expect("read file");
     assert!(contents.contains("<config>"));
     assert!(contents.contains("<interval>"));
-    let _ = fs::remove_file(path);
+    // cleanup happens when `_td` is dropped
 }

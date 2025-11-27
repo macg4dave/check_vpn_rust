@@ -1,10 +1,11 @@
 use clap::Parser;
 use std::fs;
+mod support;
 
 #[test]
 fn generate_completions_writes_file() {
     // Create a temp file path and ask the generator to write to it.
-    let path = std::env::temp_dir().join("check_vpn_comp_test.out");
+    let (_td, path) = support::temp_dir_with_child("completions_cli", "check_vpn_comp_test.out");
     let path_str = path.to_str().unwrap().to_string();
 
     // Generate bash completions into the temp file
@@ -18,7 +19,7 @@ fn generate_completions_writes_file() {
     let contents = fs::read_to_string(&path_str).expect("read comps");
     // A completion file for bash should contain the program name
     assert!(contents.contains("check_vpn"));
-    let _ = fs::remove_file(path);
+    // `_td` drops and cleans up
 }
 
 #[test]

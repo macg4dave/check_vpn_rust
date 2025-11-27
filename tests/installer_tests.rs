@@ -1,29 +1,26 @@
 #[cfg(unix)]
-use std::env;
-#[cfg(unix)]
 use std::fs::{self, File};
+mod support;
 #[cfg(unix)]
 use std::io::Write;
 #[cfg(unix)]
 use std::process::Command;
 
 #[cfg(unix)]
-fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> String {
-    let mut path = env::temp_dir();
-    path.push(format!("check_vpn_test_{}_{}", name, std::process::id()));
-    let path_str = path.to_string_lossy().into_owned();
-    let mut f = File::create(&path).expect("create temp file");
-    f.write_all(contents).expect("write temp file");
+fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> tempfile::NamedTempFile {
+    // create a NamedTempFile via the test helper. Keep the file guard alive
+    // by returning it — the file will be removed when the guard is dropped.
+    let f = support::create_temp_file_with_contents(name, contents);
     if make_exec {
         #[cfg(unix)]
         {
-            let mut perms = fs::metadata(&path).expect("meta").permissions();
+            let mut perms = fs::metadata(f.path()).expect("meta").permissions();
             use std::os::unix::fs::PermissionsExt;
             perms.set_mode(0o755);
-            fs::set_permissions(&path, perms).expect("set perms");
+            fs::set_permissions(f.path(), perms).expect("set perms");
         }
     }
-    path_str
+    f
 }
 
 #[cfg(unix)]
@@ -46,11 +43,14 @@ fn test_dry_run_user_installs_binary_and_config() {
     let bin = make_temp_file("bin", b"#! /bin/sh\n", true);
     let config = make_temp_file("config", b"<config/>\n", false);
 
+    let bin_path = bin.path().to_string_lossy().into_owned();
+    let config_path = config.path().to_string_lossy().into_owned();
+
     let (ok, out, err) = run_installer(&[
         "--binary",
-        &bin,
+        &bin_path,
         "--config",
-        &config,
+        &config_path,
         "--mode",
         "user",
         "--yes",
@@ -59,16 +59,8 @@ fn test_dry_run_user_installs_binary_and_config() {
     assert!(ok, "installer failed: stderr={} stdout={}", err, out);
 
     // should show dry-run copy for binary and config
-    assert!(
-        out.contains(&bin),
-        "stdout should mention binary path: {}",
-        out
-    );
-    assert!(
-        out.contains(&config),
-        "stdout should mention config path: {}",
-        out
-    );
+    assert!(out.contains(&bin_path), "stdout should mention binary path: {}", out);
+    assert!(out.contains(&config_path), "stdout should mention config path: {}", out);
     assert!(
         out.contains("DRY-RUN"),
         "stdout should include DRY-RUN hints: {}",
@@ -88,12 +80,15 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
     let bin = make_temp_file("bin2", b"#! /bin/sh\n", true);
     let service = make_temp_file("service", b"[Unit]\nDescription=check_vpn\n", false);
 
+    let bin_path = bin.path().to_string_lossy().into_owned();
+    let service_path = service.path().to_string_lossy().into_owned();
+
     // run in user mode to avoid needing sudo
     let (ok, out, err) = run_installer(&[
         "--binary",
-        &bin,
+        &bin_path,
         "--service",
-        &service,
+        &service_path,
         "--mode",
         "user",
         "--yes",
@@ -102,7 +97,7 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
     assert!(ok, "installer failed: stderr={} stdout={}", err, out);
 
     // Always expect the binary to be mentioned
-    assert!(out.contains(&bin));
+    assert!(out.contains(&bin_path));
 
     // On Linux with systemctl present, the script will copy the provided service file for user installs
     if cfg!(target_os = "linux") {
@@ -114,10 +109,7 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().eq("yes"))
             .unwrap_or(false);
         if has_systemctl {
-            assert!(
-                out.contains(&service),
-                "service file should be referenced in dry-run output"
-            );
+            assert!(out.contains(&service_path), "service file should be referenced in dry-run output");
         }
     }
 }
@@ -137,11 +129,11 @@ fn test_system_install_requires_root() {
         return;
     }
 
-    let bin = make_temp_file("bin_sys", b"#! /bin/sh\n", true);
+        let bin = make_temp_file("bin_sys", b"#! /bin/sh\n", true);
+        let bin_path = bin.path().to_string_lossy().into_owned();
 
     // Run in system mode as non-root; should fail with an error requesting root.
-    let (ok, out, err) =
-        run_installer(&["--binary", &bin, "--mode", "system", "--yes", "--dry-run"]);
+        let (ok, out, err) = run_installer(&["--binary", &bin_path, "--mode", "system", "--yes", "--dry-run"]);
     assert!(!ok, "Expected installer to fail when system install is attempted without root. stdout={} stderr={}", out, err);
     let combined = format!("{}{}", out, err);
     assert!(

@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use std::fs;
+mod support;
 
 #[derive(Deserialize, Debug)]
 struct IpApiResponse {
@@ -32,7 +33,7 @@ fn json_io_read_and_roundtrip() {
         b: String,
     }
 
-    let tmp = std::env::temp_dir().join("check_vpn_json_io_test.json");
+    let (_td, tmp) = support::temp_dir_with_child("json_io", "check_vpn_json_io_test.json");
     let path = tmp.to_str().expect("temp path utf8");
 
     let v = Small {
@@ -43,7 +44,7 @@ fn json_io_read_and_roundtrip() {
     let read: Small = json_io::read_json(path).expect("read_json failed");
     assert_eq!(v, read);
 
-    let _ = std::fs::remove_file(path);
+    // tempdir `_td` automatically cleans up
 }
 
 #[test]

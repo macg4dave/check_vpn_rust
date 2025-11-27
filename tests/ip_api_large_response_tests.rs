@@ -2,14 +2,16 @@ use httpmock::Method::GET;
 use httpmock::MockServer;
 // env is handled via support::ScopedEnv
 mod support;
+use serial_test::serial;
 use std::time::Duration;
 
 #[test]
+#[serial(env)]
 fn large_response_rejected_due_to_size_header() {
     let server = MockServer::start();
 
-    // Configure small max via env so test runs fast and deterministically
-    // Some targets treat env var mutation as unsafe; wrap in unsafe for portability.
+    // Configure small max via env so test runs fast and deterministically.
+    // Use scoped env helper to avoid races between tests.
     let _guard = support::ScopedEnv::set_str("CHECK_VPN_MAX_RESPONSE_BYTES", "1024");
 
     // Return a Content-Length larger than the allowed 1024 bytes

@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 mod support;
+use serial_test::serial;
 
 // Ensure a clean environment for tests that manipulate HOME
 fn with_temp_home<F: FnOnce(&tempfile::TempDir)>(f: F) {
@@ -13,6 +14,7 @@ fn with_temp_home<F: FnOnce(&tempfile::TempDir)>(f: F) {
 }
 
 #[test]
+#[serial(env)]
 fn test_config_lookup_order_user_and_system() {
     with_temp_home(|td| {
         // create a local cwd file and ensure it is preferred over others

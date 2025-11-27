@@ -1,15 +1,14 @@
-use std::fs;
+mod support;
 
 #[test]
 fn load_from_path_errors_on_malformed_xml() {
     // Create a malformed XML file
-    let path = std::env::temp_dir().join("check_vpn_malformed.xml");
-    fs::write(&path, "NOT XML HERE").expect("write malformed");
+    let (_td, path) = support::temp_dir_with_file("malformed", "check_vpn_malformed.xml", b"NOT XML HERE");
 
     let res = check_vpn::config::Config::load_from_path(&path);
     assert!(res.is_err(), "malformed xml should return an error");
 
-    let _ = fs::remove_file(path);
+    // TempDir `_td` drops and cleans up
 }
 
 #[test]
