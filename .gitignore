@@ -52,3 +52,6 @@ tmp*
 tmp-*
 tmp.*
 *.tmp
+
+# Prevent accidental commit of local GnuPG backups and other sensitive personal material
+~.gnupg.old/
