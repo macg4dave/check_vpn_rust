@@ -64,4 +64,24 @@ If you want, I can now:
 - Run a quick smoke test in a Debian container to build the .deb inside this workspace and verify the smoke-test step locally (needs docker available here), or
 - Provision a Vagrant VM and run the full install (requires Vagrant + provider on your machine).
 
+6) Local macOS package and safe test (developer)
+
+If you're on macOS you can build a local system-level package (.pkg) and test it safely without modifying the host system permanently.
+
+Build locally and produce a .pkg and tarball:
+
+```bash
+make package-macos-local
+```
+
+This creates `release/macos/check_vpn-<version>.pkg` and `artifacts/macos/check_vpn-macos-<version>.tar.gz`.
+
+Inspect or safely simulate an install (installs to a temporary disk image; no host changes):
+
+```bash
+make test-macos-pkg-local
+```
+
+Note: by default the package will NOT auto-load the LaunchDaemon. To include an auto-load step in the package's postinstall, set `CHECK_VPN_PKG_AUTOLOAD=true` when invoking the package builder (not recommended unless you know what you're doing).
+
 Tell me which run you'd like me to execute now.

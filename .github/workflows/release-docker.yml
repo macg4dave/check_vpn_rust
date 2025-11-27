@@ -52,7 +52,4 @@ jobs:
         with:
           tag: ${{ github.ref_name }}
           name: v0.5b
-          files: |
-            release/debian/**/*
-            release/fedora/**/*
-            release/unix/**/*
+          artifacts: "release/debian/**/*,release/fedora/**/*,release/unix/**/*"

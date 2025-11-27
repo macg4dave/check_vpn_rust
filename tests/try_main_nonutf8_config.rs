@@ -15,7 +15,22 @@ fn try_run_with_args_handles_non_utf8_config_paths() {
     path.push(&fname);
 
     // Write non-XML contents so load_from_path will return an error
-    fs::write(&path, "Not XML").expect("write malformed file");
+    // Some OS/filesystems (notably macOS) may refuse to create filenames
+    // containing certain invalid byte sequences. If creating the file fails
+    // with EILSEQ (illegal byte sequence) we skip the test instead of failing.
+    match fs::write(&path, "Not XML") {
+        Ok(()) => {}
+        Err(e) => {
+            if e.raw_os_error() == Some(92) {
+                eprintln!(
+                    "skipping test: platform refused to create non-UTF8 filename: {}",
+                    e
+                );
+                return;
+            }
+            panic!("write malformed file: {}", e);
+        }
+    }
 
     // Build Args with the testing config path (non-UTF8 path as PathBuf)
     let args = check_vpn::cli::Args {

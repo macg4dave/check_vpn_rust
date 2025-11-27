@@ -124,3 +124,30 @@ pushes build multi-architecture Docker images only. Full test and linting
 checks are expected to be run locally by contributors before pushing. Releases
 are produced from the single canonical tag `v0.5b` which generates multi-arch
 packages via Docker and uploads them to GitHub Releases.
+
+Local macOS package (developer):
+
+If you're on a macOS development box you can create a local system-level installer (.pkg) for testing.
+This is intentionally local-only (no CI, no uploading) and produces a package you can inspect or install.
+
+Steps:
+
+  - Build and create a .pkg and tarball (must run on macOS):
+
+    ```bash
+    make package-macos-local
+    ```
+
+    The script writes `release/macos/check_vpn-<version>.pkg` and `artifacts/macos/check_vpn-macos-<version>.tar.gz`.
+
+  - Inspect or simulate an install (safe — does not modify host when using the simulate mode):
+
+    ```bash
+    make test-macos-pkg-local
+    ```
+
+Notes:
+
+  - By default the package's postinstall does NOT auto-load the LaunchDaemon (safe default). If you want the
+    installer to try to load the LaunchDaemon automatically, set `CHECK_VPN_PKG_AUTOLOAD=true` when building (not recommended for casual testing).
+  - Signing and notarization are not included here; they require an Apple Developer account and are left as a follow-up.

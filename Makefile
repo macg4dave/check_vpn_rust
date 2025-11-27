@@ -189,6 +189,19 @@ build-macos:
 	# When running on macOS also copy package to artifacts/macos
 	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then mkdir -p $(ARTIFACT_DIR)/macos && tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; fi'
 
+.PHONY: package-macos-local test-macos-pkg-local
+# Local-only macOS packaging helpers (run on a mac dev box)
+package-macos-local:
+	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then echo "Running local mac package builder"; bash ./scripts/build-macos-pkg.sh; else echo "Skipping mac packaging: not on macOS"; fi'
+
+test-macos-pkg-local:
+	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then \
+		PKG_FILE=$$(ls -1 release/macos/*.pkg 2>/dev/null | head -n1 || true); \
+		if [ -z "$${PKG_FILE}" ]; then echo "No package found in release/macos — run make package-macos-local first"; exit 2; fi; \
+		echo "Inspecting $$PKG_FILE"; bash ./scripts/test-macos-pkg.sh inspect "$$PKG_FILE"; \
+		echo "Simulating install to disk image"; bash ./scripts/test-macos-pkg.sh simulate "$$PKG_FILE"; \
+	else echo "Skipping mac pkg tests: not on macOS"; fi'
+
 # Helper target to remind Windows users to run builds in WSL2 or the CI.
 windows-build:
 	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."
