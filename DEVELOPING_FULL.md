@@ -159,6 +159,17 @@ We use `ci-matrix.yml` which builds on `ubuntu-latest`, `macos-latest`, and `win
 
 The workflow uploads the built artifacts as release-ready tarballs or zip files.
 
+### Running long/ignored tests in CI
+
+The repository exposes a dedicated reproducible workflow that runs long or network-facing tests inside the Debian-based test container (`.github/workflows/integration-long.yml`). This workflow can be triggered manually and also runs on a weekly schedule; by default it will only run when a PR is labeled with `run-long-tests` (to avoid accidental long runs from every PR).
+
+If you have a self-hosted runner prepared to run longer tests (for example, with elevated network access or more CPU), you can also drive a self-hosted job by either:
+
+- Adding the `self-hosted-tests` label to the PR — the workflow will detect the label and run `long-integration-self-hosted` on a `self-hosted` runner (if available).
+- Or manually dispatch the workflow with the `run_self_hosted=true` input via the Actions UI to run the self-hosted job explicitly.
+
+This allows maintainers to run full-network and longer integration tests in a reproducible runtime while avoiding accidental, unnecessary long runs for routine PRs.
+
 ## Troubleshooting and common errors
 
 - Docker CLI present but daemon not responding: start Docker Desktop (Windows/macOS) or systemd docker service on Linux.

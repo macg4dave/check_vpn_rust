@@ -4,6 +4,8 @@
 [![Cargo Audit](https://github.com/macg4dave/check_vpn_rust/actions/workflows/cargo-audit.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/cargo-audit.yml)
 [![Integration: long tests](https://github.com/macg4dave/check_vpn_rust/actions/workflows/integration-long.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/integration-long.yml)
 
+Note: The 'Integration: long tests' workflow runs longer/ignored tests in a reproducible Debian container. You can trigger the job manually from the Actions UI or label a pull request with `run-long-tests`. If you have a self-hosted runner available, add `self-hosted-tests` to a PR to run the self-hosted integration job.
+
 **Automatic VPN monitoring and reconnection for Linux systems**
 
 `check_vpn` is a lightweight Rust utility that continuously monitors your VPN connection by checking your public ISP. When it detects your real ISP (indicating VPN disconnection), it automatically takes action to restore your connection—whether that's restarting your VPN service, running a custom reconnection script, or rebooting the system.
