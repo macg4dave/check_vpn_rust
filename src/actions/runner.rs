@@ -13,56 +13,133 @@ pub trait ActionRunner {
 }
 
 /// Real production implementation that talks to systemd/logind over D-Bus or runs shell commands.
-pub struct RealActionRunner {}
+pub struct RealActionRunner {
+    /// Whether we successfully detected a usable system D-Bus at construction time.
+    /// When false, runner avoids D-Bus calls and will fall back to shell or no-op.
+    dbus_available: bool,
+}
 
 impl RealActionRunner {
     pub fn new() -> Self {
-        RealActionRunner {}
+        // On non-Linux platforms we do not expect a system D-Bus to be present.
+        if !cfg!(target_os = "linux") {
+            info!(
+                "Non-Linux platform detected — D-Bus considered unavailable; using shell/no-op fallbacks"
+            );
+            return RealActionRunner { dbus_available: false };
+        }
+
+        // Best-effort detection on Linux.
+        match Connection::system() {
+            Ok(_) => RealActionRunner { dbus_available: true },
+            Err(e) => {
+                info!(
+                    "Failed to connect to system D-Bus — will fall back to shell/no-op actions: {:?}",
+                    e
+                );
+                RealActionRunner { dbus_available: false }
+            }
+        }
+    }
+
+    /// Construct a test-friendly runner that treats D-Bus availability as
+    /// specified by the caller. This is only compiled for tests.
+    #[cfg(test)]
+    pub fn new_with_dbus_available(dbus_available: bool) -> Self {
+        RealActionRunner { dbus_available }
     }
     // A Default impl is convenient for callers/tests that want the zero-config
     // runner without calling `new` explicitly. Clippy suggests adding this.
 
     fn do_reboot(&self, dry_run: bool) -> Result<()> {
         if dry_run {
-            info!("[dry-run] would request system reboot via logind");
+            if self.dbus_available {
+                info!("[dry-run] would request system reboot via logind");
+            } else {
+                info!("[dry-run] would request system reboot via fallback (no D-Bus)");
+            }
             return Ok(());
         }
 
-        // Talk to system bus and call org.freedesktop.login1.Manager.Reboot(true)
-        let conn = Connection::system().context("failed to connect to system bus")?;
-        let proxy = zbus::blocking::Proxy::new(
-            &conn,
-            "org.freedesktop.login1",
-            "/org/freedesktop/login1",
-            "org.freedesktop.login1.Manager",
-        )?;
-        proxy
-            .call_method("Reboot", &(true))
-            .context("Reboot call failed")?;
-        info!("Reboot requested via logind");
-        Ok(())
+        if self.dbus_available {
+            // Talk to system bus and call org.freedesktop.login1.Manager.Reboot(true)
+            let conn = Connection::system().context("failed to connect to system bus")?;
+            let proxy = zbus::blocking::Proxy::new(
+                &conn,
+                "org.freedesktop.login1",
+                "/org/freedesktop/login1",
+                "org.freedesktop.login1.Manager",
+            )?;
+            proxy
+                .call_method("Reboot", &(true))
+                .context("Reboot call failed")?;
+            info!("Reboot requested via logind");
+            Ok(())
+        } else {
+            info!("D-Bus unavailable; running shell fallback for reboot");
+            match Command::new("sh").arg("-c").arg("systemctl reboot --no-block || reboot").status() {
+                Ok(s) => {
+                    if s.success() {
+                        info!("Fallback reboot command executed successfully");
+                    } else {
+                        error!("Fallback reboot command returned non-zero: {:?}", s);
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to execute fallback reboot command: {:?}", e);
+                    Err(e).context("failed to spawn reboot fallback command")
+                }
+            }
+        }
     }
 
     fn do_restart_unit(&self, unit: &str, dry_run: bool) -> Result<()> {
         if dry_run {
-            info!(
-                "[dry-run] would request restart of unit '{}' via systemd D-Bus",
-                unit
-            );
+            if self.dbus_available {
+                info!(
+                    "[dry-run] would request restart of unit '{}' via systemd D-Bus",
+                    unit
+                );
+            } else {
+                info!(
+                    "[dry-run] would request restart of unit '{}' via fallback (no D-Bus)",
+                    unit
+                );
+            }
             return Ok(());
         }
 
-        let conn = Connection::system().context("failed to connect to system bus")?;
-        let proxy = zbus::blocking::Proxy::new(
-            &conn,
-            "org.freedesktop.systemd1",
-            "/org/freedesktop/systemd1",
-            "org.freedesktop.systemd1.Manager",
-        )?;
-        // Mode can be "replace"
-        proxy.call_method("RestartUnit", &(unit, "replace"))?;
-        info!("Requested restart of unit '{}'", unit);
-        Ok(())
+            if self.dbus_available {
+                let conn = Connection::system().context("failed to connect to system bus")?;
+                let proxy = zbus::blocking::Proxy::new(
+                    &conn,
+                    "org.freedesktop.systemd1",
+                    "/org/freedesktop/systemd1",
+                    "org.freedesktop.systemd1.Manager",
+                )?;
+                // Mode can be "replace"
+                proxy.call_method("RestartUnit", &(unit, "replace"))?;
+                info!("Requested restart of unit '{}'", unit);
+                Ok(())
+            } else {
+                info!("D-Bus unavailable; running shell fallback for restart");
+                let command = format!("systemctl restart {}", unit);
+                match Command::new("sh").arg("-c").arg(command).status() {
+                    Ok(s) => {
+                        if s.success() {
+                            info!("Fallback restart command executed successfully");
+                        } else {
+                            error!("Fallback restart command returned non-zero: {:?}", s);
+                        }
+                        Ok(())
+                    }
+                    Err(e) => {
+                        error!("Failed to execute fallback restart command: {:?}", e);
+                        Err(e).context("failed to spawn restart fallback command")
+                    }
+                }
+            }
     }
 
     fn do_command(&self, cmd: &str, dry_run: bool) -> Result<()> {
@@ -131,5 +208,26 @@ mod tests {
             p.execute(&Action::Command("echo".into()), true)
         });
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn dry_run_behaviour_with_dbus_unavailable() {
+        // Simulate an environment where D-Bus is not available
+        let runner = RealActionRunner::new_with_dbus_available(false);
+
+        // All actions in dry-run must return Ok and not execute side-effects
+        assert!(runner.execute(&Action::Reboot, true).is_ok());
+        assert!(runner.execute(&Action::RestartUnit("fake-unit".into()), true).is_ok());
+        assert!(runner.execute(&Action::Command("echo hi".into()), true).is_ok());
+    }
+
+    #[test]
+    fn dry_run_behaviour_with_dbus_available() {
+        // Simulate an environment where D-Bus is available — dry-run should still be safe
+        let runner = RealActionRunner::new_with_dbus_available(true);
+
+        assert!(runner.execute(&Action::Reboot, true).is_ok());
+        assert!(runner.execute(&Action::RestartUnit("fake-unit".into()), true).is_ok());
+        assert!(runner.execute(&Action::Command("echo hi".into()), true).is_ok());
     }
 }

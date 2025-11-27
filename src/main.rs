@@ -36,14 +36,14 @@ fn try_main() -> std::result::Result<(), AppError> {
 
     // If wizard requested, run it and exit.
     if args.init {
-        check_vpn::init_wizard::run_init(args.init_output.clone(), args.init_no_fetch)
+        check_vpn::init_wizard::run_init(args.init_output.as_deref(), args.init_no_fetch)
             .map_err(AppError::RuntimeError)?;
         return Ok(());
     }
 
     // Generate shell completions when requested and exit.
-    if let Some(shell) = args.generate_completions.clone() {
-        check_vpn::completions::generate_completions(&shell, args.completions_output.as_deref())
+    if let Some(shell) = args.generate_completions.as_deref() {
+        check_vpn::completions::generate_completions(shell, args.completions_output.as_deref())
             .map_err(AppError::RuntimeError)?;
         return Ok(());
     }

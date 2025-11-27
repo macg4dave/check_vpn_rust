@@ -20,8 +20,13 @@ impl GenericJsonProvider {
         Ok(Self { client, url: url.to_string(), preferred_key: None })
     }
 
-    pub fn with_key(mut self, key: Option<String>) -> Self {
-        self.preferred_key = key;
+    /// Set an optional preferred key to look up in returned JSON objects.
+    ///
+    /// Accepts an Option<&str> to avoid forcing callers to provide owned Strings
+    /// when a borrowed &str is available; the provider will clone into an owned
+    /// String internally only when necessary.
+    pub fn with_key(mut self, key: Option<&str>) -> Self {
+        self.preferred_key = key.map(|s| s.to_string());
         self
     }
 }

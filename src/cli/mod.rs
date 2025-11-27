@@ -206,7 +206,7 @@ mod tests {
         let args = Args::parse_from(argv);
         assert!(args.disable_ip_api);
         assert!(!args.disable_ifconfig_co);
-        let urls = args.provider_urls.clone().unwrap();
+        let urls = args.provider_urls.as_ref().unwrap();
         assert_eq!(urls.len(), 2);
         assert_eq!(urls[0], "http://example.test/json1");
         assert_eq!(args.custom_json_server.as_ref().unwrap(), "http://single.example/json");
@@ -223,5 +223,20 @@ mod tests {
         assert!(args.config.is_some());
         let p: PathBuf = args.config.unwrap();
         assert_eq!(p, PathBuf::from("/tmp/test_config.xml"));
+    }
+
+    #[test]
+    fn parse_generate_completions_behavior() {
+        // When --generate-completions is present without completions output, it should capture the shell
+        let argv = vec!["check_vpn", "--generate-completions", "bash"];
+        let args = Args::parse_from(argv);
+        assert_eq!(args.generate_completions.as_ref().map(|s| s.as_str()), Some("bash"));
+        assert!(args.completions_output.is_none());
+
+        // When completions-output is provided it should be captured too
+        let argv2 = vec!["check_vpn", "--generate-completions", "zsh", "--completions-output", "./comp.zsh"];
+        let args2 = Args::parse_from(argv2);
+        assert_eq!(args2.generate_completions.as_deref(), Some("zsh"));
+        assert_eq!(args2.completions_output.as_deref(), Some("./comp.zsh"));
     }
 }

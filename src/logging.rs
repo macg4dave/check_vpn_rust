@@ -67,19 +67,24 @@ pub fn init_with_verbosity(verbosity: u8) {
     // panics are visible even if the default hook is later overridden.
     let _ = std::panic::take_hook();
     std::panic::set_hook(Box::new(|info| {
-        // Log panic info at error level with message and optional location
-        let payload_msg = if let Some(s) = info.payload().downcast_ref::<&str>() {
-            s.to_string()
+        // Log panic info at error level with message and optional location.
+        // Avoid cloning the payload if possible by logging borrowed references.
+        if let Some(s) = info.payload().downcast_ref::<&str>() {
+            if let Some(location) = info.location() {
+                log::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
+            } else {
+                log::error!("panic occurred: {}", s);
+            }
         } else if let Some(s) = info.payload().downcast_ref::<String>() {
-            s.clone()
+            if let Some(location) = info.location() {
+                log::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
+            } else {
+                log::error!("panic occurred: {}", s.as_str());
+            }
+        } else if let Some(location) = info.location() {
+            log::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
         } else {
-            "Unknown panic payload".to_string()
-        };
-
-        if let Some(location) = info.location() {
-            log::error!("panic occurred: {} at {}:{}", payload_msg, location.file(), location.line());
-        } else {
-            log::error!("panic occurred: {}", payload_msg);
+            log::error!("panic occurred: {}", "Unknown panic payload");
         }
     }));
 }

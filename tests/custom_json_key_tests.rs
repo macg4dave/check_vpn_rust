@@ -12,7 +12,7 @@ fn custom_json_key_extraction() {
     // Provider with preferred key 'asn'
     let gp = check_vpn::providers::generic_json_provider::GenericJsonProvider::new(&server.url("/json"))
         .unwrap()
-        .with_key(Some("asn".to_string()));
+        .with_key(Some("asn"));
     let chain: Vec<Box<dyn VpnInfoProvider>> = vec![Box::new(gp)];
     let id = query_first_success(&chain).expect("expected success");
     assert_eq!(id.isp, "ASN123");
@@ -29,7 +29,7 @@ fn custom_json_key_fallback_when_missing() {
     // Preferred key 'asn' missing, should fallback to org
     let gp = check_vpn::providers::generic_json_provider::GenericJsonProvider::new(&server.url("/json"))
         .unwrap()
-        .with_key(Some("asn".to_string()));
+        .with_key(Some("asn"));
     let chain: Vec<Box<dyn VpnInfoProvider>> = vec![Box::new(gp)];
     let id = query_first_success(&chain).expect("expected fallback success");
     assert_eq!(id.isp, "OrgValue");

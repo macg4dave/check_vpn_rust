@@ -17,7 +17,7 @@ pub fn set_no_prompt_for_tests(disable: bool) {
     NO_PROMPT_OVERRIDE.store(disable, Ordering::Relaxed);
 }
 
-pub fn run_init(output: Option<String>, no_fetch: bool) -> Result<()> {
+pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
     println!("check_vpn init — generate a config.xml");
 
     // Decide interactive vs non-interactive:
@@ -72,8 +72,8 @@ pub fn run_init(output: Option<String>, no_fetch: bool) -> Result<()> {
         custom_json_key: None,
     };
 
-    let out_path = output.unwrap_or_else(|| "./check_vpn.xml".to_string());
-    crate::xml_io::write_xml(&cfg, &out_path)?;
+    let out_path = output.unwrap_or("./check_vpn.xml");
+    crate::xml_io::write_xml(&cfg, out_path)?;
     println!("Wrote {}", out_path);
     Ok(())
 }

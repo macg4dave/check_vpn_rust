@@ -174,9 +174,9 @@ fn build_provider_chain_getter(eff: &crate::config::EffectiveConfig) -> impl Fn(
     }
 
     // Single custom JSON server with optional key override before others.
-    if let Some(ref url) = eff.custom_json_server {
+        if let Some(ref url) = eff.custom_json_server {
         if let Ok(p) = providers::generic_json_provider::GenericJsonProvider::new(url)
-            .map(|gp| gp.with_key(eff.custom_json_key.clone())) {
+            .map(|gp| gp.with_key(eff.custom_json_key.as_deref())) {
             chain.insert(0, Box::new(p));
         }
     }
