@@ -47,37 +47,12 @@ jobs:
           echo 'Fedora artifacts:'
           ls -la release/fedora || true
 
-      - name: Install GitHub CLI
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y curl apt-transport-https gnupg
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-          sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-          sudo apt-get update
-          sudo apt-get install -y gh
-
-      - name: Create or ensure GitHub release is present
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          # Authenticate gh using GITHUB_TOKEN
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token || true
-          gh release create "${TAG_NAME}" --title "v0.5b" --notes "Single canonical release v0.5b (reproducible Docker-based artifacts)" || true
-
-      - name: Upload release artifacts
-        env:
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          for f in release/debian/*.deb; do
-            [ -f "$f" ] || continue
-            gh release upload "${TAG_NAME}" "$f" --clobber || true
-          done
-
-          for f in release/fedora/*.rpm; do
-            [ -f "$f" ] || continue
-            gh release upload "${TAG_NAME}" "$f" --clobber || true
-          done
+      - name: Create GitHub release + upload artifacts
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ github.ref_name }}
+          name: v0.5b
+          files: |
+            release/debian/**/*
+            release/fedora/**/*
+            release/unix/**/*
