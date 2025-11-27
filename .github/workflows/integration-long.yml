@@ -1,0 +1,73 @@
+name: Integration — long / ignored tests (reproducible)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_self_hosted:
+        description: 'When true, also run the self-hosted integration job'
+        required: false
+        default: 'false'
+  schedule:
+    # weekly run (UTC)
+    - cron: '0 4 * * 1'
+  pull_request:
+    types: [labeled]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  long-integration:
+    name: Long / Ignored integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: When fired by PR check for 'run-long-tests' label
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          echo "Event pull_request; checking labels for run-long-tests"
+          jq -r '.pull_request.labels[].name' $GITHUB_EVENT_PATH | grep -q '^run-long-tests$' || {
+            echo "label 'run-long-tests' not present, skipping job (normal)"; exit 0
+          }
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build reproducible test container (Debian)
+        run: |
+          docker build -t check_vpn_integration -f contrib/Dockerfile.debian .
+
+      - name: Run ignored/long tests inside the reproducible container
+        run: |
+          set -euo pipefail
+          # run tests single-threaded to limit flakiness and ensure reproducibility
+          docker run --rm check_vpn_integration bash -lc "export RUST_TEST_THREADS=1; cargo test --workspace -- --ignored --nocapture"
+
+  # Optional self-hosted run — useful for large machines that have specialized network access
+  long-integration-self-hosted:
+    name: Long / Ignored integration tests (self-hosted)
+    runs-on: self-hosted
+    if: |
+      github.event_name == 'workflow_dispatch' && (github.event.inputs.run_self_hosted == 'true')
+      || (github.event_name == 'pull_request' && contains(join(github.event.pull_request.labels.*.name, ','), 'self-hosted-tests'))
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Docker is available (self-hosted)
+        run: |
+          if ! command -v docker >/dev/null 2>&1; then
+            echo 'Docker not found on self-hosted runner — make sure Docker is installed'; exit 1
+          fi
+
+      - name: Build reproducible test container (Debian)
+        run: docker build -t check_vpn_integration -f contrib/Dockerfile.debian .
+
+      - name: Run ignored/long tests inside the reproducible container (self-hosted)
+        run: |
+          set -euo pipefail
+          export RUST_TEST_THREADS=1
+          docker run --rm check_vpn_integration bash -lc "cargo test --workspace -- --ignored --nocapture" 

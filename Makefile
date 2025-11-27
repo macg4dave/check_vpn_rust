@@ -145,6 +145,12 @@ release:
 	fi
 
 fmt:
+	## Debug target: run with backtraces and optional tracing (observability) enabled
+	.PHONY: debug
+	debug:
+		@echo "Run with backtrace enabled and tracing/structured logging (compile with --features observability)"
+		RUST_BACKTRACE=1 RUST_LOG=$${RUST_LOG:-trace} cargo run --features "observability" -- --run-once --dry-run -vv
+
 	cargo fmt --all
 
 clippy:

@@ -1,6 +1,8 @@
 # check_vpn
 
 [![CI](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/ci.yml)
+[![Cargo Audit](https://github.com/macg4dave/check_vpn_rust/actions/workflows/cargo-audit.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/cargo-audit.yml)
+[![Integration: long tests](https://github.com/macg4dave/check_vpn_rust/actions/workflows/integration-long.yml/badge.svg)](https://github.com/macg4dave/check_vpn_rust/actions/workflows/integration-long.yml)
 
 **Automatic VPN monitoring and reconnection for Linux systems**
 
@@ -388,6 +390,51 @@ sudo chmod 755 /etc/check_vpn /var/log/check_vpn
 - Test the action manually (e.g., `sudo systemctl restart your-vpn-unit`)
 - Check if the service user has permissions to execute the action
 - For `restart-unit`, ensure the service user has appropriate PolicyKit rules or run as root
+
+---
+
+### Structured logging, tracing & backtraces
+
+If you need richer diagnostic information (timelines, spans, structured fields), build and run with the optional observability feature which enables tracing-based logging and better integration with tracing systems.
+
+Locally you can use the convenience Makefile target to build & run with backtraces and tracing enabled:
+
+```sh
+# Build & run with backtraces and tracing enabled; this compiles the
+# optional "observability" feature which enables `tracing`/`tracing-subscriber`.
+make debug
+
+# Or run directly from cargo (same effect)
+RUST_BACKTRACE=1 RUST_LOG=trace cargo run --features "observability" -- --run-once --dry-run -vv
+```
+
+If running systemd-managed instances in production, enable `RUST_BACKTRACE=1` and set a suitable `RUST_LOG` environment variable (for example in a systemd drop-in) to capture backtraces and increased log verbosity: this is useful when analyzing panics or missing permissions.
+
+### Example PolicyKit rules / permissions
+
+Certain actions performed by `check_vpn` require elevated privileges when running as a non-root service user. Two common cases:
+
+- Reboot via logind (D-Bus): requires permission to call org.freedesktop.login1.Manager.Reboot.
+- Restarting systemd units via systemd D-Bus: may require polkit permission such as org.freedesktop.systemd1.manage-units.
+
+To allow the `checkvpn` service user to restart a specific unit or request a reboot without giving unrestricted root access, add a polkit rule. Example (modern polkit JS rule):
+
+```js
+// /etc/polkit-1/rules.d/50-check_vpn.rules
+polkit.addRule(function(action, subject) {
+  // Allow checkvpn user to reboot the machine via logind
+  if (action.id == "org.freedesktop.login1.reboot" && subject.user == "checkvpn") {
+    return polkit.Result.YES;
+  }
+
+  // Allow checkvpn user to restart a specific unit
+  if (action.id == "org.freedesktop.systemd1.manage-units" && subject.user == "checkvpn") {
+    return polkit.Result.YES;
+  }
+});
+```
+
+Alternatively use a lightweight `polkit` .pkla or fine-grained rules to restrict which units a service user may restart. If you choose not to grant polkit privileges, run `check_vpn` as a real root-managed system service (for example `User=root` in the unit) so it can call D-Bus/systemctl directly.
 
 ---
 

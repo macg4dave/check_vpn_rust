@@ -31,6 +31,17 @@ cargo build --release
 # Run tests
 cargo test
 
+### Debug / tracing
+
+For deeper troubleshooting during development you can build and run with backtraces and the optional `observability` feature which enables `tracing` and structured logs:
+
+```bash
+# Quick helper (runs with RUST_BACKTRACE=1 and RUST_LOG=trace)
+make debug
+
+# Or run directly:
+RUST_BACKTRACE=1 RUST_LOG=trace cargo run --features "observability" -- --run-once --dry-run -vv
+```
 Testing notes
 ----------------
 - The repository includes lightweight integration test helpers in `tests/support/mod.rs`.

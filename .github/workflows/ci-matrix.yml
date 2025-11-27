@@ -43,6 +43,12 @@ jobs:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Cache cargo bin (speed up cargo install)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Install rustfmt & clippy
         run: |
           rustup component add rustfmt clippy || true
@@ -58,6 +64,43 @@ jobs:
 
       - name: Build release
         run: cargo build --release --verbose
+
+      - name: Install cargo-audit (secure check)
+        run: |
+          set -euo pipefail
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            cargo install --locked cargo-audit
+          fi
+
+      - name: Run security audit (cargo-audit) and capture log (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          set -euo pipefail
+          cargo audit 2>&1 | tee audit.log || true
+
+      - name: Upload cargo-audit log (Unix)
+        if: matrix.os != 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-log-${{ matrix.os }}
+          path: audit.log
+
+      - name: Fail if vulnerabilities were found (Unix)
+        if: matrix.os != 'windows-latest'
+        run: cargo audit
+
+      - name: Run security audit (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          cargo audit 2>&1 | Tee-Object -FilePath audit.log; if ($LASTEXITCODE -ne 0) { Write-Output 'Vulnerabilities detected'; exit 1 }
+
+      - name: Upload cargo-audit log (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-log-windows
+          path: audit.log
 
       - name: Create tarball (Unix)
         if: matrix.os != 'windows-latest'

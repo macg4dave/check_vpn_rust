@@ -47,11 +47,46 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-
 
+      - name: Cache cargo bin (speed up cargo install)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-bin-
+
       - name: Run tests
         run: cargo test --verbose
 
       - name: Run tests with all features
         run: cargo test --all-features --verbose
+
+      - name: Install cargo-audit (secure check)
+        run: |
+          set -euo pipefail
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            cargo install --locked cargo-audit
+          fi
+
+      - name: Run security audit (cargo-audit) and capture log
+        env:
+          CARGO_TERM_COLOR: always
+        run: |
+          set -euo pipefail
+          # capture human-readable output to audit.log
+          cargo audit 2>&1 | tee audit.log || true
+
+      - name: Upload cargo-audit log
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-audit-log
+          path: audit.log
+
+      - name: Fail if vulnerabilities were found
+        run: |
+          set -e
+          # run once more so the step exits non-zero if there are vulnerabilities
+          cargo audit
 
   integration-serial:
     name: Repeatable integration tests (serial)

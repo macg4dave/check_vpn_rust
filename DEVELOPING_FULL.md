@@ -170,6 +170,13 @@ The workflow uploads the built artifacts as release-ready tarballs or zip files.
 cargo test -- --ignored
 ```
 
+Alternatively the repo includes a helper script to run the full test-suite (including ignored tests) inside the same reproducible Debian container used by CI:
+
+```bash
+# Build the test image and run ignored tests inside it
+./contrib/ci docker
+```
+
 ## Make and script shortcuts
 
 - Use `make` on Unix or WSL to run targets defined in `Makefile` (requires GNU make).

@@ -41,27 +41,59 @@ fn set_rust_log_if_unset(level: &str) {
 /// This uses `env_logger::try_init()` to avoid panicking if the logger was
 /// already initialized by another test or library; failures are ignored.
 pub fn init_with_verbosity(verbosity: u8) {
-    use env_logger::Env;
     use std::io::Write;
 
     let level = level_from_verbosity(verbosity);
-    set_rust_log_if_unset(level);
 
-    // Build a formatted logger that includes timestamp and level. If the
-    // environment variable RUST_LOG is set, that will take precedence.
-    let env = Env::default().default_filter_or(level);
-    let mut builder = env_logger::Builder::from_env(env);
-    builder.format(|buf, record| {
-        writeln!(
-            buf,
-            "{} {:<5} [{}] {}",
-            buf.timestamp_millis(),
-            record.level(),
-            record.target(),
-            record.args()
-        )
-    });
-    let _ = builder.try_init();
+    // If the optional 'observability' feature is enabled we use the
+    // `tracing` / `tracing-subscriber` stack so consumers get structured
+    // logging and better span integration. The feature is opt-in and
+    // otherwise we keep the existing env_logger behaviour.
+    #[cfg(feature = "observability")]
+    {
+        // Respect existing RUST_LOG if set and otherwise default from verbosity.
+        set_rust_log_if_unset(level);
+
+        // Use tracing-subscriber with an env filter and pretty formatting
+        // to make logs easier to debug while also supporting structured
+        // output for downstream observability systems.
+        use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+        let env_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| level.to_string());
+        let filter = EnvFilter::try_new(env_filter).unwrap_or_else(|_| EnvFilter::new(level));
+
+        // Construct a subscriber that prints events with timestamps and the level.
+        // We don't set a global panic hook here; the existing hook below will
+        // still run and emit errors through `tracing::error!`.
+        let fmt_layer = fmt::layer()
+            .with_timer(fmt::time::ChronoLocal::rfc3339())
+            .with_writer(std::io::stderr);
+
+        let _ = tracing_subscriber::registry().with(filter).with(fmt_layer).try_init();
+    }
+
+    #[cfg(not(feature = "observability"))]
+    {
+        use env_logger::Env;
+
+        set_rust_log_if_unset(level);
+
+        // Build a formatted logger that includes timestamp and level. If the
+        // environment variable RUST_LOG is set, that will take precedence.
+        let env = Env::default().default_filter_or(level);
+        let mut builder = env_logger::Builder::from_env(env);
+        builder.format(|buf, record| {
+            writeln!(
+                buf,
+                "{} {:<5} [{}] {}",
+                buf.timestamp_millis(),
+                record.level(),
+                record.target(),
+                record.args()
+            )
+        });
+        let _ = builder.try_init();
+    }
 
     // Install a panic hook that logs panic information. This helps ensure
     // panics are visible even if the default hook is later overridden.
@@ -71,34 +103,37 @@ pub fn init_with_verbosity(verbosity: u8) {
         // Avoid cloning the payload if possible by logging borrowed references.
         if let Some(s) = info.payload().downcast_ref::<&str>() {
             if let Some(location) = info.location() {
-                log::error!(
-                    "panic occurred: {} at {}:{}",
-                    s,
-                    location.file(),
-                    location.line()
-                );
+                #[cfg(feature = "observability")]
+                tracing::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
+                #[cfg(not(feature = "observability"))]
+                log::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
             } else {
+                #[cfg(feature = "observability")]
+                tracing::error!("panic occurred: {}", s);
+                #[cfg(not(feature = "observability"))]
                 log::error!("panic occurred: {}", s);
             }
         } else if let Some(s) = info.payload().downcast_ref::<String>() {
             if let Some(location) = info.location() {
-                log::error!(
-                    "panic occurred: {} at {}:{}",
-                    s.as_str(),
-                    location.file(),
-                    location.line()
-                );
+                #[cfg(feature = "observability")]
+                tracing::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
+                #[cfg(not(feature = "observability"))]
+                log::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
             } else {
+                #[cfg(feature = "observability")]
+                tracing::error!("panic occurred: {}", s.as_str());
+                #[cfg(not(feature = "observability"))]
                 log::error!("panic occurred: {}", s.as_str());
             }
         } else if let Some(location) = info.location() {
-            log::error!(
-                "panic occurred: {} at {}:{}",
-                "Unknown panic payload",
-                location.file(),
-                location.line()
-            );
+            #[cfg(feature = "observability")]
+            tracing::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
+            #[cfg(not(feature = "observability"))]
+            log::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
         } else {
+            #[cfg(feature = "observability")]
+            tracing::error!("panic occurred: {}", "Unknown panic payload");
+            #[cfg(not(feature = "observability"))]
             log::error!("panic occurred: {}", "Unknown panic payload");
         }
     }));
