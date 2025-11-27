@@ -116,21 +116,24 @@ impl Config {
         let interval = args.interval.or(self.interval).unwrap_or(60);
         let isp_to_check = args
             .isp_to_check
-            .clone()
-            .or_else(|| self.isp_to_check.clone())
-            .unwrap_or_else(|| "Hutchison 3G UK Ltd".to_string());
+            .as_deref()
+            .or(self.isp_to_check.as_deref())
+            .unwrap_or("Hutchison 3G UK Ltd")
+            .to_string();
 
         let action_type = args
             .vpn_lost_action_type
-            .clone()
-            .or_else(|| self.vpn_lost_action_type.clone())
-            .unwrap_or_else(|| "reboot".to_string());
+            .as_deref()
+            .or(self.vpn_lost_action_type.as_deref())
+            .unwrap_or("reboot")
+            .to_string();
 
         let action_arg = args
             .vpn_lost_action_arg
-            .clone()
-            .or_else(|| self.vpn_lost_action_arg.clone())
-            .unwrap_or_else(|| "/sbin/shutdown -r now".to_string());
+            .as_deref()
+            .or(self.vpn_lost_action_arg.as_deref())
+            .unwrap_or("/sbin/shutdown -r now")
+            .to_string();
 
         let dry_run = if args.dry_run {
             true
@@ -140,13 +143,15 @@ impl Config {
 
         let connectivity_endpoints = args
             .connectivity_endpoints
-            .clone()
+            .as_ref()
+            .cloned()
             .or_else(|| self.connectivity_endpoints.clone())
             .unwrap_or_else(|| vec!["8.8.8.8".to_string(), "google.com".to_string()]);
 
         let connectivity_ports = args
             .connectivity_ports
-            .clone()
+            .as_ref()
+            .cloned()
             .or_else(|| self.connectivity_ports.clone())
             .unwrap_or_else(|| {
                 vec![
@@ -175,22 +180,33 @@ impl Config {
         let run_once = args.run_once;
 
         // Provider settings: default to enabling both built-ins unless disabled via CLI or config.
-        let enable_ip_api = if args.disable_ip_api { false } else { self.enable_ip_api.unwrap_or(true) };
-        let enable_ifconfig_co = if args.disable_ifconfig_co { false } else { self.enable_ifconfig_co.unwrap_or(true) };
+        let enable_ip_api = if args.disable_ip_api {
+            false
+        } else {
+            self.enable_ip_api.unwrap_or(true)
+        };
+        let enable_ifconfig_co = if args.disable_ifconfig_co {
+            false
+        } else {
+            self.enable_ifconfig_co.unwrap_or(true)
+        };
 
         let provider_urls = args
             .provider_urls
-            .clone()
+            .as_ref()
+            .cloned()
             .or_else(|| self.provider_urls.clone())
             .unwrap_or_default();
 
         let custom_json_server = args
             .custom_json_server
-            .clone()
+            .as_ref()
+            .cloned()
             .or_else(|| self.custom_json_server.clone());
         let custom_json_key = args
             .custom_json_key
-            .clone()
+            .as_ref()
+            .cloned()
             .or_else(|| self.custom_json_key.clone());
 
         EffectiveConfig {

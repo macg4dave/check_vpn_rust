@@ -1,6 +1,6 @@
-use check_vpn::providers::{query_first_success, VpnInfoProvider};
 use check_vpn::providers;
-use httpmock::{MockServer, Method::GET};
+use check_vpn::providers::{query_first_success, VpnInfoProvider};
+use httpmock::{Method::GET, MockServer};
 
 // Simple wrapper implementing trait for test purposes around httpmock responses.
 
@@ -13,7 +13,8 @@ fn ifconfig_co_parses_asn_org() {
         then.status(200).body(body);
     });
     // Use generic provider pointed at mock to validate parsing (asn_org fallback)
-    let generic = providers::generic_json_provider::GenericJsonProvider::new(&server.url("/json")).unwrap();
+    let generic =
+        providers::generic_json_provider::GenericJsonProvider::new(&server.url("/json")).unwrap();
     let chain: Vec<Box<dyn VpnInfoProvider>> = vec![Box::new(generic)];
     let id = query_first_success(&chain).expect("expected success");
     assert_eq!(id.isp, "Vodafone Limited");
@@ -32,8 +33,12 @@ fn fallback_success_after_failure() {
         then.status(500).body("");
     });
 
-    let bad_p = providers::generic_json_provider::GenericJsonProvider::new(&server_bad.url("/json")).unwrap();
-    let good_p = providers::generic_json_provider::GenericJsonProvider::new(&server_good.url("/json")).unwrap();
+    let bad_p =
+        providers::generic_json_provider::GenericJsonProvider::new(&server_bad.url("/json"))
+            .unwrap();
+    let good_p =
+        providers::generic_json_provider::GenericJsonProvider::new(&server_good.url("/json"))
+            .unwrap();
 
     let chain: Vec<Box<dyn VpnInfoProvider>> = vec![Box::new(bad_p), Box::new(good_p)];
     let id = query_first_success(&chain).expect("should fallback to good provider");

@@ -8,12 +8,18 @@ fn exit_code_mapping_for_app_errors() {
     let cfg_err = check_vpn::config::validation::ValidationErrors(vec!["bad".into()]);
     let e = AppError::ConfigError(cfg_err);
     let c = check_vpn::error_types::exit_code_for_error(&e);
-    assert_eq!(c, ExitCode::from(check_vpn::config::EXIT_INVALID_CONFIG as u8));
+    assert_eq!(
+        c,
+        ExitCode::from(check_vpn::config::EXIT_INVALID_CONFIG as u8)
+    );
 
     // Config load error -> same mapping
     let e = AppError::ConfigLoadError(anyhow::anyhow!("bad config"));
     let c = check_vpn::error_types::exit_code_for_error(&e);
-    assert_eq!(c, ExitCode::from(check_vpn::config::EXIT_INVALID_CONFIG as u8));
+    assert_eq!(
+        c,
+        ExitCode::from(check_vpn::config::EXIT_INVALID_CONFIG as u8)
+    );
 
     // Runtime -> generic 1
     let e = AppError::RuntimeError(anyhow::anyhow!("runtime"));

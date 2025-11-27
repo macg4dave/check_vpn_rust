@@ -1,7 +1,7 @@
 use std::fs;
 use std::io::Write;
-use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -83,7 +83,10 @@ fn reload_continues_without_strict_flag() {
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_it_reload_{}.xml", Instant::now().elapsed().as_nanos()));
+    path.push(format!(
+        "check_vpn_it_reload_{}.xml",
+        Instant::now().elapsed().as_nanos()
+    ));
     let path_str = path.to_str().unwrap().to_string();
     let mut f = fs::File::create(&path_str).expect("create temp xml");
     f.write_all(xml.as_bytes()).expect("write xml");
@@ -103,14 +106,19 @@ fn reload_continues_without_strict_flag() {
     ]);
 
     let rx = spawn_output_collector(&mut child);
-    assert!(wait_for_collector_contains(&rx, "Starting check_vpn run()", Duration::from_secs(10)), "timed out waiting for child to start");
+    assert!(
+        wait_for_collector_contains(&rx, "Starting check_vpn run()", Duration::from_secs(10)),
+        "timed out waiting for child to start"
+    );
 
     // Corrupt the config file; this should NOT cause the binary to exit when not strict.
     fs::write(&path_str, "<bad>").expect("corrupt file");
 
     thread::sleep(Duration::from_secs(3));
     if let Ok(Some(status)) = child.try_wait() {
-        let out = child.wait_with_output().expect("failed to get child output");
+        let out = child
+            .wait_with_output()
+            .expect("failed to get child output");
         let stdout = String::from_utf8_lossy(&out.stdout);
         let stderr = String::from_utf8_lossy(&out.stderr);
         panic!(
@@ -129,7 +137,10 @@ fn reload_exits_with_strict_flag() {
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_it_reload_strict_{}.xml", Instant::now().elapsed().as_nanos()));
+    path.push(format!(
+        "check_vpn_it_reload_strict_{}.xml",
+        Instant::now().elapsed().as_nanos()
+    ));
     let path_str = path.to_str().unwrap().to_string();
     let mut f = fs::File::create(&path_str).expect("create temp xml");
     f.write_all(xml.as_bytes()).expect("write xml");
@@ -150,7 +161,10 @@ fn reload_exits_with_strict_flag() {
     ]);
 
     let rx = spawn_output_collector(&mut child);
-    assert!(wait_for_collector_contains(&rx, "Starting check_vpn run()", Duration::from_secs(10)), "timed out waiting for child to start");
+    assert!(
+        wait_for_collector_contains(&rx, "Starting check_vpn run()", Duration::from_secs(10)),
+        "timed out waiting for child to start"
+    );
     thread::sleep(Duration::from_secs(2));
 
     fs::write(&path_str, "<bad>").expect("corrupt file");
@@ -172,7 +186,9 @@ fn reload_exits_with_strict_flag() {
     let mut exited = None;
     while start.elapsed() < Duration::from_secs(8) {
         if let Ok(Some(status)) = child.try_wait() {
-            let out = child.wait_with_output().expect("failed to get child output");
+            let out = child
+                .wait_with_output()
+                .expect("failed to get child output");
             let stdout = String::from_utf8_lossy(&out.stdout);
             let stderr = String::from_utf8_lossy(&out.stderr);
             exited = Some((status, stdout.to_string(), stderr.to_string()));
@@ -181,7 +197,13 @@ fn reload_exits_with_strict_flag() {
         thread::sleep(Duration::from_millis(200));
     }
 
-    let (status, stdout, stderr) = exited.expect("process did not exit after strict reload failure");
-    assert!(!status.success(), "Process exited zero; expected non-zero due to strict-config. stdout:\n{}\nstderr:\n{}", stdout, stderr);
+    let (status, stdout, stderr) =
+        exited.expect("process did not exit after strict reload failure");
+    assert!(
+        !status.success(),
+        "Process exited zero; expected non-zero due to strict-config. stdout:\n{}\nstderr:\n{}",
+        stdout,
+        stderr
+    );
     let _ = fs::remove_file(&path_str);
 }

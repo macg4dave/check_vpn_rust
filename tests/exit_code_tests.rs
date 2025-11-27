@@ -1,6 +1,6 @@
+use std::io::Write;
 use std::process::Command;
 use tempfile::NamedTempFile;
-use std::io::Write;
 
 #[test]
 fn binary_exit_code_on_malformed_config() {

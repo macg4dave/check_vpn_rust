@@ -11,7 +11,10 @@ fn init_wizard_writes_file_with_defaults() {
 
     check_vpn::init_wizard::run_init(Some(path_str.as_str()), true).expect("init wizard");
 
-    assert!(std::path::Path::new(&path_str).exists(), "file should be written");
+    assert!(
+        std::path::Path::new(&path_str).exists(),
+        "file should be written"
+    );
     let contents = fs::read_to_string(&path_str).expect("read file");
     assert!(contents.contains("<config>"));
     assert!(contents.contains("<interval>"));

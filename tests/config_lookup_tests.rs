@@ -33,7 +33,11 @@ fn test_config_lookup_order_user_and_system() {
         fs::write(&user_cfg, "<config><interval>456</interval></config>").unwrap();
 
         // Create macos-style config (Library/Preferences/check_vpn/config.xml)
-        let mac_cfg_dir = td.path().join("Library").join("Preferences").join("check_vpn");
+        let mac_cfg_dir = td
+            .path()
+            .join("Library")
+            .join("Preferences")
+            .join("check_vpn");
         fs::create_dir_all(&mac_cfg_dir).unwrap();
         let mac_cfg = mac_cfg_dir.join("config.xml");
         fs::write(&mac_cfg, "<config><interval>789</interval></config>").unwrap();

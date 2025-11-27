@@ -71,18 +71,33 @@ pub fn init_with_verbosity(verbosity: u8) {
         // Avoid cloning the payload if possible by logging borrowed references.
         if let Some(s) = info.payload().downcast_ref::<&str>() {
             if let Some(location) = info.location() {
-                log::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
+                log::error!(
+                    "panic occurred: {} at {}:{}",
+                    s,
+                    location.file(),
+                    location.line()
+                );
             } else {
                 log::error!("panic occurred: {}", s);
             }
         } else if let Some(s) = info.payload().downcast_ref::<String>() {
             if let Some(location) = info.location() {
-                log::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
+                log::error!(
+                    "panic occurred: {} at {}:{}",
+                    s.as_str(),
+                    location.file(),
+                    location.line()
+                );
             } else {
                 log::error!("panic occurred: {}", s.as_str());
             }
         } else if let Some(location) = info.location() {
-            log::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
+            log::error!(
+                "panic occurred: {} at {}:{}",
+                "Unknown panic payload",
+                location.file(),
+                location.line()
+            );
         } else {
             log::error!("panic occurred: {}", "Unknown panic payload");
         }

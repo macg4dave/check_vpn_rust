@@ -1,11 +1,11 @@
 #[cfg(unix)]
+use std::env;
+#[cfg(unix)]
 use std::fs::{self, File};
 #[cfg(unix)]
 use std::io::Write;
 #[cfg(unix)]
 use std::process::Command;
-#[cfg(unix)]
-use std::env;
 
 #[cfg(unix)]
 fn make_temp_file(name: &str, contents: &[u8], make_exec: bool) -> String {
@@ -46,14 +46,38 @@ fn test_dry_run_user_installs_binary_and_config() {
     let bin = make_temp_file("bin", b"#! /bin/sh\n", true);
     let config = make_temp_file("config", b"<config/>\n", false);
 
-    let (ok, out, err) = run_installer(&["--binary", &bin, "--config", &config, "--mode", "user", "--yes", "--dry-run"]);
+    let (ok, out, err) = run_installer(&[
+        "--binary",
+        &bin,
+        "--config",
+        &config,
+        "--mode",
+        "user",
+        "--yes",
+        "--dry-run",
+    ]);
     assert!(ok, "installer failed: stderr={} stdout={}", err, out);
 
     // should show dry-run copy for binary and config
-    assert!(out.contains(&bin), "stdout should mention binary path: {}", out);
-    assert!(out.contains(&config), "stdout should mention config path: {}", out);
-    assert!(out.contains("DRY-RUN"), "stdout should include DRY-RUN hints: {}", out);
-    assert!(out.contains("Installed binary to") , "should still log installation target");
+    assert!(
+        out.contains(&bin),
+        "stdout should mention binary path: {}",
+        out
+    );
+    assert!(
+        out.contains(&config),
+        "stdout should mention config path: {}",
+        out
+    );
+    assert!(
+        out.contains("DRY-RUN"),
+        "stdout should include DRY-RUN hints: {}",
+        out
+    );
+    assert!(
+        out.contains("Installed binary to"),
+        "should still log installation target"
+    );
     assert!(out.contains("Installed config to") || out.contains("No config found"));
 }
 
@@ -65,7 +89,16 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
     let service = make_temp_file("service", b"[Unit]\nDescription=check_vpn\n", false);
 
     // run in user mode to avoid needing sudo
-    let (ok, out, err) = run_installer(&["--binary", &bin, "--service", &service, "--mode", "user", "--yes", "--dry-run"]);
+    let (ok, out, err) = run_installer(&[
+        "--binary",
+        &bin,
+        "--service",
+        &service,
+        "--mode",
+        "user",
+        "--yes",
+        "--dry-run",
+    ]);
     assert!(ok, "installer failed: stderr={} stdout={}", err, out);
 
     // Always expect the binary to be mentioned
@@ -81,7 +114,10 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().eq("yes"))
             .unwrap_or(false);
         if has_systemctl {
-            assert!(out.contains(&service), "service file should be referenced in dry-run output");
+            assert!(
+                out.contains(&service),
+                "service file should be referenced in dry-run output"
+            );
         }
     }
 }
@@ -104,8 +140,13 @@ fn test_system_install_requires_root() {
     let bin = make_temp_file("bin_sys", b"#! /bin/sh\n", true);
 
     // Run in system mode as non-root; should fail with an error requesting root.
-    let (ok, out, err) = run_installer(&["--binary", &bin, "--mode", "system", "--yes", "--dry-run"]);
+    let (ok, out, err) =
+        run_installer(&["--binary", &bin, "--mode", "system", "--yes", "--dry-run"]);
     assert!(!ok, "Expected installer to fail when system install is attempted without root. stdout={} stderr={}", out, err);
     let combined = format!("{}{}", out, err);
-    assert!(combined.contains("requires root") || combined.contains("System install requires root"), "Expected message about requiring root; got: {}", combined);
+    assert!(
+        combined.contains("requires root") || combined.contains("System install requires root"),
+        "Expected message about requiring root; got: {}",
+        combined
+    );
 }

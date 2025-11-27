@@ -1,9 +1,12 @@
 use std::net::TcpListener;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread;
 
-use check_vpn::config::EffectiveConfig;
 use check_vpn::app::perform_check;
+use check_vpn::config::EffectiveConfig;
 
 #[test]
 fn perform_check_runs_action_when_isp_matches() {

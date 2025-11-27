@@ -1,6 +1,6 @@
 use std::net::TcpListener;
-use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 

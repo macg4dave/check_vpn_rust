@@ -22,13 +22,17 @@ fn no_obvious_args_clone_patterns() {
             if p.is_dir() {
                 // skip target/ and .git
                 if let Some(n) = p.file_name().and_then(|s| s.to_str()) {
-                    if n == "target" || n == ".git" { continue; }
+                    if n == "target" || n == ".git" {
+                        continue;
+                    }
                 }
                 walk(&p, occurrences);
             } else if let Some(ext) = p.extension().and_then(|s| s.to_str()) {
                 if ext == "rs" {
                     let txt = fs::read_to_string(&p).unwrap_or_default();
-                    if txt.contains("args.init_output.clone()") || txt.contains("args.generate_completions.clone()") {
+                    if txt.contains("args.init_output.clone()")
+                        || txt.contains("args.generate_completions.clone()")
+                    {
                         occurrences.push(p.display().to_string());
                     }
                 }

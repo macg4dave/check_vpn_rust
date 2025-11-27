@@ -14,7 +14,7 @@ use std::time::Duration;
 /// listener (e.g., by connecting) to speed shutdown.
 pub fn start_metrics_server(addr: &str, keep_running: Arc<AtomicBool>) -> Option<JoinHandle<()>> {
     let addr = addr.to_string();
-    let kr = keep_running.clone();
+    let kr = Arc::clone(&keep_running);
     Some(std::thread::spawn(move || {
         let listener = match TcpListener::bind(&addr) {
             Ok(l) => l,

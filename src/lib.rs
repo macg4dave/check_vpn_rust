@@ -24,47 +24,47 @@
 // include! usage is deliberate and safe. Prefer directory modules where the
 // layout is stable.
 pub mod cli;
+pub mod completions;
+pub mod init_wizard;
 pub mod networking;
 pub mod providers;
-pub mod init_wizard;
-pub mod completions;
 
 pub mod ip_api {
-	include!("ip_api/mod.rs");
+    include!("ip_api/mod.rs");
 }
 
 pub mod metrics;
 
 pub mod app {
-	include!("app.rs");
+    include!("app.rs");
 }
 
 pub mod xml_io {
-	include!("xml_io/mod.rs");
+    include!("xml_io/mod.rs");
 }
 
 pub mod json_io {
-	include!("json_io/mod.rs");
+    include!("json_io/mod.rs");
 }
 
 pub mod error_types;
 
 // Shared helpers and modules
-pub mod fs_ops;
 pub mod actions;
-pub mod logging;
 pub mod config;
+pub mod fs_ops;
+pub mod logging;
 pub mod timer {
-	include!("timer.rs");
+    include!("timer.rs");
 }
 
 // Convenience re-exports for common items used throughout tests and the
 // examples in README. Keeping these re-exports stable makes the top-level
 // crate more ergonomic to use.
-pub use actions::Action;
 pub use actions::parse_action;
-pub use ip_api::get_isp;
-pub use providers::{VpnIdentity};
-pub use timer::{start_timer, TimerHandle};
-pub use networking::NetworkingError;
+pub use actions::Action;
 pub use config::Config;
+pub use ip_api::get_isp;
+pub use networking::NetworkingError;
+pub use providers::VpnIdentity;
+pub use timer::{start_timer, TimerHandle};

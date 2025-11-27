@@ -37,7 +37,7 @@ impl TimerHandle {
 /// chunks (10ms) between invocations and checks the stop flag between chunks.
 pub fn start_timer(interval_ms: u64, mut task: impl FnMut() + Send + 'static) -> TimerHandle {
     let stop = Arc::new(AtomicBool::new(false));
-    let stop_clone = stop.clone();
+    let stop_clone = Arc::clone(&stop);
 
     // Normalize zero to a sane minimum interval (1ms) to prevent tight spins.
     let interval = if interval_ms == 0 { 1 } else { interval_ms };

@@ -72,7 +72,6 @@ pub struct Args {
     pub config: Option<PathBuf>,
 
     // Metrics flags removed — metrics server is out of scope for this build.
-
     /// Exit with non-zero codes on errors even in long-running mode (useful for health checks)
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
     pub exit_on_error: bool,
@@ -140,8 +139,8 @@ impl Args {
 #[cfg(test)]
 mod tests {
     use super::Args;
-    use std::path::PathBuf;
     use clap::Parser;
+    use std::path::PathBuf;
 
     #[test]
     fn parse_args_connectivity_and_flags() {
@@ -209,7 +208,10 @@ mod tests {
         let urls = args.provider_urls.as_ref().unwrap();
         assert_eq!(urls.len(), 2);
         assert_eq!(urls[0], "http://example.test/json1");
-        assert_eq!(args.custom_json_server.as_ref().unwrap(), "http://single.example/json");
+        assert_eq!(
+            args.custom_json_server.as_ref().unwrap(),
+            "http://single.example/json"
+        );
         assert_eq!(args.custom_json_key.as_ref().unwrap(), "asn");
         assert!(args.init);
         assert_eq!(args.init_output.as_ref().unwrap(), "./gen.xml");
@@ -230,11 +232,17 @@ mod tests {
         // When --generate-completions is present without completions output, it should capture the shell
         let argv = vec!["check_vpn", "--generate-completions", "bash"];
         let args = Args::parse_from(argv);
-        assert_eq!(args.generate_completions.as_ref().map(|s| s.as_str()), Some("bash"));
+        assert_eq!(args.generate_completions.as_deref(), Some("bash"));
         assert!(args.completions_output.is_none());
 
         // When completions-output is provided it should be captured too
-        let argv2 = vec!["check_vpn", "--generate-completions", "zsh", "--completions-output", "./comp.zsh"];
+        let argv2 = vec![
+            "check_vpn",
+            "--generate-completions",
+            "zsh",
+            "--completions-output",
+            "./comp.zsh",
+        ];
         let args2 = Args::parse_from(argv2);
         assert_eq!(args2.generate_completions.as_deref(), Some("zsh"));
         assert_eq!(args2.completions_output.as_deref(), Some("./comp.zsh"));

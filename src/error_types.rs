@@ -1,7 +1,7 @@
+use crate::config::validation::ValidationErrors;
+use anyhow::Error as AnyhowError;
 use std::process::ExitCode;
 use thiserror::Error;
-use anyhow::Error as AnyhowError;
-use crate::config::validation::ValidationErrors;
 
 /// Application-level error kinds. These are used at boundaries so the binary
 /// can map errors to meaningful exit codes and messages.

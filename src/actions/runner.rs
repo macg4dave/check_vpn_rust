@@ -26,18 +26,24 @@ impl RealActionRunner {
             info!(
                 "Non-Linux platform detected — D-Bus considered unavailable; using shell/no-op fallbacks"
             );
-            return RealActionRunner { dbus_available: false };
+            return RealActionRunner {
+                dbus_available: false,
+            };
         }
 
         // Best-effort detection on Linux.
         match Connection::system() {
-            Ok(_) => RealActionRunner { dbus_available: true },
+            Ok(_) => RealActionRunner {
+                dbus_available: true,
+            },
             Err(e) => {
                 info!(
                     "Failed to connect to system D-Bus — will fall back to shell/no-op actions: {:?}",
                     e
                 );
-                RealActionRunner { dbus_available: false }
+                RealActionRunner {
+                    dbus_available: false,
+                }
             }
         }
     }
@@ -77,7 +83,11 @@ impl RealActionRunner {
             Ok(())
         } else {
             info!("D-Bus unavailable; running shell fallback for reboot");
-            match Command::new("sh").arg("-c").arg("systemctl reboot --no-block || reboot").status() {
+            match Command::new("sh")
+                .arg("-c")
+                .arg("systemctl reboot --no-block || reboot")
+                .status()
+            {
                 Ok(s) => {
                     if s.success() {
                         info!("Fallback reboot command executed successfully");
@@ -110,36 +120,36 @@ impl RealActionRunner {
             return Ok(());
         }
 
-            if self.dbus_available {
-                let conn = Connection::system().context("failed to connect to system bus")?;
-                let proxy = zbus::blocking::Proxy::new(
-                    &conn,
-                    "org.freedesktop.systemd1",
-                    "/org/freedesktop/systemd1",
-                    "org.freedesktop.systemd1.Manager",
-                )?;
-                // Mode can be "replace"
-                proxy.call_method("RestartUnit", &(unit, "replace"))?;
-                info!("Requested restart of unit '{}'", unit);
-                Ok(())
-            } else {
-                info!("D-Bus unavailable; running shell fallback for restart");
-                let command = format!("systemctl restart {}", unit);
-                match Command::new("sh").arg("-c").arg(command).status() {
-                    Ok(s) => {
-                        if s.success() {
-                            info!("Fallback restart command executed successfully");
-                        } else {
-                            error!("Fallback restart command returned non-zero: {:?}", s);
-                        }
-                        Ok(())
+        if self.dbus_available {
+            let conn = Connection::system().context("failed to connect to system bus")?;
+            let proxy = zbus::blocking::Proxy::new(
+                &conn,
+                "org.freedesktop.systemd1",
+                "/org/freedesktop/systemd1",
+                "org.freedesktop.systemd1.Manager",
+            )?;
+            // Mode can be "replace"
+            proxy.call_method("RestartUnit", &(unit, "replace"))?;
+            info!("Requested restart of unit '{}'", unit);
+            Ok(())
+        } else {
+            info!("D-Bus unavailable; running shell fallback for restart");
+            let command = format!("systemctl restart {}", unit);
+            match Command::new("sh").arg("-c").arg(command).status() {
+                Ok(s) => {
+                    if s.success() {
+                        info!("Fallback restart command executed successfully");
+                    } else {
+                        error!("Fallback restart command returned non-zero: {:?}", s);
                     }
-                    Err(e) => {
-                        error!("Failed to execute fallback restart command: {:?}", e);
-                        Err(e).context("failed to spawn restart fallback command")
-                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    error!("Failed to execute fallback restart command: {:?}", e);
+                    Err(e).context("failed to spawn restart fallback command")
                 }
             }
+        }
     }
 
     fn do_command(&self, cmd: &str, dry_run: bool) -> Result<()> {
@@ -151,7 +161,7 @@ impl RealActionRunner {
         // Fallback to executing the external command. This is the only place we use
         // external processes; prefer D-Bus actions where possible for a pure-Rust workflow.
         match Command::new("sh").arg("-c").arg(cmd).status() {
-                Ok(s) => {
+            Ok(s) => {
                 if s.success() {
                     info!("Command executed successfully");
                     Ok(())
@@ -217,8 +227,12 @@ mod tests {
 
         // All actions in dry-run must return Ok and not execute side-effects
         assert!(runner.execute(&Action::Reboot, true).is_ok());
-        assert!(runner.execute(&Action::RestartUnit("fake-unit".into()), true).is_ok());
-        assert!(runner.execute(&Action::Command("echo hi".into()), true).is_ok());
+        assert!(runner
+            .execute(&Action::RestartUnit("fake-unit".into()), true)
+            .is_ok());
+        assert!(runner
+            .execute(&Action::Command("echo hi".into()), true)
+            .is_ok());
     }
 
     #[test]
@@ -227,7 +241,11 @@ mod tests {
         let runner = RealActionRunner::new_with_dbus_available(true);
 
         assert!(runner.execute(&Action::Reboot, true).is_ok());
-        assert!(runner.execute(&Action::RestartUnit("fake-unit".into()), true).is_ok());
-        assert!(runner.execute(&Action::Command("echo hi".into()), true).is_ok());
+        assert!(runner
+            .execute(&Action::RestartUnit("fake-unit".into()), true)
+            .is_ok());
+        assert!(runner
+            .execute(&Action::Command("echo hi".into()), true)
+            .is_ok());
     }
 }

@@ -1,5 +1,5 @@
-use std::fs;
 use clap::Parser;
+use std::fs;
 
 #[test]
 fn generate_completions_writes_file() {
@@ -8,9 +8,13 @@ fn generate_completions_writes_file() {
     let path_str = path.to_str().unwrap().to_string();
 
     // Generate bash completions into the temp file
-    check_vpn::completions::generate_completions("bash", Some(path_str.as_str())).expect("generate comps");
+    check_vpn::completions::generate_completions("bash", Some(path_str.as_str()))
+        .expect("generate comps");
 
-    assert!(std::path::Path::new(&path_str).exists(), "completions file should be written");
+    assert!(
+        std::path::Path::new(&path_str).exists(),
+        "completions file should be written"
+    );
     let contents = fs::read_to_string(&path_str).expect("read comps");
     // A completion file for bash should contain the program name
     assert!(contents.contains("check_vpn"));

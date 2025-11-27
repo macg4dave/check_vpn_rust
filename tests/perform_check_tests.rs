@@ -1,8 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use check_vpn::config::Config;
 use check_vpn::cli::Args;
+use check_vpn::config::Config;
 use clap::Parser;
 
 #[test]
@@ -24,7 +24,10 @@ fn perform_check_runs_action_when_isp_matches() {
 
     check_vpn::app::perform_check(&eff, get_isp, run_action).expect("perform_check");
 
-    assert!(ran.load(Ordering::SeqCst), "expected action to run when ISP matches");
+    assert!(
+        ran.load(Ordering::SeqCst),
+        "expected action to run when ISP matches"
+    );
 }
 
 #[test]
@@ -45,7 +48,10 @@ fn perform_check_does_not_run_action_when_isp_differs() {
 
     check_vpn::app::perform_check(&eff, get_isp, run_action).expect("perform_check");
 
-    assert!(!ran.load(Ordering::SeqCst), "did not expect action to run when ISP differs");
+    assert!(
+        !ran.load(Ordering::SeqCst),
+        "did not expect action to run when ISP differs"
+    );
 }
 
 #[test]
@@ -66,6 +72,12 @@ fn perform_check_handles_get_isp_error_gracefully() {
 
     // Should not panic/exit; perform_check logs and returns Ok
     let res = check_vpn::app::perform_check(&eff, get_isp, run_action);
-    assert!(res.is_ok(), "perform_check should return Ok on get_isp error in non-fatal mode");
-    assert!(!ran.load(Ordering::SeqCst), "action should not run when get_isp fails");
+    assert!(
+        res.is_ok(),
+        "perform_check should return Ok on get_isp error in non-fatal mode"
+    );
+    assert!(
+        !ran.load(Ordering::SeqCst),
+        "action should not run when get_isp fails"
+    );
 }

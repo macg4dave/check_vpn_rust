@@ -33,6 +33,6 @@ pub fn query_first_success(providers: &[Box<dyn VpnInfoProvider>]) -> Result<Vpn
     Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no providers configured")))
 }
 
-pub mod ip_api_provider;
-pub mod ifconfig_co_provider;
 pub mod generic_json_provider;
+pub mod ifconfig_co_provider;
+pub mod ip_api_provider;

@@ -11,7 +11,10 @@ fn binary_accepts_config_flag() {
     // create a small config xml file
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let mut path = std::env::temp_dir();
-    path.push(format!("check_vpn_it_{}.xml", std::time::Instant::now().elapsed().as_nanos()));
+    path.push(format!(
+        "check_vpn_it_{}.xml",
+        std::time::Instant::now().elapsed().as_nanos()
+    ));
     let path_str = path.to_str().unwrap().to_string();
     let mut f = fs::File::create(&path_str).expect("create temp xml");
     f.write_all(xml.as_bytes()).expect("write xml");
@@ -32,7 +35,10 @@ fn binary_accepts_config_flag() {
 
     // Run binary with --config and --run-once --dry-run so it exits quickly
     let mut cmd = Command::new(bin);
-    cmd.arg("--config").arg(&path_str).arg("--run-once").arg("--dry-run");
+    cmd.arg("--config")
+        .arg(&path_str)
+        .arg("--run-once")
+        .arg("--dry-run");
     cmd.stderr(Stdio::inherit());
     cmd.stdout(Stdio::piped());
 
@@ -43,7 +49,10 @@ fn binary_accepts_config_flag() {
 
     // Binary should exit with code 0 when run-once + dry-run; ensure it started
     // and didn't crash with a missing flag error.
-    assert!(output.status.success(), "binary exited non-zero (stderr may contain details)");
+    assert!(
+        output.status.success(),
+        "binary exited non-zero (stderr may contain details)"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     // verify the program printed something helpful (e.g., logs). We only check it ran.
     let _ = stdout; // no-op; presence of output is not required — success status is sufficient

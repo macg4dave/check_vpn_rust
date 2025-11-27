@@ -1,12 +1,13 @@
+#![allow(dead_code)]
 // Lightweight helpers for integration tests.
 // Keep the API small and std-only so tests don't pull extra deps.
 
-use std::net::TcpListener;
 use std::io::{Read, Write};
-use std::sync::Arc;
-use std::time::Duration;
+use std::net::TcpListener;
 use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 /// Bind an ephemeral TCP listener on localhost and return it plus its port.
 ///
@@ -61,7 +62,9 @@ pub fn start_http_server(body: &'static str, status: u16) -> TestHttpServer {
     let body_arc = Arc::new(body.to_string());
 
     // Set non-blocking accept so shutdown signals are seen promptly
-    listener.set_nonblocking(true).expect("failed to set nonblocking listener");
+    listener
+        .set_nonblocking(true)
+        .expect("failed to set nonblocking listener");
     let handle = thread::spawn(move || {
         // Run until shutdown is requested via rx; use non-blocking accept in a loop
         loop {

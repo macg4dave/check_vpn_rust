@@ -62,7 +62,7 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
     }
 
     let keep_running = Arc::new(AtomicBool::new(true));
-    let kr = keep_running.clone();
+    let kr = Arc::clone(&keep_running);
     ctrlc::set_handler(move || {
         kr.store(false, Ordering::SeqCst);
         info!("Received termination signal, shutting down...");

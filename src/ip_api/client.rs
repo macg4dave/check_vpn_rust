@@ -175,10 +175,10 @@ mod tests {
         let big_body = "x".repeat(2048);
         let _m = server.mock(|when, then| {
             when.method(GET).path("/json");
-            then.status(200)
+                then.status(200)
                 .header("content-type", "application/json")
                 .header("content-length", "2048")
-                .body(big_body.clone());
+                .body(big_body.as_str());
         });
 
         let client = Client::builder()
@@ -202,7 +202,7 @@ mod tests {
 
         // Use a responding closure to simulate a 429 on the first call and 200 on the second.
         let call_count = std::sync::Arc::new(Mutex::new(0));
-        let call_count2 = call_count.clone();
+        let call_count2 = std::sync::Arc::clone(&call_count);
 
         let _m = server.mock(move |when, then| {
             when.method(GET).path("/json");

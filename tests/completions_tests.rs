@@ -8,9 +8,13 @@ fn completions_writes_output_file() {
     // Ensure any previous test artifact is removed.
     let _ = fs::remove_file(&path);
 
-    check_vpn::completions::generate_completions("bash", Some(path_str)).expect("generate completions");
+    check_vpn::completions::generate_completions("bash", Some(path_str))
+        .expect("generate completions");
 
-    assert!(std::path::Path::new(path_str).exists(), "completions file should be written");
+    assert!(
+        std::path::Path::new(path_str).exists(),
+        "completions file should be written"
+    );
     let contents = fs::read_to_string(path_str).expect("read file");
     // Basic sanity check — content should not be empty and should contain a completion marker.
     assert!(!contents.is_empty());
