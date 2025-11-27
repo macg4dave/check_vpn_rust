@@ -32,3 +32,13 @@ Thumbs.db
 
 # Local build artifacts produced by Makefile
 /artifacts/
+
+# Packaging outputs
+/release/
+
+# Per-arch target directories created by scripts
+/target-*/
+
+# Temporary packaging artifacts (root-level)
+/*.deb
+/*.rpm
