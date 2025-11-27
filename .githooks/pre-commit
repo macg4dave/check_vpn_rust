@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Simple pre-commit hook to prevent accidental commits of private keys, tokens, and obvious personal info.
+# This is intentionally conservative; it blocks commonly leaked markers and paths.
+
+set -euo pipefail
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | tr '\n' ' ')
+[ -n "$STAGED_FILES" ] || exit 0
+
+PATTERNS=(
+  "BEGIN PGP PRIVATE KEY BLOCK"
+  "BEGIN RSA PRIVATE KEY"
+  "BEGIN OPENSSH PRIVATE KEY"
+  "BEGIN PRIVATE KEY"
+  "private-keys-v1.d"
+  "~/.gnupg"
+  "~.gnupg.old"
+  "GITHUB_TOKEN"
+  "ghp_[A-Za-z0-9_]"
+  "gho_[A-Za-z0-9_]"
+  "ghs_[A-Za-z0-9_]"
+  "xoxb-[A-Za-z0-9_]"
+  "aws_secret_access_key"
+)
+
+EXIT_CODE=0
+
+for f in $STAGED_FILES; do
+  # Only scan text files; skip binaries
+  if git show :"$f" | grep -qI .; then
+    for p in "${PATTERNS[@]}"; do
+      if git show :"$f" | grep -E -n --color=always "$p" >/dev/null 2>&1; then
+        echo "[pre-commit] BLOCK: potential secret or personal data found in staged file: $f"
+        echo "         matched pattern: $p"
+        echo
+        git show :"$f" | grep -n --color=always -E "$p" | sed -n '1,6p'
+        EXIT_CODE=1
+      fi
+    done
+  fi
+done
+
+if [ "$EXIT_CODE" -ne 0 ]; then
+  echo
+  echo "Commit blocked. Remove the sensitive data from the staged files, or stash them, then commit again." >&2
+  exit $EXIT_CODE
+fi
+
+exit 0
