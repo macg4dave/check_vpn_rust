@@ -24,20 +24,12 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Build multi-arch Docker images and push to GHCR
-        env:
-          PLATFORMS: linux/amd64,linux/arm64
-          REPO: ghcr.io/${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Logging into GHCR using GITHUB_TOKEN"
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin || true
-
-          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-8)
-          docker buildx build --platform ${PLATFORMS} \
-            --tag "${REPO}:v${{ github.ref_name }}" \
-            --tag "${REPO}:latest" \
-            --push .
+      # NOTE: the project packaging takes place in the next step and uses
+      # scripts/build-all-packages.sh. Building a multi-arch container image
+      # from the repository root is not required for the release artifact
+      # packaging and previously failed because a root Dockerfile does not
+      # exist. Skipping direct image build here and relying on packaging
+      # helpers to create the artifacts that will be uploaded to the release.
 
       - name: Build packages (Docker-based)
         env:
