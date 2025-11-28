@@ -31,6 +31,14 @@ or from PowerShell/CMD:
 set ALLOW_NON_WSL=1 && make dev-all
 ```
 
+You can use `make help` for a quick summary, or one of the extended help commands (no side-effects) to get more details:
+
+- `make help-dev`
+- `make help-docker`
+- `make help-packaging`
+- `make help-windows`
+- `make help-targets` — full extended help including the `dev-all` WSL guard details
+
 If you're unsure where to start, check the issue tracker for "good first issue" labels.
 
 ## Docker image pushes (GHCR)

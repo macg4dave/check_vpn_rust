@@ -128,6 +128,8 @@ Note: we have removed PowerShell-specific helper scripts from the repository. To
 ### Windows (WSL2)
 - Use WSL shell and either `make` or the POSIX shell test/build scripts under `./scripts`. WSL will use the Linux toolchain and (if enabled) Docker Desktop's WSL integration. From Windows you can invoke WSL commands directly (e.g. `wsl make` or `wsl ./scripts/test-all-docker.sh`).
 
+See also `make help` for a summary, or use the sub-commands `make help-dev`, `make help-docker`, `make help-packaging`, and `make help-windows` for focused help, or `make help-targets` for extended Makefile help (includes the WSL guard for `dev-all`).
+
 Note: The `make dev-all` shortcut includes a guard that prevents running this target from a native Windows shell (PowerShell/CMD/Git Bash) by default; this reduces accidental environment mismatches. To run it from a native Windows shell (not recommended) set `ALLOW_NON_WSL=1`:
 
 ```bash

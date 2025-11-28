@@ -177,6 +177,14 @@ RUST_TEST_THREADS=1 cargo test --workspace -- --ignored --nocapture
 
 Note: On Windows this script uses a WSL2 guard and will not run in non-WSL shells by default. Use WSL2 (e.g., `wsl ./scripts/dev-all.sh`) or pass `--allow-non-wsl` to force execution.
 
+Run `make help` for a short summary or one of the extended help commands below:
+
+- `make help-dev` — development helpers
+- `make help-docker` — docker test/build helpers
+- `make help-packaging` — packaging helpers
+- `make help-windows` — Windows/WSL guidance
+- `make help-targets` — extended Makefile targets (includes `dev-all` and WSL guard info)
+
 If you prefer to use the Makefile shortcut `make dev-all`, the Makefile includes a similar guard and will abort in a native Windows shell by default. To override that guard and force the target to run from a native Windows shell, set the environment variable `ALLOW_NON_WSL=1`:
 
 ```bash

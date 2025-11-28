@@ -59,7 +59,11 @@ Run host tests & Docker tests from Windows (WSL2):
 wsl ./scripts/dev-all.sh
 ```
 
-Note: on Windows, this script will refuse to run in non-WSL shells by default; use a WSL2 shell (e.g. `wsl ./scripts/dev-all.sh`) or pass `--allow-non-wsl` to force it. If you call the Makefile shortcut `make dev-all`, the Makefile guard is controlled via the `ALLOW_NON_WSL` environment variable (e.g. `ALLOW_NON_WSL=1 make dev-all`).
+Note: on Windows, this script will refuse to run in non-WSL shells by default; use a WSL2 shell (e.g. `wsl ./scripts/dev-all.sh`) or pass `--allow-non-wsl` to force it.
+
+If you call the Makefile shortcut `make dev-all`, the Makefile guard is controlled via the `ALLOW_NON_WSL` environment variable (e.g. `ALLOW_NON_WSL=1 make dev-all`).
+
+Run `make help targets` for a short list of common Makefile targets and extended recommendations (it includes the `dev-all` WSL guard info).
 
 ## Notes
 

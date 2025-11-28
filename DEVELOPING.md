@@ -64,6 +64,14 @@ If you are developing on Windows we recommend using WSL2 for parity with the Deb
 - To use WSL2 from Windows: `wsl make release` or `wsl ./scripts/docker-build.sh debian build-release`
 - You can also open a WSL shell and run the POSIX scripts directly: `./scripts/test-all-docker.sh`, `./scripts/docker-build.sh` or `./scripts/build-all.sh`.
 
+Run `make help` for a quick summary, or one of the extended help commands for more details:
+
+ - `make help-dev`
+ - `make help-docker`
+ - `make help-packaging`
+ - `make help-windows`
+ - `make help-targets` — full extended help and the `dev-all` WSL guard details
+
 Note: If you use the `make dev-all` shortcut, the Makefile includes a guard that stops execution in native Windows shells (PowerShell/CMD/Git Bash) by default; this protects developers from running the POSIX test/build helpers in an unsupported environment. If you must run it in a native Windows shell (not recommended), set `ALLOW_NON_WSL=1` to override the guard:
 
 ```bash

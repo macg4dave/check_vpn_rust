@@ -226,7 +226,9 @@ test-macos-pkg-local:
 windows-build:
 	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."
 
-.PHONY: dev-all dev-docker
+.PHONY: dev-all dev-docker targets help-dev help-docker help-packaging help-windows help-targets
+targets:
+	@:
 dev-all:
 	@if [ "$(ALLOW_NON_WSL)" = "1" ]; then \
 		echo "ALLOW_NON_WSL set — proceeding in non-WSL environment (use with care)"; \
@@ -243,23 +245,19 @@ dev-docker:
 
 # Help target: show common targets and notes about Windows/WSL usage
 help:
-	@echo "check_vpn — Makefile Help"
-	@echo ""
-	@echo "Usage: make <target> [VAR=value]"
-	@echo "Common targets:"
-	@echo "  dev         — Run the development entry (cargo run)"
-	@echo "  build       — Debug build (cargo build)"
-	@echo "  release     — Release build (cargo build --release)"
-	@echo "  test-all-docker — Run Docker-based tests for Debian/Fedora via containers"
-	@echo "  debian-build-release — Produce Debian release artifacts via Docker"
-	@echo "  fedora-build-release — Produce Fedora release artifacts via Docker"
-	@echo "  package-all — Build platform packages (via Docker)"
-	@echo "  dev-all     — Run the host tests, dockerized tests, and packaging locally (POSIX/WSL recommended)"
-	@echo ""
-	@echo "Windows note:"
-	@echo "  We recommend using WSL2 on Windows for POSIX build/test helpers."
-	@echo "  If you use 'make dev-all' from a native Windows shell (PowerShell/CMD/Git Bash), the Makefile will prevent execution unless you set ALLOW_NON_WSL=1." 
-	@echo "  Recommended: wsl make dev-all"
-	@echo "  Override (not recommended): ALLOW_NON_WSL=1 make dev-all"
-	@echo ""
-	@echo "For script-only invocation: ./scripts/dev-all.sh --allow-non-wsl"
+	@sh ./scripts/make-help.sh
+
+help-dev:
+	@sh ./scripts/make-help.sh dev
+
+help-docker:
+	@sh ./scripts/make-help.sh docker
+
+help-packaging:
+	@sh ./scripts/make-help.sh packaging
+
+help-windows:
+	@sh ./scripts/make-help.sh windows
+
+help-targets:
+	@sh ./scripts/make-help.sh targets
