@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # contrib/ci — helper to run the full test-suite locally (including long/ignored tests)
 #
+# Windows note: To run on Windows, launch a WSL2 shell and run this script there (recommended). Do not run this from PowerShell.
+#
+# Note: This script predates the local 'dev-all' helper. For a single script that
+# runs tests, Dockerized tests, and packaging locally, consider using:
+#   ./scripts/dev-all.sh
+#
 # This script makes it easy to reproduce the CI / integration-test behavior locally.
 # It supports two modes:
 #  - local : run the full test suite directly on your host Rust toolchain
@@ -10,6 +16,7 @@
 #   ./contrib/ci local        # run tests on your host
 #   ./contrib/ci docker       # run tests inside the reproducible Debian container
 #   ./contrib/ci docker short # build the container and run only non-ignored tests
+#   ./contrib/ci docker-build # build multi-arch images locally (no push)
 
 set -euo pipefail
 
@@ -26,6 +33,16 @@ case "$mode" in
     RUST_TEST_THREADS=1 cargo test --workspace -- --ignored --nocapture
     ;;
 
+  dev-all)
+    echo "Running dev-all helper script (host tests + docker tests + packaging)"
+    if [ -x ./scripts/dev-all.sh ]; then
+      ./scripts/dev-all.sh
+    else
+      echo "scripts/dev-all.sh not found or not executable; please run ./contrib/ci local or run scripts/dev-all.sh directly"
+      exit 1
+    fi
+    ;;
+
   docker)
     echo "Building reproducible test image (contrib/Dockerfile.debian)"
     docker build -t check_vpn_integration -f contrib/Dockerfile.debian .
@@ -39,9 +56,25 @@ case "$mode" in
     docker run --rm check_vpn_integration cargo test --workspace --verbose
     ;;
 
+  docker-build)
+    echo "Build multi-arch images locally (no push by default)"
+    echo "Ensure you have Docker Desktop / BuildKit enabled and QEMU configured"
+    echo "Setting up buildx + QEMU (requires privileged Docker access)"
+    docker run --privileged --rm tonistiigi/binfmt --install all
+    docker buildx create --use --name buildx-builder || true
+    docker buildx inspect --bootstrap
+    echo "Building images for linux/amd64 and linux/arm64 using contrib/Dockerfile"
+    for plat in linux/amd64 linux/arm64; do
+      echo "Building for $plat"
+      # Docker tag names cannot contain '/'; replace slashes with '-' (linux-arm64)
+      sanitized_platform=${plat//\//-}
+      docker buildx build --platform "$plat" -f contrib/Dockerfile --load -t "check_vpn_integration:${sanitized_platform}" .
+    done
+    ;;
+
   *)
     echo "Unknown mode: $mode"
-    echo "Usage: $0 {local|docker|docker-short}"
+    echo "Usage: $0 {local|docker|docker-short|docker-build}"
     exit 2
     ;;
 esac

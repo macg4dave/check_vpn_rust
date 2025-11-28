@@ -64,6 +64,18 @@ If you are developing on Windows we recommend using WSL2 for parity with the Deb
 - To use WSL2 from Windows: `wsl make release` or `wsl ./scripts/docker-build.sh debian build-release`
 - You can also open a WSL shell and run the POSIX scripts directly: `./scripts/test-all-docker.sh`, `./scripts/docker-build.sh` or `./scripts/build-all.sh`.
 
+Note: If you use the `make dev-all` shortcut, the Makefile includes a guard that stops execution in native Windows shells (PowerShell/CMD/Git Bash) by default; this protects developers from running the POSIX test/build helpers in an unsupported environment. If you must run it in a native Windows shell (not recommended), set `ALLOW_NON_WSL=1` to override the guard:
+
+```bash
+ALLOW_NON_WSL=1 make dev-all
+```
+
+From PowerShell/CMD:
+
+```powershell
+set ALLOW_NON_WSL=1 && make dev-all
+```
+
 Docker-based Debian/Fedora builds (recommended for reproducible Linux artifacts)
 
 These use the Dockerfiles under `contrib/`.
@@ -99,13 +111,13 @@ docker run --rm -v "$PWD":/work -w /work check_vpn_fedora \
 
 macOS builds
 
-- Recommended: use GitHub Actions macOS runner (`macos-latest`) to produce macOS artifacts. For repository CI, see `.github/workflows/docker-builds.yml` and `.github/workflows/release-docker.yml`.
+- Recommended: use GitHub Actions macOS runner (`macos-latest`) to produce macOS artifacts. Historically the repository used GitHub Actions workflows (`.github/workflows/docker-builds.yml`, `.github/workflows/release-docker.yml`) but recent changes encourage running CI tasks locally; see `./scripts/dev-all.sh` for a one-command local reproduction of CI tasks.
 - Alternative: build natively on a Mac using `cargo build --release`.
 - Cross-compiling to macOS (from Linux/Windows) is not recommended unless you have an Apple SDK and osxcross; Apple SDKs are restricted by licensing and not bundled.
 
 CI behaviour
 
-- The previous matrix workflow has been archived; CI now focuses on Docker-based builds (`docker-builds.yml`) and a single canonical tag release (`release-docker.yml`).
+- The previous matrix workflow has been archived, and GitHub workflows are kept for historical reference under `.github/workflows/archived/`. The recommended approach for developers now is to run tests and packaging locally using the `./scripts/dev-all.sh` script which reproduces the main CI flows (host tests, Dockerized tests, packaging).
 - On `ubuntu-latest`, the workflow builds Docker images from `contrib/Dockerfile.debian` and `contrib/Dockerfile.fedora`, runs `cargo build --release` inside them, and uploads tarball artifacts.
 - On `macos-latest`, the workflow runs a native `cargo build --release` and uploads the resulting binary.
 - On `windows-latest`, CI runs Windows-native packaging steps on the `windows-latest` runner; locally we recommend using WSL2 or CI for packaged Windows artifacts.

@@ -132,7 +132,7 @@ This is intentionally local-only (no CI, no uploading) and produces a package yo
 
 Steps:
 
-  - Build and create a .pkg and tarball (must run on macOS):
+- Build and create a .pkg and tarball (must run on macOS):
 
     ```bash
     make package-macos-local
@@ -148,6 +148,67 @@ Steps:
 
 Notes:
 
-  - By default the package's postinstall does NOT auto-load the LaunchDaemon (safe default). If you want the
-    installer to try to load the LaunchDaemon automatically, set `CHECK_VPN_PKG_AUTOLOAD=true` when building (not recommended for casual testing).
-  - Signing and notarization are not included here; they require an Apple Developer account and are left as a follow-up.
+- By default the package's postinstall does NOT auto-load the LaunchDaemon (safe default). If you want the
+  installer to try to load the LaunchDaemon automatically, set `CHECK_VPN_PKG_AUTOLOAD=true` when building (not recommended for casual testing).
+- Signing and notarization are not included here; they require an Apple Developer account and are left as a follow-up.
+
+## Running CI locally (replace GitHub Actions)
+
+If you want to run the full CI and packaging locally without relying on GitHub Actions, the repo provides scripts and helpers to reproduce the CI tasks on your host and in containers:
+
+- Run unit and integration tests locally (single-threaded):
+
+```bash
+RUST_TEST_THREADS=1 cargo test --workspace -- --ignored --nocapture
+```
+
+- Run the containerized test suite (Debian image):
+
+```bash
+./contrib/ci docker
+```
+
+- Run the developer local 'CI' tasks (host tests, docker tests and packaging):
+
+```bash
+./scripts/dev-all.sh
+# Optional flags: --skip-docker --skip-packages --include-ignored
+```
+
+Note: On Windows this script uses a WSL2 guard and will not run in non-WSL shells by default. Use WSL2 (e.g., `wsl ./scripts/dev-all.sh`) or pass `--allow-non-wsl` to force execution.
+
+If you prefer to use the Makefile shortcut `make dev-all`, the Makefile includes a similar guard and will abort in a native Windows shell by default. To override that guard and force the target to run from a native Windows shell, set the environment variable `ALLOW_NON_WSL=1`:
+
+```bash
+ALLOW_NON_WSL=1 make dev-all
+```
+
+From PowerShell/CMD:
+
+```powershell
+set ALLOW_NON_WSL=1 && make dev-all
+```
+
+## WSL2 setup (Windows)
+
+If you're on Windows, install WSL2 and run the POSIX helper scripts inside the WSL2 environment. For a quick setup:
+
+- Install WSL2: follow the Microsoft guide: [Install WSL2](https://learn.microsoft.com/windows/wsl/install).
+- Install a WSL distro like Ubuntu from the Microsoft Store and enable Docker Desktop's WSL integration if needed.
+
+Install Rust in WSL via `rustup` (see [rustup](https://rustup.rs)):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Once WSL and Rust are installed, use the dev helper from WSL:
+
+```bash
+wsl ./scripts/dev-all.sh
+```
+
+
+On Windows, use WSL2 and run the POSIX helper from inside WSL rather than PowerShell: `wsl ./scripts/dev-all.sh` (Optional flags: `--skip-docker`, `--skip-packages`, `--include-ignored`)
+
+These scripts are intended to reproduce the primary CI tasks locally: running tests, building Docker images, and producing packaging artifacts. When running packaging steps locally you will need Docker/Buildx and QEMU or platform-specific packaging tools (e.g., cargo-deb or fpm) installed and available.

@@ -48,17 +48,19 @@ cargo test
 cargo test --test timer_tests
 ```
 
-Windows PowerShell examples (the user's default shell):
-```powershell
+
+Windows (WSL2) examples (run these from Windows using WSL2):
+```bash
 # build
-cargo build --release
+wsl cargo build --release
 
 # run tests
-cargo test
+wsl cargo test
 
 # run a single test file
-cargo test --test timer_tests
+wsl cargo test --test timer_tests
 ```
+
 
 ## Files of interest
 

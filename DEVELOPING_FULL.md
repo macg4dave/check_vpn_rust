@@ -28,7 +28,7 @@ If you need a short summary, use `DEVELOPING.md` top-level commands. This file e
 ### Fedora (for packaging parity)
 - Docker Desktop or native Docker Engine on Linux
 
-### Windows (native)
+### Windows (native notes)
 - Windows 10/11 (latest updates)
 - rustup (https://rustup.rs)
 - Visual Studio Build Tools (C++ workload) for MSVC toolchain, or MSYS2 for GNU toolchain
@@ -122,11 +122,23 @@ cargo clippy --all-targets --all-features
 ### macOS (native)
 - Ensure Xcode Command Line Tools and Homebrew deps installed. Then run `cargo build --release`.
 
--### Windows (native)
+### Windows (native)
 Note: we have removed PowerShell-specific helper scripts from the repository. To produce Windows artifacts you can either use the CI on `windows-latest` or build on a native Windows machine using the Visual Studio toolchain. If you prefer a POSIX workflow, use WSL2 and run the normal POSIX helpers from a WSL shell (see "Windows (WSL2)" below).
 
 ### Windows (WSL2)
 - Use WSL shell and either `make` or the POSIX shell test/build scripts under `./scripts`. WSL will use the Linux toolchain and (if enabled) Docker Desktop's WSL integration. From Windows you can invoke WSL commands directly (e.g. `wsl make` or `wsl ./scripts/test-all-docker.sh`).
+
+Note: The `make dev-all` shortcut includes a guard that prevents running this target from a native Windows shell (PowerShell/CMD/Git Bash) by default; this reduces accidental environment mismatches. To run it from a native Windows shell (not recommended) set `ALLOW_NON_WSL=1`:
+
+```bash
+ALLOW_NON_WSL=1 make dev-all
+```
+
+From PowerShell/CMD:
+
+```powershell
+set ALLOW_NON_WSL=1 && make dev-all
+```
 
 ## Docker-based reproducible builds (Debian / Fedora)
 
@@ -196,7 +208,7 @@ Alternatively the repo includes a helper script to run the full test-suite (incl
 - `Makefile` — convenience tasks for local dev and Docker builds (targets: `all`, `release`, `debian-build-release`, `fedora-build-release`, `test-all-docker`, `windows-test-all-docker`).
 - `scripts/*.sh` — POSIX shell helpers for builds and Docker operations (recommended). WSL2 users can run these from a WSL shell or via `wsl` from a Windows shell.
 - `scripts/*.sh` — POSIX shell counterparts for WSL/Linux/macOS.
-- `.github/workflows/ci-matrix.yml` — archived; prefer `docker-builds.yml` and `release-docker.yml` for the current CI flow.
+.github/workflows/matrix.yml — previously used matrix workflow is archived in .github/workflows/archived/. To reproduce the CI workflows locally, use `./scripts/dev-all.sh`.
 
 ---
 

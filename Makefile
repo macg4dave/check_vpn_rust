@@ -2,6 +2,26 @@ IMAGE_NAME := check_vpn_tests
 ARTIFACT_DIR := artifacts
 UNAME_S := $(shell uname -s)
 
+# Detect WSL or native Windows (PowerShell/CMD/Git Bash/Cygwin)
+# - If UNAME_S contains MINGW/MSYS/CYGWIN or OS==Windows_NT and there's no
+#   WSL_DISTRO_NAME nor 'Microsoft' kernel, treat as native Windows shell.
+# - Otherwise assume POSIX/WSL environment.
+ifeq ($(findstring MINGW,$(UNAME_S)),MINGW)
+	WSL_DETECTED := no
+else ifeq ($(findstring MSYS,$(UNAME_S)),MSYS)
+	WSL_DETECTED := no
+else ifeq ($(findstring CYGWIN,$(UNAME_S)),CYGWIN)
+	WSL_DETECTED := no
+else ifeq ($(OS),Windows_NT)
+	ifneq ($(WSL_DISTRO_NAME),)
+		WSL_DETECTED := yes
+	else
+		WSL_DETECTED := no
+	endif
+else
+	WSL_DETECTED := yes
+endif
+
 # Default: build host, Debian, Fedora, and Windows artifacts. macOS build runs
 # only when on macOS. Windows build runs only on Windows.
 .PHONY: all _maybe-macos _maybe-windows
@@ -141,7 +161,7 @@ package-fedora:
 	fi'
 
 
-.PHONY: dev build release fmt clippy clean build-macos windows-build
+.PHONY: help dev build release fmt clippy clean build-macos windows-build
 # Local convenience targets for native development
 dev:
 	cargo run
@@ -205,3 +225,41 @@ test-macos-pkg-local:
 # Helper target to remind Windows users to run builds in WSL2 or the CI.
 windows-build:
 	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."
+
+.PHONY: dev-all dev-docker
+dev-all:
+	@if [ "$(ALLOW_NON_WSL)" = "1" ]; then \
+		echo "ALLOW_NON_WSL set — proceeding in non-WSL environment (use with care)"; \
+	elif [ "$(WSL_DETECTED)" = "no" ]; then \
+		echo "ERROR: It appears you're running 'make dev-all' from a Windows (non-WSL) shell."; \
+		echo "Please use WSL2 for proper POSIX parity and Docker integration or set ALLOW_NON_WSL=1 to force"; \
+		echo "Example: wsl make dev-all"; \
+		exit 1; \
+	fi; \
+	@sh -c './scripts/dev-all.sh || true'
+
+dev-docker:
+	@sh -c './contrib/ci docker || true'
+
+# Help target: show common targets and notes about Windows/WSL usage
+help:
+	@echo "check_vpn — Makefile Help"
+	@echo ""
+	@echo "Usage: make <target> [VAR=value]"
+	@echo "Common targets:"
+	@echo "  dev         — Run the development entry (cargo run)"
+	@echo "  build       — Debug build (cargo build)"
+	@echo "  release     — Release build (cargo build --release)"
+	@echo "  test-all-docker — Run Docker-based tests for Debian/Fedora via containers"
+	@echo "  debian-build-release — Produce Debian release artifacts via Docker"
+	@echo "  fedora-build-release — Produce Fedora release artifacts via Docker"
+	@echo "  package-all — Build platform packages (via Docker)"
+	@echo "  dev-all     — Run the host tests, dockerized tests, and packaging locally (POSIX/WSL recommended)"
+	@echo ""
+	@echo "Windows note:"
+	@echo "  We recommend using WSL2 on Windows for POSIX build/test helpers."
+	@echo "  If you use 'make dev-all' from a native Windows shell (PowerShell/CMD/Git Bash), the Makefile will prevent execution unless you set ALLOW_NON_WSL=1." 
+	@echo "  Recommended: wsl make dev-all"
+	@echo "  Override (not recommended): ALLOW_NON_WSL=1 make dev-all"
+	@echo ""
+	@echo "For script-only invocation: ./scripts/dev-all.sh --allow-non-wsl"

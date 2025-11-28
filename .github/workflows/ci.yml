@@ -10,4 +10,4 @@ jobs:
     steps:
       - name: Noop
         run: |
-          echo "ARCHIVED: legacy CI (disabled) - use docker-builds.yml and release-docker.yml"
+          echo "ARCHIVED: legacy CI (disabled) - use ./scripts/dev-all.sh or ./contrib/ci to run local CI"
