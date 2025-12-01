@@ -29,11 +29,7 @@ pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
 #[cfg(all(feature = "xml_quick", feature = "xml_pretty"))]
 pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
     let compact = quick_xml::se::to_string(value)?;
-    let pretty = compact.replace(
-        "><", ">
-<",
-    );
-    Ok(pretty)
+    Ok(pretty_print_xml(&compact))
 }
 
 #[cfg(feature = "xml_quick")]
@@ -42,6 +38,33 @@ fn extract_line_col(_err_msg: &str, doc: &str) -> Option<(usize, usize)> {
         return Some((doc.lines().count(), 1));
     }
     None
+}
+
+#[cfg(all(feature = "xml_quick", feature = "xml_pretty"))]
+fn pretty_print_xml(s: &str) -> String {
+    // Lightweight formatter for simple config XML (best-effort indentation).
+    let mut out = String::new();
+    let mut indent: i32 = 0;
+    let tokens = s.replace("><", ">\n<");
+    for line in tokens.lines() {
+        let l = line.trim();
+        if l.starts_with("</") && indent > 0 {
+            indent -= 1;
+        }
+        for _ in 0..indent {
+            out.push_str("  ");
+        }
+        out.push_str(l);
+        out.push('\n');
+        if l.starts_with('<')
+            && !l.starts_with("</")
+            && !l.ends_with("/>")
+            && !l.contains("</")
+        {
+            indent += 1;
+        }
+    }
+    out.trim_end().to_string()
 }
 
 #[cfg(all(feature = "xml_serde", not(feature = "xml_quick")))]

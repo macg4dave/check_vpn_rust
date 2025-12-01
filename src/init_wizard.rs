@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use std::io::IsTerminal;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -63,42 +63,16 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
     if interval == 0 {
         return Err(anyhow!("interval must be greater than zero"));
     }
-    let action = prompt_default(
-        interactive,
-        "Action type (reboot|restart-unit|command)",
-        "restart-unit",
-    )?;
-    let action_arg = match action.as_str() {
-        "restart-unit" => prompt_default(
-            interactive,
-            "Systemd unit to restart",
-            "openvpn-client@myvpn.service",
-        )?,
-        "command" => prompt_default(
-            interactive,
-            "Command to run",
-            "/usr/local/bin/reconnect_vpn.sh",
-        )?,
-        "reboot" => String::new(),
-        other => {
-            return Err(anyhow!(
-                "invalid action type '{}'; expected reboot, restart-unit, or command",
-                other
-            ))
-        }
-    };
-    if (action == "restart-unit" || action == "command") && action_arg.trim().is_empty() {
-        return Err(anyhow!(
-            "vpn_lost_action_arg must be provided for restart-unit and command action types"
-        ));
-    }
+    // Action selection is out of scope for the wizard; rely on runtime defaults
+    // (command + echo "vpn lost") to avoid dangerous reboot actions on platforms
+    // where they may fail or be unavailable.
 
     // Build Config
     let cfg = Config {
         interval: Some(interval),
         isp_to_check: Some(isp),
-        vpn_lost_action_type: Some(action),
-        vpn_lost_action_arg: Some(action_arg),
+        vpn_lost_action_type: Some("command".to_string()),
+        vpn_lost_action_arg: Some(r#"echo "vpn lost""#.to_string()),
         dry_run: Some(false),
         exit_on_error: Some(false),
         connectivity_endpoints: Some(vec!["8.8.8.8".to_string(), "google.com".to_string()]),
@@ -119,8 +93,34 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
         return Err(anyhow!("generated config failed validation: {}", joined));
     }
 
-    let out_path = output.unwrap_or("./check_vpn.xml");
-    crate::xml_io::write_xml(&cfg, out_path)?;
+    let default_path = {
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                std::path::Path::new(&home)
+                    .join("Library")
+                    .join("Preferences")
+                    .join("check_vpn")
+                    .join("config.xml")
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                "./check_vpn.xml".to_string()
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            "./check_vpn.xml".to_string()
+        }
+    };
+
+    let out_path: String = output
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| default_path.clone());
+    crate::fs_ops::ensure_parent_dir_exists(&out_path, "config")
+        .context("failed to create parent directory for generated config")?;
+    crate::xml_io::write_xml(&cfg, &out_path)
+        .with_context(|| format!("failed to write generated config to {}", out_path))?;
     println!("Wrote {}", out_path);
     Ok(())
 }

@@ -33,7 +33,7 @@ serial_test = "3.2.0"
 tempfile = "3"
 
 [features]
-default = ["xml_quick", "json_pretty"]
+default = ["xml_quick", "json_pretty", "xml_pretty"]
 # Use quick-xml for fast serde-based XML de/ser
 xml_quick = ["dep:quick-xml"]
 # Use serde-xml-rs as the backend instead (slower, but sometimes more lenient)

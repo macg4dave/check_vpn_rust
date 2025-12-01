@@ -88,8 +88,7 @@ pub fn init_with_verbosity(verbosity: u8) {
 
     #[cfg(not(feature = "observability"))]
     {
-        use env_logger::Env;
-        use std::io::Write;
+        use env_logger::{Env, WriteStyle};
 
         set_rust_log_if_unset(level);
 
@@ -97,16 +96,9 @@ pub fn init_with_verbosity(verbosity: u8) {
         // environment variable RUST_LOG is set, that will take precedence.
         let env = Env::default().default_filter_or(level);
         let mut builder = env_logger::Builder::from_env(env);
-        builder.format(|buf, record| {
-            writeln!(
-                buf,
-                "{} {:<5} [{}] {}",
-                buf.timestamp_millis(),
-                record.level(),
-                record.target(),
-                record.args()
-            )
-        });
+        builder.write_style(WriteStyle::Auto);
+        builder.format_timestamp_millis();
+        builder.format_target(true);
         let _ = builder.try_init();
     }
 

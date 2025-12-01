@@ -80,6 +80,25 @@ fn roundtrip_example_config() {
 }
 
 #[test]
+fn pretty_xml_inserts_newlines_and_indentation() {
+    let cfg = check_vpn::config::Config::default();
+    let (_td, p) = support::temp_dir_with_child("xml_pretty", "check_vpn_pretty.xml");
+    let path_str = p.to_str().expect("failed to get path string");
+
+    check_vpn::xml_io::write_xml(&cfg, path_str).expect("write_xml failed");
+    let contents = std::fs::read_to_string(path_str).expect("read back");
+
+    assert!(
+        contents.contains('\n'),
+        "pretty XML should contain newlines"
+    );
+    assert!(
+        contents.contains("  <"),
+        "pretty XML should contain indentation"
+    );
+}
+
+#[test]
 fn malformed_xml_errors_gracefully() {
     // Missing closing tag for <config> and interval not closed properly
     let bad_xml = r#"<config><interval>60<interval><isp_to_check>BadISP</isp_to_check>"#;

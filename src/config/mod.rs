@@ -125,14 +125,14 @@ impl Config {
             .vpn_lost_action_type
             .as_deref()
             .or(self.vpn_lost_action_type.as_deref())
-            .unwrap_or("reboot")
+            .unwrap_or("command")
             .to_string();
 
         let action_arg = args
             .vpn_lost_action_arg
             .as_deref()
             .or(self.vpn_lost_action_arg.as_deref())
-            .unwrap_or("/sbin/shutdown -r now")
+            .unwrap_or(r#"echo "vpn lost""#)
             .to_string();
 
         let dry_run = if args.dry_run {
@@ -245,8 +245,8 @@ impl Default for Config {
         Config {
             interval: Some(60),
             isp_to_check: Some("Hutchison 3G UK Ltd".to_string()),
-            vpn_lost_action_type: Some("reboot".to_string()),
-            vpn_lost_action_arg: Some("/sbin/shutdown -r now".to_string()),
+            vpn_lost_action_type: Some("command".to_string()),
+            vpn_lost_action_arg: Some(r#"echo "vpn lost""#.to_string()),
             dry_run: Some(false),
             connectivity_endpoints: Some(vec!["8.8.8.8".to_string(), "google.com".to_string()]),
             connectivity_ports: Some(vec![
@@ -319,6 +319,32 @@ impl Config {
         let etc = std::path::Path::new("/etc/check_vpn/config.xml");
         if etc.exists() {
             return Self::load_from_path(etc);
+        }
+
+        // On macOS, if no config is found anywhere, create a default one under
+        // ~/Library/Preferences/check_vpn/config.xml to match platform norms.
+        #[cfg(target_os = "macos")]
+        {
+            if let Ok(home) = std::env::var("HOME") {
+                let mac_path = std::path::Path::new(&home)
+                    .join("Library")
+                    .join("Preferences")
+                    .join("check_vpn")
+                    .join("config.xml");
+                if !mac_path.exists() {
+                    let cfg = Config::default();
+                    if let Err(e) = crate::xml_io::write_xml(&cfg, &mac_path.to_string_lossy()) {
+                        log::warn!(
+                            "failed to write default macOS config at {}: {:?}",
+                            mac_path.display(),
+                            e
+                        );
+                    } else {
+                        log::info!("wrote default config to {}", mac_path.display());
+                        return Ok(cfg);
+                    }
+                }
+            }
         }
 
         Ok(Config::default())

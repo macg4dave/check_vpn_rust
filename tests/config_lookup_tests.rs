@@ -68,3 +68,39 @@ fn test_config_lookup_order_user_and_system() {
         assert!(val == 456 || val == 789 || val == 999 || val == 60);
     });
 }
+
+#[cfg(target_os = "macos")]
+#[test]
+#[serial(env)]
+fn macos_load_writes_default_config_when_missing() {
+    use std::env;
+    use std::path::PathBuf;
+
+    let td = tempfile::tempdir().expect("create tempdir");
+    let home = td.path().join("home");
+    fs::create_dir_all(&home).unwrap();
+
+    let _home_guard = support::ScopedEnv::set_str("HOME", home.to_str().unwrap());
+    let _cfg_guard = support::ScopedEnv::set("CHECK_VPN_CONFIG", None);
+
+    // Avoid picking up any cwd-local config by running in the temp home.
+    let cwd_before = env::current_dir().unwrap();
+    env::set_current_dir(&home).unwrap();
+
+    let cfg = check_vpn::config::Config::load().expect("load default");
+    assert_eq!(cfg.interval.unwrap(), 60);
+
+    let mac_path: PathBuf = home
+        .join("Library")
+        .join("Preferences")
+        .join("check_vpn")
+        .join("config.xml");
+    assert!(
+        mac_path.exists(),
+        "expected default config to be written to {}",
+        mac_path.display()
+    );
+
+    // restore cwd
+    env::set_current_dir(cwd_before).unwrap();
+}

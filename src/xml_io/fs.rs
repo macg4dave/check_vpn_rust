@@ -46,6 +46,8 @@ pub fn write_xml<T: Serialize>(value: &T, path: &str) -> Result<()> {
     let _enter = span.enter();
 
     let xml = super::backend::serialize_xml(value).context("failed to serialize to xml")?;
+    // Ensure the target directory exists before writing.
+    crate::fs_ops::ensure_parent_dir_exists(path, "xml")?;
     crate::fs_ops::write_string(path, &xml, "xml")?;
     log::debug!(
         "xml_io::write_xml wrote path={} bytes={} in {:?}",
