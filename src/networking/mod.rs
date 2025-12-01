@@ -1,4 +1,5 @@
 use log::{debug, trace};
+use std::net::{IpAddr, SocketAddr};
 use std::thread::sleep;
 use std::time::Duration;
 mod connect;
@@ -13,6 +14,81 @@ pub const DEFAULT_RETRIES: usize = 1;
 
 /// Default ports to try when endpoint does not include an explicit port.
 pub const DEFAULT_PORTS: [u16; 3] = [443u16, 53u16, 80u16];
+
+fn format_host_port(host: &str, port: u16) -> String {
+    if host.starts_with('[') {
+        format!("{}:{}", host, port)
+    } else if host.contains(':') {
+        format!("[{}]:{}", host, port)
+    } else {
+        format!("{}:{}", host, port)
+    }
+}
+
+fn parse_bracketed_host(endpoint: &str) -> Option<(String, Option<u16>)> {
+    if !endpoint.starts_with('[') {
+        return None;
+    }
+    let close = endpoint.rfind(']')?;
+    let host = endpoint[1..close].to_string();
+    let remainder = endpoint.get(close + 1..).unwrap_or_default();
+    if remainder.is_empty() {
+        return Some((host, None));
+    }
+    if let Some(port_str) = remainder.strip_prefix(':') {
+        if let Ok(port) = port_str.parse::<u16>() {
+            return Some((host, Some(port)));
+        }
+    }
+    None
+}
+
+fn expand_endpoint_candidates(endpoint: &str, ports: &[u16]) -> Vec<String> {
+    let trimmed = endpoint.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    // Exact socket address with a port (IPv4 or IPv6 with brackets)
+    if trimmed.parse::<SocketAddr>().is_ok() {
+        return vec![trimmed.to_string()];
+    }
+
+    // Bracketed IPv6 literal with or without explicit port.
+    if let Some((host, port)) = parse_bracketed_host(trimmed) {
+        let bracketed = format!("[{}]", host);
+        return match port {
+            Some(p) => vec![format_host_port(&bracketed, p)],
+            None => ports
+                .iter()
+                .map(|p| format_host_port(&bracketed, *p))
+                .collect(),
+        };
+    }
+
+    // Plain IP without port: append defaults, bracketing IPv6 literals.
+    if let Ok(ip) = trimmed.parse::<IpAddr>() {
+        return ports
+            .iter()
+            .map(|p| format_host_port(&ip.to_string(), *p))
+            .collect();
+    }
+
+    // Hostname with explicit port (hostname:port)
+    if let Some((host, port_str)) = trimmed.rsplit_once(':') {
+        if !host.contains(']') && !host.contains(':') {
+            if let Ok(port) = port_str.parse::<u16>() {
+                return vec![format_host_port(host, port)];
+            }
+        }
+    }
+
+    // Hostname (or any other string) without a port: append defaults.
+    ports
+        .iter()
+        .map(|p| format_host_port(trimmed, *p))
+        .collect()
+}
 
 /// Check whether any of the provided endpoints are reachable using a TCP connect
 /// as a lightweight "ping" (avoids raw socket privileges).
@@ -56,12 +132,10 @@ pub fn is_online_with_retries<S: AsRef<str>>(
     for ep in endpoints {
         let s = ep.as_ref();
 
-        let candidates = if s.contains(':') {
-            // Already contains a port
-            vec![s.to_string()]
-        } else {
-            ports.iter().map(|p| format!("{}:{}", s, p)).collect()
-        };
+        let candidates = expand_endpoint_candidates(s, ports);
+        if candidates.is_empty() {
+            continue;
+        }
 
         // Try each candidate address; each may be attempted `attempts` times
         // to allow transient failures to recover.
@@ -95,4 +169,48 @@ pub fn is_online_with_retries<S: AsRef<str>>(
 
     // No endpoint accepted a connection within given attempts/timeouts.
     Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+
+    #[test]
+    fn ipv6_endpoint_without_port_is_supported() {
+        // Not all environments have IPv6; skip if binding fails.
+        let listener = match TcpListener::bind("[::1]:0") {
+            Ok(l) => l,
+            Err(_) => return,
+        };
+        let port = listener.local_addr().unwrap().port();
+        let endpoints = vec!["::1".to_string()];
+        let res = is_online_with_retries(&endpoints, 1, &[port], 1);
+        assert_eq!(res.unwrap_or(false), true);
+    }
+
+    #[test]
+    fn ipv6_endpoint_with_brackets_and_default_port() {
+        let listener = match TcpListener::bind("[::1]:0") {
+            Ok(l) => l,
+            Err(_) => return,
+        };
+        let port = listener.local_addr().unwrap().port();
+        let endpoints = vec!["[::1]".to_string()];
+        let res = is_online_with_retries(&endpoints, 1, &[port], 1);
+        assert_eq!(res.unwrap_or(false), true);
+    }
+
+    #[test]
+    fn ipv6_endpoint_with_explicit_port_keeps_port() {
+        let listener = match TcpListener::bind("[::1]:0") {
+            Ok(l) => l,
+            Err(_) => return,
+        };
+        let port = listener.local_addr().unwrap().port();
+        let endpoints = vec![format!("[::1]:{}", port)];
+        let alt_port = port.saturating_add(1);
+        let res = is_online_with_retries(&endpoints, 1, &[alt_port], 1);
+        assert_eq!(res.unwrap_or(false), true);
+    }
 }

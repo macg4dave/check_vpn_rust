@@ -89,13 +89,17 @@ impl RealActionRunner {
                 .arg("--no-block")
                 .status()
             {
-                        Ok(s) => {
+                Ok(s) => {
                     if s.success() {
                         info!("Fallback reboot command executed successfully");
+                        Ok(())
                     } else {
                         error!("Fallback reboot command returned non-zero: {:?}", s);
+                        Err(anyhow::anyhow!(
+                            "reboot fallback returned non-zero: {:?}",
+                            s
+                        ))
                     }
-                    Ok(())
                 }
                 Err(e) => {
                     error!("Failed to execute fallback reboot command: {:?}", e);
@@ -107,7 +111,7 @@ impl RealActionRunner {
                                 Ok(())
                             } else {
                                 error!("Fallback reboot binary returned non-zero: {:?}", r);
-                                Err(anyhow::anyhow!("reboot returned non-zero status"))
+                                Err(anyhow::anyhow!("reboot returned non-zero status: {:?}", r))
                                     .context("failed to run any reboot fallback")
                             }
                         }
@@ -161,10 +165,14 @@ impl RealActionRunner {
                 Ok(s) => {
                     if s.success() {
                         info!("Fallback restart command executed successfully");
+                        Ok(())
                     } else {
                         error!("Fallback restart command returned non-zero: {:?}", s);
+                        Err(anyhow::anyhow!(
+                            "restart fallback returned non-zero: {:?}",
+                            s
+                        ))
                     }
-                    Ok(())
                 }
                 Err(e) => {
                     error!("Failed to execute fallback restart command: {:?}", e);
@@ -186,26 +194,30 @@ impl RealActionRunner {
         // validation to reject strings that contain obvious shell meta-characters.
         if !crate::config::validation::is_safe_command_string(cmd) {
             error!("Command contains forbidden shell meta-characters; refusing to run");
-            return Err(anyhow::anyhow!("command contains forbidden shell meta-characters").context("unsafe command"));
+            return Err(
+                anyhow::anyhow!("command contains forbidden shell meta-characters")
+                    .context("unsafe command"),
+            );
         }
 
-        let mut parts = cmd.split_whitespace();
-        let prog = match parts.next() {
-            Some(p) => p,
-            None => {
-                error!("Empty command passed to runner");
-                return Err(anyhow::anyhow!("empty command").context("no executable found"));
-            }
-        };
+        let parts = shell_words::split(cmd).context("failed to parse command string")?;
+        if parts.is_empty() {
+            error!("Empty command passed to runner");
+            return Err(anyhow::anyhow!("empty command").context("no executable found"));
+        }
+        let prog = &parts[0];
 
-        match Command::new(prog).args(parts).status() {
+        match Command::new(prog).args(&parts[1..]).status() {
             Ok(s) => {
                 if s.success() {
                     info!("Command executed successfully");
                     Ok(())
                 } else {
                     error!("Command exited with status: {:?}", s);
-                    Ok(()) // do not treat non-zero as a hard error for now
+                    Err(anyhow::anyhow!(
+                        "command exited with non-zero status: {:?}",
+                        s
+                    ))
                 }
             }
             Err(e) => {
@@ -285,5 +297,67 @@ mod tests {
         assert!(runner
             .execute(&Action::Command("echo hi".into()), true)
             .is_ok());
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn command_nonzero_status_returns_error() {
+        // Use a portable non-zero command on Unix-like systems.
+        let runner = RealActionRunner::new_with_dbus_available(false);
+        let res = runner.execute(&Action::Command("false".into()), false);
+        assert!(
+            res.is_err(),
+            "expected non-zero command to be surfaced as error"
+        );
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn command_parses_quoted_arguments() {
+        // Ensure quoted args are preserved (no shell is used).
+        let runner = RealActionRunner::new_with_dbus_available(false);
+        let cmd = r#"/bin/echo "hi there""#;
+        let res = runner.execute(&Action::Command(cmd.into()), false);
+        assert!(res.is_ok(), "expected quoted command to execute");
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn command_with_meta_characters_is_rejected() {
+        let runner = RealActionRunner::new_with_dbus_available(false);
+        let cmd = "echo ok; rm -rf /";
+        let res = runner.execute(&Action::Command(cmd.into()), false);
+        assert!(
+            res.is_err(),
+            "commands containing shell metacharacters must be rejected"
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn command_supports_spaced_program_path() {
+        use std::fs::File;
+        use std::io::Write;
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let script_path = dir
+            .path()
+            .join("script with spaces.sh")
+            .to_string_lossy()
+            .to_string();
+
+        let mut f = File::create(&script_path).expect("create script");
+        writeln!(f, "#!/bin/sh\nexit 0").expect("write script");
+        let mut perms = std::fs::metadata(&script_path)
+            .expect("metadata")
+            .permissions();
+        perms.set_mode(0o755);
+        std::fs::set_permissions(&script_path, perms).expect("chmod");
+
+        let runner = RealActionRunner::new_with_dbus_available(false);
+        let cmd = format!("\"{}\"", script_path);
+        let res = runner.execute(&Action::Command(cmd), false);
+        assert!(res.is_ok(), "spaced program paths should be supported");
     }
 }

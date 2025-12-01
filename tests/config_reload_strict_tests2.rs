@@ -23,6 +23,8 @@ fn spawn_binary_with_config(args: &[&str]) -> std::process::Child {
     cmd.stdin(Stdio::null());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::piped());
+    cmd.env("RUST_LOG", "info");
+    cmd.env("RUST_LOG_STYLE", "never");
     cmd.spawn().expect("spawn check_vpn")
 }
 
@@ -80,6 +82,7 @@ fn wait_for_collector_contains(rx: &Receiver<String>, substr: &str, timeout: Dur
 #[test]
 fn reload_continues_without_strict_flag() {
     let (_listener, port) = support::tcp_listener_and_port();
+    let _server = support::start_http_server(r#"{"isp":"TestISP"}"#, 200);
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
     let (_td, p) = support::temp_dir_with_file("reload", "check_vpn_it_reload.xml", xml.as_bytes());
@@ -95,6 +98,8 @@ fn reload_continues_without_strict_flag() {
         "127.0.0.1",
         "--connectivity-ports",
         &format!("{}", port),
+        "--provider-url",
+        &_server.url(),
         "--disable-ip-api",
         "--disable-ifconfig-co",
     ]);
@@ -128,9 +133,14 @@ fn reload_continues_without_strict_flag() {
 #[test]
 fn reload_exits_with_strict_flag() {
     let (_listener, port) = support::tcp_listener_and_port();
+    let _server = support::start_http_server(r#"{"isp":"TestISP"}"#, 200);
 
     let xml = r#"<config><interval>1</interval><isp_to_check>TestISP</isp_to_check></config>"#;
-    let (_td, p) = support::temp_dir_with_file("reload_strict", "check_vpn_it_reload_strict.xml", xml.as_bytes());
+    let (_td, p) = support::temp_dir_with_file(
+        "reload_strict",
+        "check_vpn_it_reload_strict.xml",
+        xml.as_bytes(),
+    );
     let path_str = p.to_str().unwrap().to_string();
 
     let mut child = spawn_binary_with_config(&[
@@ -143,6 +153,8 @@ fn reload_exits_with_strict_flag() {
         "127.0.0.1",
         "--connectivity-ports",
         &format!("{}", port),
+        "--provider-url",
+        &_server.url(),
         "--strict-config",
         "--disable-ip-api",
         "--disable-ifconfig-co",
@@ -193,5 +205,12 @@ fn reload_exits_with_strict_flag() {
         stdout,
         stderr
     );
+    if let Some(code) = status.code() {
+        assert_eq!(
+            code,
+            check_vpn::config::EXIT_INVALID_CONFIG,
+            "expected strict reload failures to map to config exit code"
+        );
+    }
     // TempDir `_td` drops and cleans up
 }

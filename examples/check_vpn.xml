@@ -3,7 +3,7 @@
   <!-- Interval in seconds between checks -->
   <interval>60</interval>
 
-  <!-- ISP string indicating VPN is lost (match exact ISP string returned by ip-api.com) -->
+  <!-- ISP string indicating VPN is lost (match exact ISP string returned by ip-api.com over HTTPS) -->
   <isp_to_check>Hutchison 3G UK Ltd</isp_to_check>
 
   <!-- Action to perform when VPN is lost: reboot | restart-unit | command -->

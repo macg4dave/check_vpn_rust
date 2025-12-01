@@ -6,6 +6,8 @@ Small, fast, and reliable VPN connection monitor written in Rust. It checks your
 
 - Automatic VPN monitoring via public provider APIs
 - Flexible responses: restart a systemd unit, run a command, or reboot
+- Built-in providers default to HTTPS for ISP lookups (ip-api.com) with override hooks
+- Config validation ensures at least one provider is enabled/configured to avoid silent failures
 - Small, dependency-minimal metrics endpoint for simple health checks
 - Testable design, CI, and packaging-friendly layout
 
@@ -69,6 +71,14 @@ Run a script when the ISP is detected:
 ```sh
 check_vpn -i "Your ISP Name" -t command -a "/usr/local/bin/reconnect_vpn.sh"
 ```
+
+Commands are executed without a shell; quoting is respected (parsed with shell-words) and obvious shell metacharacters are rejected. Example with args:
+
+```sh
+check_vpn -t command -a '/usr/local/bin/reconnect_vpn.sh --reason "vpn lost"'
+```
+
+Provider configuration: ensure at least one provider is enabled (default ip-api + ifconfig.co, or custom URLs). Validation fails fast if all providers are disabled or missing to avoid silent loops.
 
 ## System service (systemd)
 

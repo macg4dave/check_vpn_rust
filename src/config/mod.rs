@@ -329,7 +329,8 @@ impl Config {
         // don't need to assume UTF-8. We convert to a string lossily for the
         // existing xml_io helpers which currently accept &str.
         let path_s = path.to_string_lossy().to_string();
-        let c: Config = crate::xml_io::read_xml(&path_s).context("failed to read config via xml_io")?;
+        let c: Config =
+            crate::xml_io::read_xml(&path_s).context("failed to read config via xml_io")?;
         Ok(c)
     }
 }

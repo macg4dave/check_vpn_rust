@@ -4,8 +4,8 @@ use std::os::unix::ffi::OsStringExt;
 #[test]
 #[cfg(unix)]
 fn load_from_path_handles_non_utf8_paths_without_panicking() {
-    use std::fs;
     use std::ffi::OsString;
+    use std::fs;
 
     // Create a filename containing invalid UTF-8 bytes (0xff)
     let fname = OsString::from_vec(b"cfg-\xff-not-utf8.xml".to_vec());
@@ -34,5 +34,8 @@ fn load_from_path_handles_non_utf8_paths_without_panicking() {
 
     // Call load_from_path with a Path that may contain non-UTF8; should return Err
     let res = check_vpn::config::Config::load_from_path(path.as_path());
-    assert!(res.is_err(), "expected load_from_path to return Err for malformed/non-UTF8 path");
+    assert!(
+        res.is_err(),
+        "expected load_from_path to return Err for malformed/non-UTF8 path"
+    );
 }

@@ -134,6 +134,37 @@ impl Args {
     }
 }
 
+impl Default for Args {
+    fn default() -> Self {
+        Self {
+            interval: None,
+            isp_to_check: None,
+            vpn_lost_action_type: None,
+            vpn_lost_action_arg: None,
+            dry_run: false,
+            connectivity_endpoints: None,
+            connectivity_ports: None,
+            connectivity_timeout_secs: None,
+            connectivity_retries: None,
+            run_once: false,
+            verbose: 0,
+            config: None,
+            exit_on_error: false,
+            strict_config: false,
+            disable_ip_api: false,
+            disable_ifconfig_co: false,
+            provider_urls: None,
+            custom_json_server: None,
+            custom_json_key: None,
+            init: false,
+            init_output: None,
+            init_no_fetch: false,
+            generate_completions: None,
+            completions_output: None,
+        }
+    }
+}
+
 // Unit tests for CLI parsing. These are intentionally small and focused on
 // ensuring that argument parsing and attribute wiring behave as expected.
 #[cfg(test)]

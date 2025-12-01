@@ -52,6 +52,11 @@ Testing notes
 
  - For unit tests that mutate global state (for example, `RUST_LOG`), prefer serializing
    tests with `serial_test::serial` or use a local RAII guard to restore the environment.
+
+- Provider/command regressions worth running before PRs:
+  - `cargo test providers_tests` (covers provider response caps and provider-chain validation)
+  - `cargo test command_parses_quoted_arguments`
+
 # Format and lint
 cargo fmt --all
 cargo clippy --all-targets --all-features

@@ -10,7 +10,7 @@ fn real_ip_api_returns_200_and_parses() {
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap();
-    let url = "http://ip-api.com/json".to_string();
+    let url = "https://ip-api.com/json".to_string();
     let isp = check_vpn::ip_api::get_isp_with_client_and_url(&client, &url, 1)
         .expect("expected real ip-api to succeed");
     assert!(

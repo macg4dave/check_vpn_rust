@@ -57,8 +57,16 @@ fn test_dry_run_user_installs_binary_and_config() {
     assert!(ok, "installer failed: stderr={} stdout={}", err, out);
 
     // should show dry-run copy for binary and config
-    assert!(out.contains(&bin_path), "stdout should mention binary path: {}", out);
-    assert!(out.contains(&config_path), "stdout should mention config path: {}", out);
+    assert!(
+        out.contains(&bin_path),
+        "stdout should mention binary path: {}",
+        out
+    );
+    assert!(
+        out.contains(&config_path),
+        "stdout should mention config path: {}",
+        out
+    );
     assert!(
         out.contains("DRY-RUN"),
         "stdout should include DRY-RUN hints: {}",
@@ -107,7 +115,10 @@ fn test_dry_run_service_flag_on_linux_if_applicable() {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().eq("yes"))
             .unwrap_or(false);
         if has_systemctl {
-            assert!(out.contains(&service_path), "service file should be referenced in dry-run output");
+            assert!(
+                out.contains(&service_path),
+                "service file should be referenced in dry-run output"
+            );
         }
     }
 }
@@ -127,11 +138,18 @@ fn test_system_install_requires_root() {
         return;
     }
 
-        let bin = make_temp_file("bin_sys", b"#! /bin/sh\n", true);
-        let bin_path = bin.path().to_string_lossy().into_owned();
+    let bin = make_temp_file("bin_sys", b"#! /bin/sh\n", true);
+    let bin_path = bin.path().to_string_lossy().into_owned();
 
     // Run in system mode as non-root; should fail with an error requesting root.
-        let (ok, out, err) = run_installer(&["--binary", &bin_path, "--mode", "system", "--yes", "--dry-run"]);
+    let (ok, out, err) = run_installer(&[
+        "--binary",
+        &bin_path,
+        "--mode",
+        "system",
+        "--yes",
+        "--dry-run",
+    ]);
     assert!(!ok, "Expected installer to fail when system install is attempted without root. stdout={} stderr={}", out, err);
     let combined = format!("{}{}", out, err);
     assert!(

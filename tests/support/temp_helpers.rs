@@ -28,7 +28,11 @@ pub fn temp_dir_with_child(prefix: &str, child_filename: &str) -> (tempfile::Tem
 
 /// Convenience helper that creates a TempDir and writes `contents` to a child file.
 /// Returns the TempDir and the child path. Both are valid until the TempDir is dropped.
-pub fn temp_dir_with_file(prefix: &str, child_filename: &str, contents: &[u8]) -> (tempfile::TempDir, PathBuf) {
+pub fn temp_dir_with_file(
+    prefix: &str,
+    child_filename: &str,
+    contents: &[u8],
+) -> (tempfile::TempDir, PathBuf) {
     let (td, p) = temp_dir_with_child(prefix, child_filename);
     std::fs::write(&p, contents).expect("write child file");
     (td, p)

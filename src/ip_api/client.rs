@@ -6,6 +6,9 @@ use std::io::Read;
 use std::thread::sleep;
 use std::time::Duration;
 
+/// Default ip-api endpoint (HTTPS).
+pub const DEFAULT_IP_API_URL: &str = "https://ip-api.com/json";
+
 /// Default maximum response body size in bytes before we reject the response.
 const DEFAULT_MAX_RESPONSE_BYTES: usize = 5 * 1024 * 1024; // 5MB
 /// Maximum Retry-After seconds to respect (clamp large values)
@@ -123,7 +126,7 @@ fn parse_retry_after_secs(resp: &reqwest::blocking::Response) -> Option<u64> {
 pub fn get_isp() -> Result<String> {
     // Allow tests to override the endpoint via environment variable.
     let url = std::env::var("CHECK_VPN_TEST_URL")
-        .unwrap_or_else(|_| "http://ip-api.com/json".to_string());
+        .unwrap_or_else(|_| DEFAULT_IP_API_URL.to_string());
     // Simple configurable retry policy via env var CHECK_VPN_RETRY_COUNT (default 1)
     let retries: usize = std::env::var("CHECK_VPN_RETRY_COUNT")
         .ok()
@@ -284,5 +287,13 @@ mod tests {
         // Ensure our added context is present in the returned error
         assert!(s.contains("failed to query ip api"), "error missing context: {}", s);
         assert!(s.contains("2"), "error should mention attempts in: {}", s);
+    }
+
+    #[test]
+    fn default_url_uses_https() {
+        assert!(
+            DEFAULT_IP_API_URL.starts_with("https://"),
+            "default ip-api URL should use HTTPS"
+        );
     }
 }

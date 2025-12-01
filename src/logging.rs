@@ -62,6 +62,10 @@ pub fn init_with_verbosity(verbosity: u8) {
         // output for downstream observability systems.
         use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
+        // Forward `log` macros into the tracing subscriber so existing log! calls
+        // continue to emit output when observability is enabled.
+        let _ = tracing_log::LogTracer::init();
+
         let env_filter = std::env::var("RUST_LOG").unwrap_or_else(|_| level.to_string());
         let filter = EnvFilter::try_new(env_filter).unwrap_or_else(|_| EnvFilter::new(level));
 
@@ -72,10 +76,14 @@ pub fn init_with_verbosity(verbosity: u8) {
         // to avoid enabling optional features such as `chrono` in the
         // tracing-subscriber dependency. This keeps the default build
         // lightweight while still providing timestamps.
-        let fmt_layer = fmt::layer().with_timer(fmt::time::time())
+        let fmt_layer = fmt::layer()
+            .with_timer(fmt::time::time())
             .with_writer(std::io::stderr);
 
-        let _ = tracing_subscriber::registry().with(filter).with(fmt_layer).try_init();
+        let _ = tracing_subscriber::registry()
+            .with(filter)
+            .with(fmt_layer)
+            .try_init();
     }
 
     #[cfg(not(feature = "observability"))]
@@ -111,9 +119,19 @@ pub fn init_with_verbosity(verbosity: u8) {
         if let Some(s) = info.payload().downcast_ref::<&str>() {
             if let Some(location) = info.location() {
                 #[cfg(feature = "observability")]
-                tracing::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
+                tracing::error!(
+                    "panic occurred: {} at {}:{}",
+                    s,
+                    location.file(),
+                    location.line()
+                );
                 #[cfg(not(feature = "observability"))]
-                log::error!("panic occurred: {} at {}:{}", s, location.file(), location.line());
+                log::error!(
+                    "panic occurred: {} at {}:{}",
+                    s,
+                    location.file(),
+                    location.line()
+                );
             } else {
                 #[cfg(feature = "observability")]
                 tracing::error!("panic occurred: {}", s);
@@ -123,9 +141,19 @@ pub fn init_with_verbosity(verbosity: u8) {
         } else if let Some(s) = info.payload().downcast_ref::<String>() {
             if let Some(location) = info.location() {
                 #[cfg(feature = "observability")]
-                tracing::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
+                tracing::error!(
+                    "panic occurred: {} at {}:{}",
+                    s.as_str(),
+                    location.file(),
+                    location.line()
+                );
                 #[cfg(not(feature = "observability"))]
-                log::error!("panic occurred: {} at {}:{}", s.as_str(), location.file(), location.line());
+                log::error!(
+                    "panic occurred: {} at {}:{}",
+                    s.as_str(),
+                    location.file(),
+                    location.line()
+                );
             } else {
                 #[cfg(feature = "observability")]
                 tracing::error!("panic occurred: {}", s.as_str());
@@ -134,9 +162,19 @@ pub fn init_with_verbosity(verbosity: u8) {
             }
         } else if let Some(location) = info.location() {
             #[cfg(feature = "observability")]
-            tracing::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
+            tracing::error!(
+                "panic occurred: {} at {}:{}",
+                "Unknown panic payload",
+                location.file(),
+                location.line()
+            );
             #[cfg(not(feature = "observability"))]
-            log::error!("panic occurred: {} at {}:{}", "Unknown panic payload", location.file(), location.line());
+            log::error!(
+                "panic occurred: {} at {}:{}",
+                "Unknown panic payload",
+                location.file(),
+                location.line()
+            );
         } else {
             #[cfg(feature = "observability")]
             tracing::error!("panic occurred: {}", "Unknown panic payload");

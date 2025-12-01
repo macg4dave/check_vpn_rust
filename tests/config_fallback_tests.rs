@@ -3,7 +3,8 @@ mod support;
 #[test]
 fn load_from_path_errors_on_malformed_xml() {
     // Create a malformed XML file
-    let (_td, path) = support::temp_dir_with_file("malformed", "check_vpn_malformed.xml", b"NOT XML HERE");
+    let (_td, path) =
+        support::temp_dir_with_file("malformed", "check_vpn_malformed.xml", b"NOT XML HERE");
 
     let res = check_vpn::config::Config::load_from_path(&path);
     assert!(res.is_err(), "malformed xml should return an error");

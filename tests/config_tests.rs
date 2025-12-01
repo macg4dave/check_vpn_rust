@@ -178,7 +178,8 @@ fn missing_required_field_uses_default_on_merge() {
 fn env_var_config_override() {
     // Create a small config file and point CHECK_VPN_CONFIG at it
     let xml = r#"<config><interval>77</interval><isp_to_check>Env ISP</isp_to_check></config>"#;
-    let (_td, p) = support::temp_dir_with_file("cfg_override", "check_vpn_env_override.xml", xml.as_bytes());
+    let (_td, p) =
+        support::temp_dir_with_file("cfg_override", "check_vpn_env_override.xml", xml.as_bytes());
     let path_str = p.to_str().unwrap();
 
     // Use a scoped environment helper to ensure the env var is restored.

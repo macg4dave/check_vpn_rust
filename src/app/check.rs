@@ -101,6 +101,7 @@ mod tests {
     use super::*;
     use crate::config::EffectiveConfig;
     use anyhow::anyhow;
+    use crate::error_types::AppError;
 
     #[test]
     fn perform_check_returns_runtime_error_with_context_when_isp_fails() {
@@ -138,5 +139,43 @@ mod tests {
             // AppError::RuntimeError should contain the debug string with underlying error
             assert!(err.to_string().contains("simulated provider fail"));
         }
+    }
+
+    #[test]
+    fn action_failure_is_propagated_as_app_error() {
+        // Create a local listener so connectivity reports online.
+        use std::net::TcpListener;
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind listener");
+        let port = listener.local_addr().expect("local addr").port();
+
+        let eff = EffectiveConfig {
+            interval: 1,
+            isp_to_check: "TestISP".to_string(),
+            action_type: "reboot".to_string(),
+            action_arg: "".to_string(),
+            dry_run: true,
+            connectivity_endpoints: vec![format!("127.0.0.1:{}", port)],
+            connectivity_ports: vec![port],
+            connectivity_timeout_secs: 1,
+            connectivity_retries: 1,
+            run_once: true,
+            exit_on_error: true,
+            enable_ip_api: false,
+            enable_ifconfig_co: false,
+            provider_urls: vec![],
+            custom_json_server: None,
+            custom_json_key: None,
+        };
+
+        let get_isp = || -> anyhow::Result<String> { Ok("TestISP".to_string()) };
+        let failing_action = |_a: &crate::actions::Action, _d: bool| -> anyhow::Result<()> {
+            Err(anyhow!("simulated action failure"))
+        };
+
+        let res = perform_check(&eff, get_isp, failing_action);
+        assert!(
+            matches!(res, Err(AppError::ActionFailed(_))),
+            "expected AppError::ActionFailed when action execution fails"
+        );
     }
 }

@@ -21,3 +21,18 @@ fn init_wizard_writes_file_with_defaults() {
     assert!(contents.contains("<interval>"));
     // cleanup happens when `_td` is dropped
 }
+
+#[test]
+fn run_with_timeout_times_out_and_returns_err() {
+    // Use a long-running closure and a very short timeout.
+    let res = check_vpn::init_wizard::run_with_timeout(
+        |cancel| {
+            while !cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            1u32
+        },
+        std::time::Duration::from_millis(10),
+    );
+    assert!(res.is_err(), "expected timeout to return Err");
+}

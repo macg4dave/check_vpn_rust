@@ -102,10 +102,10 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
                 if args.strict_config {
                     // Emit a clear marker on stderr so external test harnesses can
                     // reliably detect the strict-config exit condition, then exit
-                    // early with a non-zero status (tests only assert non-zero).
+                    // early with a non-zero status (mapped by main/bin).
                     eprintln!("--strict-config is set");
                     eprintln!("Failed to reload config from disk and --strict-config is set; exiting: {:?}", e);
-                    std::process::exit(1);
+                    return Err(AppError::ConfigLoadError(e));
                 }
                 debug!(
                     "Failed to reload config from disk (path = {}, will continue with previous): {:?}; to fail on reload problems, start with --strict-config",
@@ -176,6 +176,11 @@ fn build_provider_chain_getter(eff: &crate::config::EffectiveConfig) -> impl Fn(
     }
 
     move || {
+        if chain.is_empty() {
+            return Err(anyhow::anyhow!(
+                "no providers configured after validation; enable at least one provider"
+            ));
+        }
         let id = providers::query_first_success(&chain)?;
         Ok(id.isp)
     }

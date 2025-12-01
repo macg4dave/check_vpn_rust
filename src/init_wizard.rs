@@ -1,7 +1,8 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use std::io::IsTerminal;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 // std::fs not needed; writing via xml_io
 
 use crate::config::Config;
@@ -44,7 +45,7 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
         // Move chain into closure to satisfy 'static requirement.
         let chain_for_closure = chain;
         match run_with_timeout(
-            move || providers::query_first_success(&chain_for_closure),
+            move |cancel| providers::query_first_success_with_cancel(&chain_for_closure, &cancel),
             std::time::Duration::from_secs(20),
         ) {
             Ok(Ok(id)) => detected_isp = id.isp,
@@ -55,7 +56,13 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
 
     // Prompt minimal fields
     let isp = prompt_default(interactive, "ISP to watch for (vpn lost)", &detected_isp)?;
-    let interval = prompt_default(interactive, "Interval seconds", "60")?;
+    let interval_str = prompt_default(interactive, "Interval seconds", "60")?;
+    let interval: u64 = interval_str
+        .parse()
+        .map_err(|e| anyhow!("invalid interval '{}': {}", interval_str, e))?;
+    if interval == 0 {
+        return Err(anyhow!("interval must be greater than zero"));
+    }
     let action = prompt_default(
         interactive,
         "Action type (reboot|restart-unit|command)",
@@ -72,12 +79,23 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
             "Command to run",
             "/usr/local/bin/reconnect_vpn.sh",
         )?,
-        _ => String::new(),
+        "reboot" => String::new(),
+        other => {
+            return Err(anyhow!(
+                "invalid action type '{}'; expected reboot, restart-unit, or command",
+                other
+            ))
+        }
     };
+    if (action == "restart-unit" || action == "command") && action_arg.trim().is_empty() {
+        return Err(anyhow!(
+            "vpn_lost_action_arg must be provided for restart-unit and command action types"
+        ));
+    }
 
     // Build Config
     let cfg = Config {
-        interval: Some(interval.parse().unwrap_or(60)),
+        interval: Some(interval),
         isp_to_check: Some(isp),
         vpn_lost_action_type: Some(action),
         vpn_lost_action_arg: Some(action_arg),
@@ -93,6 +111,13 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
         custom_json_server: None,
         custom_json_key: None,
     };
+
+    // Validate the generated config so the user sees failures immediately.
+    let eff = cfg.merge_with_args(&crate::cli::Args::default());
+    if let Err(errs) = crate::config::Config::validate_values(&eff) {
+        let joined = errs.0.join("; ");
+        return Err(anyhow!("generated config failed validation: {}", joined));
+    }
 
     let out_path = output.unwrap_or("./check_vpn.xml");
     crate::xml_io::write_xml(&cfg, out_path)?;
@@ -117,19 +142,32 @@ fn prompt_default(interactive: bool, label: &str, default: &str) -> Result<Strin
 }
 
 // Simple timeout helper: executes closure on a thread and joins with timeout.
-fn run_with_timeout<F, R>(f: F, dur: std::time::Duration) -> Result<R, ()>
+pub fn run_with_timeout<F, R>(f: F, dur: std::time::Duration) -> Result<R, ()>
 where
-    F: FnOnce() -> R + Send + 'static,
+    F: FnOnce(Arc<AtomicBool>) -> R + Send + 'static,
     R: Send + 'static,
 {
     use std::sync::mpsc;
     use std::thread;
+    let cancel = Arc::new(AtomicBool::new(false));
+    let cancel_for_thread = Arc::clone(&cancel);
     let (tx, rx) = mpsc::channel();
-    thread::spawn(move || {
-        let _ = tx.send(f());
+    let handle = thread::spawn(move || {
+        let _ = tx.send(f(cancel_for_thread));
     });
+
     match rx.recv_timeout(dur) {
-        Ok(r) => Ok(r),
-        Err(_) => Err(()),
+        Ok(r) => {
+            let _ = handle.join();
+            Ok(r)
+        }
+        Err(_) => {
+            cancel.store(true, Ordering::Relaxed);
+            // Join the worker on a background thread so the caller returns promptly.
+            thread::spawn(move || {
+                let _ = handle.join();
+            });
+            Err(())
+        }
     }
 }

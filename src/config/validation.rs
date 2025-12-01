@@ -12,7 +12,9 @@ pub struct ValidationErrors(pub Vec<String>);
 // `thiserror::Error` provides the std::error::Error impl via derive.
 
 /// Validate effective configuration values. Returns Ok(()) if valid or Err(errors).
-pub fn validate_values(eff: &crate::config::EffectiveConfig) -> std::result::Result<(), ValidationErrors> {
+pub fn validate_values(
+    eff: &crate::config::EffectiveConfig,
+) -> std::result::Result<(), ValidationErrors> {
     let mut errors: Vec<String> = Vec::new();
     if eff.interval == 0 {
         errors.push("interval must be greater than zero".to_string());
@@ -30,7 +32,9 @@ pub fn validate_values(eff: &crate::config::EffectiveConfig) -> std::result::Res
     }
 
     // For restart-unit and command, ensure arg is non-empty
-    if (eff.action_type == "restart-unit" || eff.action_type == "command") && eff.action_arg.trim().is_empty() {
+    if (eff.action_type == "restart-unit" || eff.action_type == "command")
+        && eff.action_arg.trim().is_empty()
+    {
         errors.push(
             "vpn_lost_action_arg must be provided for restart-unit and command action types"
                 .to_string(),
@@ -47,13 +51,19 @@ pub fn validate_values(eff: &crate::config::EffectiveConfig) -> std::result::Res
     // executes commands directly without a shell trampoline, so we reject
     // inputs that look like shell pipelines, redirections, or multiple commands.
     if eff.action_type == "command" && !is_safe_command_string(&eff.action_arg) {
-        errors.push("vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string());
+        errors.push(
+            "vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string(),
+        );
     }
 
     // Connectivity checks: endpoints and ports must be present and timeout/retries sensible
     if eff.connectivity_endpoints.is_empty() {
         errors.push("connectivity_endpoints must include at least one endpoint".to_string());
-    } else if eff.connectivity_endpoints.iter().any(|s| s.trim().is_empty()) {
+    } else if eff
+        .connectivity_endpoints
+        .iter()
+        .any(|s| s.trim().is_empty())
+    {
         errors.push("connectivity_endpoints contains an empty string".to_string());
     }
 
@@ -67,6 +77,18 @@ pub fn validate_values(eff: &crate::config::EffectiveConfig) -> std::result::Res
 
     if eff.connectivity_retries == 0 {
         errors.push("connectivity_retries must be at least 1".to_string());
+    }
+
+    // Provider availability: require at least one provider to be enabled/configured.
+    if !eff.enable_ip_api
+        && !eff.enable_ifconfig_co
+        && eff.provider_urls.is_empty()
+        && eff.custom_json_server.is_none()
+    {
+        errors.push(
+            "at least one provider must be enabled or configured (ip-api, ifconfig.co, provider_urls, or custom_json_server)"
+                .to_string(),
+        );
     }
 
     if errors.is_empty() {
@@ -306,5 +328,32 @@ mod tests {
             .unwrap_err()
             .to_string()
             .contains("vpn_lost_action_arg for command contains forbidden shell meta-characters"));
+    }
+
+    #[test]
+    fn validate_requires_at_least_one_provider() {
+        let endpoints = vec!["8.8.8.8".to_string()];
+        let ports = vec![networking::DEFAULT_PORTS[0]];
+        let mut eff = make_eff(
+            60,
+            "ISP",
+            "command",
+            "echo hi",
+            endpoints.clone(),
+            ports.clone(),
+            networking::DEFAULT_TIMEOUT_SECS,
+            networking::DEFAULT_RETRIES,
+        );
+        eff.enable_ip_api = false;
+        eff.enable_ifconfig_co = false;
+        eff.provider_urls.clear();
+        eff.custom_json_server = None;
+
+        let res = validate_values(&eff);
+        assert!(res.is_err());
+        assert!(res
+            .unwrap_err()
+            .to_string()
+            .contains("at least one provider must be enabled or configured"));
     }
 }

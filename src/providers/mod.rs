@@ -5,6 +5,7 @@
 //! adapted via a thin wrapper; new providers (e.g. ifconfig.co) implement the
 //! same interface. Custom JSON endpoints can also be configured via CLI / XML.
 use anyhow::Result;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Resulting minimal info we care about for VPN loss detection. Extendable.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -22,6 +23,27 @@ pub trait VpnInfoProvider: Send + Sync {
 pub fn query_first_success(providers: &[Box<dyn VpnInfoProvider>]) -> Result<VpnIdentity> {
     let mut last_err: Option<anyhow::Error> = None;
     for p in providers {
+        match p.query() {
+            Ok(id) => return Ok(id),
+            Err(e) => {
+                last_err = Some(anyhow::anyhow!("{}: {}", p.name(), e));
+                continue;
+            }
+        }
+    }
+    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no providers configured")))
+}
+
+/// Variant of `query_first_success` that bails out early when `cancel` is set.
+pub fn query_first_success_with_cancel(
+    providers: &[Box<dyn VpnInfoProvider>],
+    cancel: &AtomicBool,
+) -> Result<VpnIdentity> {
+    let mut last_err: Option<anyhow::Error> = None;
+    for p in providers {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(anyhow::anyhow!("provider query cancelled"));
+        }
         match p.query() {
             Ok(id) => return Ok(id),
             Err(e) => {

@@ -61,5 +61,8 @@ fn try_run_with_args_handles_non_utf8_config_paths() {
     };
 
     let res = check_vpn::try_run_with_args(args);
-    assert!(matches!(res, Err(check_vpn::error_types::AppError::ConfigLoadError(_))));
+    assert!(matches!(
+        res,
+        Err(check_vpn::error_types::AppError::ConfigLoadError(_))
+    ));
 }

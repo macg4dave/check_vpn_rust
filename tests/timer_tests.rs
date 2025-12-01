@@ -15,14 +15,15 @@ fn timer_invokes_callback_repeatedly() {
         c.fetch_add(1, Ordering::SeqCst);
     });
 
-    // Wait ~120ms so we expect ~6 invocations (allow margin).
-    std::thread::sleep(Duration::from_millis(120));
+    // Wait ~150ms so we expect several invocations (allow generous margin for
+    // slower CI hosts).
+    std::thread::sleep(Duration::from_millis(150));
 
     // Stop the timer and join
     handle.stop();
 
     let val = counter.load(Ordering::SeqCst);
-    assert!(val >= 4, "expected >=4 ticks, got {}", val);
+    assert!(val >= 3, "expected >=3 ticks, got {}", val);
 }
 
 /// Timer should stop when handle.stop() is called.

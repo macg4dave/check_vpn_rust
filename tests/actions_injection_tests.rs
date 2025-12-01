@@ -1,4 +1,7 @@
-use check_vpn::actions::{Action, runner::{ActionRunner, RealActionRunner}};
+use check_vpn::actions::{
+    runner::{ActionRunner, RealActionRunner},
+    Action,
+};
 
 #[test]
 fn runner_rejects_command_with_shell_meta() {

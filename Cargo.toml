@@ -16,12 +16,14 @@ ctrlc = "3.2"
 anyhow = "1.0"
 thiserror = "1.0"
 zbus = { version = "5.12.0", features = ["blocking"] }
+shell-words = "1.1"
 
 # XML backends (optional, selected via features)
 quick-xml = { version = "0.38.3", features = ["serialize"], optional = true }
 serde-xml-rs = { version = "0.8.1", optional = true }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["fmt", "env-filter"] }
+tracing-log = { version = "0.2", optional = true }
 
 [dev-dependencies]
 httpmock = "0.8.2"
@@ -44,7 +46,7 @@ xml_pretty = []
 xml_tracing = ["dep:tracing"]
 # Enable structured/tracing-based logging and spans at compile time.
 # This is an opt-in feature which bundles `tracing` and `tracing-subscriber`.
-observability = ["dep:tracing", "dep:tracing-subscriber"]
+observability = ["dep:tracing", "dep:tracing-subscriber", "dep:tracing-log"]
 # Pretty-print JSON output when writing files (optional)
 json_pretty = []
 

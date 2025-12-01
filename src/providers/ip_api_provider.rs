@@ -2,6 +2,7 @@ use anyhow::Result;
 use reqwest::blocking::Client;
 use std::time::Duration;
 
+use crate::ip_api::client::DEFAULT_IP_API_URL;
 use crate::providers::{VpnIdentity, VpnInfoProvider};
 
 pub struct IpApiProvider {
@@ -18,9 +19,14 @@ impl IpApiProvider {
             .build()?;
         Ok(Self {
             client,
-            url: "http://ip-api.com/json".to_string(),
+            url: DEFAULT_IP_API_URL.to_string(),
             retries: 1,
         })
+    }
+
+    /// Expose the configured endpoint (primarily for tests/diagnostics).
+    pub fn endpoint(&self) -> &str {
+        &self.url
     }
 }
 

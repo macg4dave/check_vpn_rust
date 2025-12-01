@@ -65,11 +65,13 @@ pub mod timer {
 /// Run the application given a pre-parsed set of CLI arguments. Mirrors the
 /// behavior of the binary `try_main` and returns `Result<(), AppError>` so
 /// callers can inspect and handle failures programmatically (e.g., tests).
-pub fn try_run_with_args(args: crate::cli::Args) -> std::result::Result<(), crate::error_types::AppError> {
+pub fn try_run_with_args(
+    args: crate::cli::Args,
+) -> std::result::Result<(), crate::error_types::AppError> {
     // Keep most of the original `try_main` semantics here. This is intentionally
     // implemented at the crate root to keep the API surface small and testable.
-    use anyhow::Context;
     use crate::error_types::AppError;
+    use anyhow::Context;
 
     // Initialize logging early using CLI verbosity so app.run can log at the
     // requested level. This respects RUST_LOG if already set.
@@ -91,7 +93,9 @@ pub fn try_run_with_args(args: crate::cli::Args) -> std::result::Result<(), crat
 
     // Load configuration from the chosen source, wrapping errors as AppError.
     let cfg = if let Some(path) = args.config.as_ref() {
-        match crate::config::Config::load_from_path(path.as_path()).context("loading configuration from --config path") {
+        match crate::config::Config::load_from_path(path.as_path())
+            .context("loading configuration from --config path")
+        {
             Ok(c) => c,
             Err(e) => {
                 // Provide an actionable hint including a best-effort path
