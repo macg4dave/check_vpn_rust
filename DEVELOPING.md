@@ -3,11 +3,13 @@
 This file describes how to build and test this repository across supported OSes: macOS, Debian/Fedora (via Docker), and Windows. It also describes the CI approach used by the project.
 
 Summary
+
 - Supported platforms: macOS, Debian, Fedora (packaged via Docker), Windows (native / WSL2)
-- CI: The historical GitHub Actions matrix workflow has been archived; the repository now uses two focused workflows: `docker-builds.yml` (push/PR Docker multi-arch builds) and `release-docker.yml` (tag-triggered release for v0.5b).
+- CI: The historical GitHub Actions matrix workflow has been archived; the repository now uses two focused workflows: `docker-builds.yml` (push/PR Docker multi-arch builds) and `release-docker.yml` (tag-triggered release for v1.0.x).
 
 Prerequisites
-- Rust toolchain: install rustup from https://rustup.rs
+
+- Rust toolchain: install rustup from <https://rustup.rs>
 - Docker Desktop (for Docker-based Debian/Fedora builds)
 - (Windows native) Visual Studio Build Tools (C++ workload) if using the MSVC toolchain
 - WSL2 (optional, recommended for parity with Linux)
@@ -42,15 +44,17 @@ make debug
 # Or run directly:
 RUST_BACKTRACE=1 RUST_LOG=trace cargo run --features "observability" -- --run-once --dry-run -vv
 ```
+
 Testing notes
 ----------------
+
 - The repository includes lightweight integration test helpers in `tests/support/mod.rs`.
   Use `support::ScopedEnv::set_str(key, value)` in integration tests to temporarily set
   environment variables and automatically restore the previous state when the guard
   is dropped. This avoids unsafe env mutation blocks and reduces flakiness in parallel
   test runs.
 
- - For unit tests that mutate global state (for example, `RUST_LOG`), prefer serializing
+- For unit tests that mutate global state (for example, `RUST_LOG`), prefer serializing
    tests with `serial_test::serial` or use a local RAII guard to restore the environment.
 
 - Provider/command regressions worth running before PRs:
@@ -58,8 +62,10 @@ Testing notes
   - `cargo test command_parses_quoted_arguments`
 
 # Format and lint
+
 cargo fmt --all
 cargo clippy --all-targets --all-features
+
 ```
 
 Windows / WSL2
@@ -127,6 +133,7 @@ Cleaning and packaging
 - The helper scripts and Docker wrapper steps produce `.tar.gz` or `.zip` artifacts under `target/release/`.
 
 If you want, I can:
+
 - Tidy up the `.github/workflows/` directory and keep only the chosen workflows (I left a small inert placeholder file so the old CI doesn't accidentally run).  
 - Add a `Makefile` shortcut to call the POSIX Docker helpers from WSL-friendly paths (for example `wsl ./scripts/docker-build.sh ...`).
 

@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Normalize package filenames inside release/ so architecture suffixes match the folder
 # Example fixes:
-#  release/debian/arm64/check-vpn_0.1.0-1_amd64.deb -> check-vpn_0.1.0-1_arm64.deb
-#  release/fedora/arm64/check_vpn-v0.5b-1.x86_64.rpm -> check_vpn-v0.5b-1.aarch64.rpm
+#  release/debian/arm64/check-vpn_1.0.0-1_amd64.deb -> check-vpn_1.0.0-1_arm64.deb
+#  release/fedora/arm64/check_vpn-v1.0.0-1.x86_64.rpm -> check_vpn-v1.0.0-1.aarch64.rpm
 
 REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$REPO_ROOT"

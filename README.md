@@ -100,10 +100,6 @@ sudo systemctl status check_vpn
 
 For desktop/personal runs, you can use a user unit instead of a system unit.
 
-## Metrics & logs
-
-If enabled, the metrics endpoint is available (default 127.0.0.1:9090). Logs are by default handled by systemd journald when running as a service.
-
 ## Troubleshooting
 
 Check journal logs when a systemd service is used:
@@ -113,6 +109,12 @@ sudo journalctl -u check_vpn -f
 ```
 
 If an action fails, try the action manually (e.g. `sudo systemctl restart your-vpn-unit`) and verify permissions.
+
+## Windows notes
+
+- The binary builds and runs on Windows 10/11. systemd/D-Bus actions are Linux-only; on Windows prefer the `command` action to run a recovery script.
+- Use `--config C:\path\to\config.xml` (or `CHECK_VPN_CONFIG`) and run from PowerShell or Task Scheduler. Hot-reload of the config file is supported when the service stays running.
+- Connectivity checks and provider lookups are identical to Linux; ensure outbound HTTPS is allowed through your firewall.
 
 ## Contributing
 
@@ -127,7 +129,6 @@ This project is licensed under the terms of the `LICENSE` file in the project ro
 For more examples and advanced configuration, consult the repository `contrib/` and `docs/` directories.
 
 ## CI and releases
-
 
 This repository uses a simplified CI pipeline. Pull requests and main-branch
 pushes build multi-architecture Docker images only. Full test and linting

@@ -1,6 +1,6 @@
 [package]
 name = "check_vpn"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 description = "VPN monitoring and automatic reconnect"
 
@@ -15,7 +15,6 @@ env_logger = "0.11.8"
 ctrlc = "3.2"
 anyhow = "1.0"
 thiserror = "1.0"
-zbus = { version = "5.12.0", features = ["blocking"] }
 shell-words = "1.1"
 
 # XML backends (optional, selected via features)
@@ -24,6 +23,9 @@ serde-xml-rs = { version = "0.8.1", optional = true }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["fmt", "env-filter"] }
 tracing-log = { version = "0.2", optional = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5.12.0", features = ["blocking"] }
 
 [dev-dependencies]
 httpmock = "0.8.2"
@@ -62,4 +64,3 @@ assets = [
 ]
 
 maintainer-scripts = "contrib/packaging"
-

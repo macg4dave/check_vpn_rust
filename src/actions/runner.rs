@@ -1,6 +1,8 @@
 use anyhow::{Context, Result};
 use log::{error, info};
 use std::process::Command;
+
+#[cfg(target_os = "linux")]
 use zbus::blocking::Connection;
 
 use super::Action;
@@ -21,29 +23,30 @@ pub struct RealActionRunner {
 
 impl RealActionRunner {
     pub fn new() -> Self {
-        // On non-Linux platforms we do not expect a system D-Bus to be present.
-        if !cfg!(target_os = "linux") {
-            info!(
-                "Non-Linux platform detected — D-Bus considered unavailable; using shell/no-op fallbacks"
-            );
-            return RealActionRunner {
-                dbus_available: false,
-            };
-        }
-
-        // Best-effort detection on Linux.
-        match Connection::system() {
-            Ok(_) => RealActionRunner {
-                dbus_available: true,
-            },
-            Err(e) => {
-                info!(
-                    "Failed to connect to system D-Bus — will fall back to shell/no-op actions: {:?}",
-                    e
-                );
-                RealActionRunner {
-                    dbus_available: false,
+        #[cfg(target_os = "linux")]
+        {
+            // Best-effort detection on Linux.
+            match Connection::system() {
+                Ok(_) => RealActionRunner {
+                    dbus_available: true,
+                },
+                Err(e) => {
+                    info!(
+                        "Failed to connect to system D-Bus - will fall back to shell/no-op actions: {:?}",
+                        e
+                    );
+                    RealActionRunner {
+                        dbus_available: false,
+                    }
                 }
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            // On non-Linux platforms we do not expect a system D-Bus or systemd.
+            info!("Non-Linux platform detected - using shell/no-op fallbacks");
+            RealActionRunner {
+                dbus_available: false,
             }
         }
     }
@@ -67,21 +70,23 @@ impl RealActionRunner {
             return Ok(());
         }
 
-        if self.dbus_available {
-            // Talk to system bus and call org.freedesktop.login1.Manager.Reboot(true)
-            let conn = Connection::system().context("failed to connect to system bus")?;
-            let proxy = zbus::blocking::Proxy::new(
-                &conn,
-                "org.freedesktop.login1",
-                "/org/freedesktop/login1",
-                "org.freedesktop.login1.Manager",
-            )?;
-            proxy
-                .call_method("Reboot", &(true))
-                .context("Reboot call failed")?;
-            info!("Reboot requested via logind");
-            Ok(())
-        } else {
+        #[cfg(target_os = "linux")]
+        {
+            if self.dbus_available {
+                // Talk to system bus and call org.freedesktop.login1.Manager.Reboot(true)
+                let conn = Connection::system().context("failed to connect to system bus")?;
+                let proxy = zbus::blocking::Proxy::new(
+                    &conn,
+                    "org.freedesktop.login1",
+                    "/org/freedesktop/login1",
+                    "org.freedesktop.login1.Manager",
+                )?;
+                proxy
+                    .call_method("Reboot", &(true))
+                    .context("Reboot call failed")?;
+                info!("Reboot requested via logind");
+                return Ok(());
+            }
             info!("D-Bus unavailable; running explicit fallback for reboot");
             // Try systemctl first, then fallback to the reboot binary.
             match Command::new("systemctl")
@@ -123,6 +128,28 @@ impl RealActionRunner {
                 }
             }
         }
+        #[cfg(not(target_os = "linux"))]
+        {
+            info!("Using platform fallback reboot (no systemd available)");
+            #[cfg(target_os = "windows")]
+            let status = Command::new("shutdown")
+                .args(["/r", "/t", "0"])
+                .status();
+            #[cfg(not(target_os = "windows"))]
+            let status = Command::new("shutdown").args(["-r", "now"]).status();
+
+            match status {
+                Ok(s) if s.success() => {
+                    info!("Fallback reboot command executed successfully");
+                    Ok(())
+                }
+                Ok(s) => Err(anyhow::anyhow!(
+                    "reboot fallback returned non-zero: {:?}",
+                    s
+                )),
+                Err(e) => Err(e).context("failed to spawn platform reboot command"),
+            }
+        }
     }
 
     fn do_restart_unit(&self, unit: &str, dry_run: bool) -> Result<()> {
@@ -141,19 +168,21 @@ impl RealActionRunner {
             return Ok(());
         }
 
-        if self.dbus_available {
-            let conn = Connection::system().context("failed to connect to system bus")?;
-            let proxy = zbus::blocking::Proxy::new(
-                &conn,
-                "org.freedesktop.systemd1",
-                "/org/freedesktop/systemd1",
-                "org.freedesktop.systemd1.Manager",
-            )?;
-            // Mode can be "replace"
-            proxy.call_method("RestartUnit", &(unit, "replace"))?;
-            info!("Requested restart of unit '{}'", unit);
-            Ok(())
-        } else {
+        #[cfg(target_os = "linux")]
+        {
+            if self.dbus_available {
+                let conn = Connection::system().context("failed to connect to system bus")?;
+                let proxy = zbus::blocking::Proxy::new(
+                    &conn,
+                    "org.freedesktop.systemd1",
+                    "/org/freedesktop/systemd1",
+                    "org.freedesktop.systemd1.Manager",
+                )?;
+                // Mode can be "replace"
+                proxy.call_method("RestartUnit", &(unit, "replace"))?;
+                info!("Requested restart of unit '{}'", unit);
+                return Ok(());
+            }
             info!("D-Bus unavailable; running explicit fallback for restart");
             // Basic validation: unit name must not contain whitespace or obvious
             // shell meta-characters.
@@ -179,6 +208,11 @@ impl RealActionRunner {
                     Err(e).context("failed to spawn restart fallback command")
                 }
             }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            error!("restart-unit action is not supported on this platform");
+            Err(anyhow::anyhow!("restart-unit not supported on this platform"))
         }
     }
 

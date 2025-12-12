@@ -4,7 +4,7 @@ set -euo pipefail
 # Build an RPM using fpm. Requires fpm to be installed (gem install fpm).
 # Usage: sudo ./contrib/fpm-build.sh [version]
 
-VERSION=${1:-0.1.0}
+VERSION=${1:-1.0.0}
 TARGET_DIR=${CARGO_TARGET_DIR:-target}
 PKG_NAME=check_vpn
 BUILD_DIR=$(mktemp -d)

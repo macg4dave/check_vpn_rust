@@ -15,7 +15,7 @@ Development helper scripts are in `scripts/` and example packaging is in `contri
 Automated CI on this repository is intentionally minimal: pull requests and
 pushes will only build multi-arch Docker images. Full tests, linting and
 security audits are expected to be run locally by contributors before
-creating a PR. Releases are created for the single canonical release tag
-`v0.5b` and produce multi-arch artifacts built in Docker.
+creating a PR. Releases are produced from semver tags (starting at `v1.0.0`)
+and generate multi-arch artifacts built in Docker.
 
 If you're unsure where to start, check the issue tracker for "good first issue" labels.

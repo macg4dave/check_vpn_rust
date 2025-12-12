@@ -1,14 +1,14 @@
 #![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
-//! check_vpn — small CLI tool and library to verify external IP / ISP and
+//! check_vpn - small CLI tool and library to verify external IP / ISP and
 //! optionally run actions when the public IP changes (useful for VPN checks).
 //!
 //! This crate exposes both a binary (`check_vpn` in `src/main.rs`) and a
 //! library surface for testing and embedding. The public API is intentionally
 //! small and centered around:
-//! - `check_vpn::app::perform_check` — perform a single connectivity/ISP check
-//! - `check_vpn::config::Config` — load/merge/validate configuration
-//! - `check_vpn::timer::start_timer` and `TimerHandle` — a tiny recurring timer
-//! - `check_vpn::actions` — action parsing and execution helpers
+//! - `check_vpn::app::perform_check` - perform a single connectivity/ISP check
+//! - `check_vpn::config::Config` - load/merge/validate configuration
+//! - `check_vpn::timer::start_timer` and `TimerHandle` - a tiny recurring timer
+//! - `check_vpn::actions` - action parsing and execution helpers
 //!
 //! Example (ignored):
 //! ```ignore

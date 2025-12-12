@@ -5,6 +5,7 @@ This document collects specific build/runtime requirements and step-by-step inst
 If you need a short summary, use `DEVELOPING.md` top-level commands. This file expands the requirements and commands so contributors can reproduce builds and tests reliably.
 
 ### Table of contents
+
 - System requirements (per OS)
 - Toolchain installation (Rust + toolchains)
 - Native dependencies (OpenSSL, libcurl, etc.)
@@ -16,25 +17,30 @@ If you need a short summary, use `DEVELOPING.md` top-level commands. This file e
 ## System requirements (per OS)
 
 ### macOS (developer machine)
+
 - macOS 12+ recommended
-- Homebrew package manager (https://brew.sh)
+- Homebrew package manager (<https://brew.sh>)
 - Xcode Command Line Tools: `xcode-select --install`
 - rustup (see Toolchain installation)
 
 ### Debian / Ubuntu (for local builds or inside Docker)
+
 - Docker Desktop (on Windows/macOS) or native Docker Engine on Linux
 - If building natively (not recommended for packaging parity), install system packages listed in the Dockerfile (see section below).
 
 ### Fedora (for packaging parity)
+
 - Docker Desktop or native Docker Engine on Linux
 
 ### Windows (native)
+
 - Windows 10/11 (latest updates)
-- rustup (https://rustup.rs)
+- rustup (<https://rustup.rs>)
 - Visual Studio Build Tools (C++ workload) for MSVC toolchain, or MSYS2 for GNU toolchain
 - If using WSL2: install Ubuntu or another distro and enable Docker Desktop WSL integration
 
 ### Common: Docker (for reproducible Linux builds and tests)
+
 - Docker Desktop for Windows/macOS: install and start the Linux engine. Enable WSL 2 integration if you run scripts from WSL.
 - On Linux: install docker.io/dockerd and ensure the daemon is running (systemd service).
 
@@ -49,6 +55,7 @@ rustup default stable
 ```
 
 ### Windows specifics
+
 - Recommended: use MSVC toolchain for best compatibility with native libraries:
 
 ```
@@ -58,27 +65,28 @@ rustup default stable-x86_64-pc-windows-msvc
 - Install Visual Studio Build Tools (C++ workload). Download from Microsoft and ensure `cl.exe` is available on PATH.
 
 ### WSL2 specifics
+
 - If using WSL2, install rustup inside the WSL distro (not on Windows) for Linux-native builds, or use the Dockerfiles for exact parity.
 
 ## Native dependencies (system libraries)
 
 This project uses crates that may require system libraries (libssl, libcurl, etc.). The Dockerfiles in `contrib/` install the necessary packages for Debian/Fedora. If building natively, install the following as a starting point.
 
-### Debian/Ubuntu (native):
+### Debian/Ubuntu (native)
 
 ```bash
 sudo apt update
 sudo apt install -y build-essential pkg-config libssl-dev libcurl4-openssl-dev libgmp-dev
 ```
 
-### Fedora (native):
+### Fedora (native)
 
 ```bash
 sudo dnf groupinstall -y "Development Tools"
 sudo dnf install -y pkgconfig openssl-devel libcurl-devel gmp-devel
 ```
 
-### macOS (Homebrew):
+### macOS (Homebrew)
 
 ```bash
 brew install openssl pkg-config curl
@@ -87,6 +95,7 @@ export OPENSSL_DIR="$(brew --prefix openssl)"
 ```
 
 ### Windows (MSVC)
+
 - Ensure Visual Studio Build Tools installed. For OpenSSL, you can use vcpkg or a prebuilt binary. Example vcpkg flow (optional):
 
 ```
@@ -120,12 +129,14 @@ cargo clippy --all-targets --all-features
 ```
 
 ### macOS (native)
+
 - Ensure Xcode Command Line Tools and Homebrew deps installed. Then run `cargo build --release`.
 
 -### Windows (native)
 Note: we have removed PowerShell-specific helper scripts from the repository. To produce Windows artifacts you can either use the CI on `windows-latest` or build on a native Windows machine using the Visual Studio toolchain. If you prefer a POSIX workflow, use WSL2 and run the normal POSIX helpers from a WSL shell (see "Windows (WSL2)" below).
 
 ### Windows (WSL2)
+
 - Use WSL shell and either `make` or the POSIX shell test/build scripts under `./scripts`. WSL will use the Linux toolchain and (if enabled) Docker Desktop's WSL integration. From Windows you can invoke WSL commands directly (e.g. `wsl make` or `wsl ./scripts/test-all-docker.sh`).
 
 ## Docker-based reproducible builds (Debian / Fedora)
@@ -149,7 +160,7 @@ The previous CI matrix workflow (`ci-matrix.yml`) has been archived. The
 repository now uses simplified CI focused on Docker-based multi-architecture
 builds and a single release workflow. Active workflows in `.github/workflows/`
 include `docker-builds.yml` (push/PR builder) and `release-docker.yml` (tag
--triggered release for v0.5b).
+triggered release for v1.0.x).
 
 - On `ubuntu-latest` the workflow uses Docker to produce Debian/Fedora artifacts.
 - On `macos-latest` the workflow runs a native `cargo build --release`.

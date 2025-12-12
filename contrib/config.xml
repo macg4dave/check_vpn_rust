@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Example config file for check_vpn. Place at /etc/check_vpn/config.xml or pass with --config-file -->
-<check_vpn>
+<!-- Example config file for check_vpn. Place at /etc/check_vpn/config.xml or pass with --config -->
+<config>
   <!-- Seconds between checks -->
   <interval>60</interval>
 
@@ -25,4 +25,14 @@
 
   <connectivity_timeout_secs>2</connectivity_timeout_secs>
   <connectivity_retries>1</connectivity_retries>
-</check_vpn>
+
+  <!-- Providers: leave defaults enabled or customize -->
+  <enable_ip_api>true</enable_ip_api>
+  <enable_ifconfig_co>true</enable_ifconfig_co>
+  <!-- Optional: custom providers -->
+  <!--
+  <provider_urls>
+    <url>https://example.com/ipinfo.json</url>
+  </provider_urls>
+  -->
+</config>

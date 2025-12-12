@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Cleanup script (dry-run by default) to remove all GitHub Releases and tags
 # except the canonical v0.5b release, then push a v0.5b tag and optionally
-# trigger the release workflow.
+# trigger the release workflow. Legacy helper: current releases use semver
+# tags (v1.0.x); keep this script for historical cleanups only.
 #
 # WARNING: This script performs DESTRUCTIVE remote operations when --yes is
 # passed. Use carefully and ensure you have the right permissions and auth.

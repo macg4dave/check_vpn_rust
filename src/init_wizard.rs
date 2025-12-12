@@ -19,7 +19,7 @@ pub fn set_no_prompt_for_tests(disable: bool) {
 }
 
 pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
-    println!("check_vpn init — generate a config.xml");
+    println!("check_vpn init - generate a config.xml");
 
     // Decide interactive vs non-interactive:
     // Prompts are only shown when stdin is a TTY AND no disabling env var is set.

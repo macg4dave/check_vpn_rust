@@ -1,6 +1,6 @@
 use crate::error_types::AppError;
 use std::result::Result;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::sleep;
@@ -119,14 +119,15 @@ pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
             }
         }
 
-    // Execute the single check using the current effective configuration.
-    let get_isp_closure = build_provider_chain_getter(&eff);
-    perform_check(&eff, get_isp_closure, actions::run_action)?;
+        // Execute the single check using the current effective configuration.
+        let get_isp_closure = build_provider_chain_getter(&eff);
+        perform_check(&eff, get_isp_closure, actions::run_action)?;
 
         // Sleep but wake earlier if we are asked to stop; use the possibly-updated interval.
         let mut slept = 0u64;
         while slept < eff.interval && keep_running.load(Ordering::SeqCst) {
-            let to_sleep = std::cmp::min(1, eff.interval as i32) as u64;
+            // Sleep in one-second slices to remain responsive to stop signals without overflowing.
+            let to_sleep = std::cmp::min(1u64, eff.interval);
             sleep(Duration::from_secs(to_sleep));
             slept += to_sleep;
         }
@@ -150,29 +151,37 @@ fn build_provider_chain_getter(eff: &crate::config::EffectiveConfig) -> impl Fn(
 
     // Custom provider URLs first, in specified order
     for url in &eff.provider_urls {
-        if let Ok(p) = providers::generic_json_provider::GenericJsonProvider::new(url) {
-            chain.push(Box::new(p));
-        }
+        match providers::generic_json_provider::GenericJsonProvider::new(url) {
+            Ok(p) => chain.push(Box::new(p)),
+            Err(e) => warn!("Failed to configure custom provider '{}': {:?}", url, e),
+        };
     }
 
     // Single custom JSON server with optional key override before others.
-        if let Some(ref url) = eff.custom_json_server {
-        if let Ok(p) = providers::generic_json_provider::GenericJsonProvider::new(url)
-            .map(|gp| gp.with_key(eff.custom_json_key.as_deref())) {
-            chain.insert(0, Box::new(p));
-        }
+    if let Some(ref url) = eff.custom_json_server {
+        match providers::generic_json_provider::GenericJsonProvider::new(url)
+            .map(|gp| gp.with_key(eff.custom_json_key.as_deref()))
+        {
+            Ok(p) => chain.insert(0, Box::new(p)),
+            Err(e) => warn!(
+                "Failed to configure custom JSON server '{}': {:?}",
+                url, e
+            ),
+        };
     }
 
     // Built-ins
     if eff.enable_ip_api {
-        if let Ok(p) = providers::ip_api_provider::IpApiProvider::new_default() {
-            chain.push(Box::new(p));
-        }
+        match providers::ip_api_provider::IpApiProvider::new_default() {
+            Ok(p) => chain.push(Box::new(p)),
+            Err(e) => warn!("Failed to initialize ip-api provider: {:?}", e),
+        };
     }
     if eff.enable_ifconfig_co {
-        if let Ok(p) = providers::ifconfig_co_provider::IfconfigCoProvider::new_default() {
-            chain.push(Box::new(p));
-        }
+        match providers::ifconfig_co_provider::IfconfigCoProvider::new_default() {
+            Ok(p) => chain.push(Box::new(p)),
+            Err(e) => warn!("Failed to initialize ifconfig.co provider: {:?}", e),
+        };
     }
 
     move || {
