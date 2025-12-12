@@ -25,6 +25,6 @@ else
   echo "docker not available; skipping fedora docker release build"
 fi
 
-echo "Note: building Windows-packaged artifacts is not supported from WSL/posix directly in this helper; use CI or a native Windows build for a packaged .zip." 
+echo "Note: building Windows-packaged artifacts is not supported from WSL/posix directly in this helper; use CI or a native Windows build for a packaged .zip."
 
 echo "All builds complete. Check target/release and artifacts/ for outputs."

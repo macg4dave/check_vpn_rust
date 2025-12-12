@@ -41,26 +41,19 @@ case "$DISTRO" in
 esac
 
 echo "Building image $IMAGE from $DOCKERFILE..."
-  
-# Guard: check repo size before sending build context. Docker will tar the
-# current directory and send it as the build context — if your workspace (eg
-# target/) is huge, this can exceed daemon/BuildKit limits and fail.
-# You can bypass this check by setting DOCKER_BUILD_ALLOW_LARGE=1 in the env.
+
 if [ "${DOCKER_BUILD_ALLOW_LARGE:-}" != "1" ]; then
-  # If the repository has an explicit .dockerignore that excludes `target/`
-  # then the build context should already be small and we can skip the
-  # heavy-size check.
   if [ -f .dockerignore ] && grep -qE '^target(/|$)' .dockerignore; then
-    echo ".dockerignore contains 'target/' — skipping repo-size check."
+    echo ".dockerignore excludes target/ - skipping repo-size check."
   else
     size_mb=$(du -sm . | awk '{print $1}')
-  max_mb=20480 # 20 GB
-  if [ "$size_mb" -ge "$max_mb" ]; then
-    echo "ERROR: repository size is ${size_mb}MB (>= ${max_mb}MB)." >&2
-    echo "Docker will send your whole repo as the build context which may fail with BuildKit for very large contexts." >&2
-    echo "Suggested fixes: make sure you have a .dockerignore that excludes 'target/' or large files, or set DOCKER_BUILD_ALLOW_LARGE=1 to bypass this check." >&2
-    exit 1
-  fi
+    max_mb=20480 # 20 GB
+    if [ "$size_mb" -ge "$max_mb" ]; then
+      echo "ERROR: repository size is ${size_mb}MB (>= ${max_mb}MB)." >&2
+      echo "Docker will send your whole repo as the build context which may fail with BuildKit for very large contexts." >&2
+      echo "Suggested fixes: ensure .dockerignore excludes target/ or large files, or set DOCKER_BUILD_ALLOW_LARGE=1 to bypass this check." >&2
+      exit 1
+    fi
   fi
 fi
 

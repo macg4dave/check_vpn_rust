@@ -16,18 +16,20 @@ OUT_PKG_DIR="$ROOT_DIR/release/macos"
 ARTIFACT_DIR="$ROOT_DIR/artifacts/macos"
 PKGROOT="$(mktemp -d)"
 SCRIPTS_DIR="$(mktemp -d)"
+cleanup() { rm -rf "$PKGROOT" "$SCRIPTS_DIR"; }
+trap cleanup EXIT
 
 VERSION=${VERSION:-}
 if [ -z "$VERSION" ]; then
-  if git rev-parse --git-dir >/dev/null 2>&1; then
-    VERSION=$(git describe --tags --always 2>/dev/null || true)
+  if git -C "$ROOT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
+    VERSION=$(git -C "$ROOT_DIR" describe --tags --always 2>/dev/null || true)
   fi
 fi
 if [ -z "$VERSION" ]; then
   VERSION=$(date -u +%Y%m%d%H%M%S)
 fi
 
-echo "Building check_vpn macOS package — version: ${VERSION}"
+echo "Building check_vpn macOS package - version: ${VERSION}"
 
 mkdir -p "$OUT_PKG_DIR"
 mkdir -p "$ARTIFACT_DIR"
@@ -108,8 +110,5 @@ tar -czf "$ARTIFACT_DIR/check_vpn-macos-${VERSION}.tar.gz" -C "$ROOT_DIR/target/
 
 echo "Package created: $PKG_OUT"
 echo "Tarball created: $ARTIFACT_DIR/check_vpn-macos-${VERSION}.tar.gz"
-
-# Cleanup
-rm -rf "$PKGROOT" "$SCRIPTS_DIR"
 
 echo "Done."

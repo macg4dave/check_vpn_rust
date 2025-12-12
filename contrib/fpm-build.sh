@@ -2,37 +2,36 @@
 set -euo pipefail
 
 # Build an RPM using fpm. Requires fpm to be installed (gem install fpm).
-# Usage: sudo ./contrib/fpm-build.sh [version]
+# Usage: ./contrib/fpm-build.sh [version]
 
 VERSION=${1:-1.0.0}
 TARGET_DIR=${CARGO_TARGET_DIR:-target}
 PKG_NAME=check_vpn
 BUILD_DIR=$(mktemp -d)
-DESTDIR=$BUILD_DIR/root
+DESTDIR="$BUILD_DIR/root"
+cleanup() { rm -rf "$BUILD_DIR"; }
+trap cleanup EXIT
 
 echo "Preparing layout in $DESTDIR"
-mkdir -p "$DESTDIR"/usr/bin
-mkdir -p "$DESTDIR"/etc/check_vpn
-mkdir -p "$DESTDIR"/lib/systemd/system
+mkdir -p "$DESTDIR/usr/bin" "$DESTDIR/etc/check_vpn" "$DESTDIR/lib/systemd/system"
 
 echo "Building release (target dir: ${TARGET_DIR})"
 if [ -n "${CARGO_TARGET_DIR:-}" ]; then
-  # Use the CARGO_TARGET_DIR env var if provided (for per-arch target dirs)
   CARGO_TARGET_DIR="${TARGET_DIR}" cargo build --release
 else
   cargo build --release
 fi
 
 echo "Copying files"
-cp "${TARGET_DIR}"/release/check_vpn "$DESTDIR"/usr/bin/
-cp contrib/config.xml "$DESTDIR"/etc/check_vpn/config.xml
-cp contrib/check_vpn.service "$DESTDIR"/lib/systemd/system/check_vpn.service
+cp "${TARGET_DIR}/release/check_vpn" "$DESTDIR/usr/bin/"
+cp contrib/config.xml "$DESTDIR/etc/check_vpn/config.xml"
+cp contrib/check_vpn.service "$DESTDIR/lib/systemd/system/check_vpn.service"
 
 # Copy systemd drop-in snippets if present
 if [ -d contrib/systemd/check_vpn.service.d ]; then
   echo "Including systemd drop-ins"
-  mkdir -p "$DESTDIR"/lib/systemd/system/check_vpn.service.d
-  cp -r contrib/systemd/check_vpn.service.d/* "$DESTDIR"/lib/systemd/system/check_vpn.service.d/ || true
+  mkdir -p "$DESTDIR/lib/systemd/system/check_vpn.service.d"
+  cp -r contrib/systemd/check_vpn.service.d/* "$DESTDIR/lib/systemd/system/check_vpn.service.d/" 2>/dev/null || true
 fi
 
 if ! command -v fpm >/dev/null 2>&1; then
@@ -56,4 +55,3 @@ fpm -s dir -t rpm \
   lib/systemd/system/check_vpn.service
 
 echo "RPM created in current directory"
-rm -rf "$BUILD_DIR"

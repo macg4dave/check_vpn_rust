@@ -30,8 +30,8 @@ Docker images
 
 Two images are provided to keep packaging reproducible:
 
-- `contrib/Dockerfile.debian-packaging` — Debian-based image with rustup and `cargo-deb` installed to build .deb packages.
-- `contrib/Dockerfile.fedora-packaging` — Fedora-based image with rustup and `fpm` (Ruby gem) to build .rpm packages.
+- `contrib/Dockerfile.debian-packaging` - Debian-based image with rustup and `cargo-deb` installed to build .deb packages.
+- `contrib/Dockerfile.fedora-packaging` - Fedora-based image with rustup and `fpm` (Ruby gem) to build .rpm packages.
 
 The packaging script builds these images and executes the existing packaging helper
 scripts in `contrib/` (`contrib/cargo-deb.sh` and `contrib/fpm-build.sh`).
@@ -41,8 +41,8 @@ Artifacts
 
 After a successful run, you will find packages in:
 
-- `release/debian/` — contains `*.deb` files created by `cargo-deb`.
-- `release/fedora/` — contains `*.rpm` files created by `fpm`.
+- `release/debian/` - contains `*.deb` files created by `cargo-deb`.
+- `release/fedora/` - contains `*.rpm` files created by `fpm`.
 
 Make targets
 ------------
@@ -91,7 +91,7 @@ Image size optimizations
 -------------------------
 
 Packaging Docker images are optimized by pruning cargo/rustup caches and stripping
-binaries where possible — this reduces image size without removing required runtime
+binaries where possible - this reduces image size without removing required runtime
 tooling. The images deliberately keep the rust toolchain and packaging tools that are
 required to compile and build packages inside the container at runtime, but we remove
 download caches and temporary artifacts to keep images as small as practical.

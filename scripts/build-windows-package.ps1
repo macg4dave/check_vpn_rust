@@ -1,14 +1,17 @@
+param(
+    [string]$Version = ""
+)
+
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-
-param(
-    [string]$Version
-)
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Push-Location $repoRoot
 try {
-    # Build release binary
+    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+        throw "cargo not found in PATH"
+    }
+
     cargo build --release
 
     $artifactDir = Join-Path $repoRoot 'artifacts\windows'
