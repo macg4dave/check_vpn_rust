@@ -25,13 +25,22 @@ the `release/` folder:
 ./scripts/build-all-packages.sh --skip-debian
 ```
 
+Windows note
+------------
+
+These packaging scripts are bash + Docker based. On Windows, run them from WSL2 or Git Bash, for example:
+
+```sh
+bash ./scripts/build-all-packages.sh --version 1.2.3
+```
+
 Docker images
 -------------
 
 Two images are provided to keep packaging reproducible:
 
-- `contrib/Dockerfile.debian-packaging` - Debian-based image with rustup and `cargo-deb` installed to build .deb packages.
-- `contrib/Dockerfile.fedora-packaging` - Fedora-based image with rustup and `fpm` (Ruby gem) to build .rpm packages.
+- `contrib/Dockerfile.debian-packaging` — Debian-based image with rustup and `cargo-deb` installed to build .deb packages.
+- `contrib/Dockerfile.fedora-packaging` — Fedora-based image with rustup and `fpm` (Ruby gem) to build .rpm packages.
 
 The packaging script builds these images and executes the existing packaging helper
 scripts in `contrib/` (`contrib/cargo-deb.sh` and `contrib/fpm-build.sh`).
@@ -41,8 +50,16 @@ Artifacts
 
 After a successful run, you will find packages in:
 
-- `release/debian/` - contains `*.deb` files created by `cargo-deb`.
-- `release/fedora/` - contains `*.rpm` files created by `fpm`.
+- `release/debian/` — contains `*.deb` files created by `cargo-deb`.
+- `release/fedora/` — contains `*.rpm` files created by `fpm`.
+- `release/bin/<arch>/` — raw `check_vpn` binaries plus a `check_vpn-<version>-<arch>.tar.gz` helper tarball for each architecture.
+- `release/unix/<arch>/` — systemd-friendly layout (binary + units/config) used inside the packages and tarball.
+
+Versioning
+----------
+
+- The `--version` value is used for RPM versioning (via `fpm`) and for naming the tarball in `release/bin/<arch>/`.
+- Debian packaging uses `cargo-deb` with `--deb-version` so the produced `.deb` version matches `--version` (default revision is `-1`, override via `DEB_REVISION=...`).
 
 Make targets
 ------------
@@ -91,7 +108,7 @@ Image size optimizations
 -------------------------
 
 Packaging Docker images are optimized by pruning cargo/rustup caches and stripping
-binaries where possible - this reduces image size without removing required runtime
+binaries where possible — this reduces image size without removing required runtime
 tooling. The images deliberately keep the rust toolchain and packaging tools that are
 required to compile and build packages inside the container at runtime, but we remove
 download caches and temporary artifacts to keep images as small as practical.

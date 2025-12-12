@@ -46,10 +46,14 @@ jobs:
           ls -la release/debian || true
           echo 'Fedora artifacts:'
           ls -la release/fedora || true
+          echo 'Binary artifacts:'
+          ls -la release/bin || true
+          echo 'Unix layout artifacts:'
+          ls -la release/unix || true
 
       - name: Create GitHub release + upload artifacts
         uses: ncipollo/release-action@v1
         with:
           tag: ${{ github.ref_name }}
           name: v0.5b
-          artifacts: "release/debian/**/*,release/fedora/**/*,release/unix/**/*"
+          artifacts: "release/debian/**/*,release/fedora/**/*,release/unix/**/*,release/bin/**/*"

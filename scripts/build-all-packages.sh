@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# This script uses bash features (arrays). If invoked via `sh`, fail fast with a clear error.
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Error: this script must be run with bash (e.g. 'bash ./scripts/build-all-packages.sh')." >&2
+  exit 2
+fi
+
 # Reproducible packaging helper. Builds Debian (.deb) and Fedora (.rpm) packages
 # inside Docker images and places artifacts into release/debian/ and
 # release/fedora/ respectively.
@@ -16,6 +22,7 @@ BUILD_CACHE="${BUILD_CACHE:-0}"
 OUTPUT_DIR_DEFAULT="${REPO_ROOT}/release"
 PLATFORMS="${PLATFORMS:-linux/amd64,linux/arm64}"
 VERSION=""
+DEB_REVISION="${DEB_REVISION:-1}"
 OUTPUT_DIR="$OUTPUT_DIR_DEFAULT"
 USE_DOCKER=1
 SKIP_DEBIAN=0
@@ -59,7 +66,12 @@ if [ -z "$VERSION" ]; then
   VERSION=${VERSION:-0.0.0}
 fi
 
-mkdir -p "$OUTPUT_DIR/debian" "$OUTPUT_DIR/fedora" "$OUTPUT_DIR/unix"
+VERSION_NORMALIZED="${VERSION#v}"
+DEB_VERSION_FULL="${VERSION_NORMALIZED}-${DEB_REVISION}"
+VERSION_FILE_SAFE="${VERSION//\//_}"
+VERSION_FILE_SAFE="${VERSION_FILE_SAFE//:/_}"
+
+mkdir -p "$OUTPUT_DIR/debian" "$OUTPUT_DIR/fedora" "$OUTPUT_DIR/unix" "$OUTPUT_DIR/bin"
 
 IFS=',' read -r -a PLATFORM_ARRAY <<< "$PLATFORMS"
 
@@ -76,6 +88,28 @@ ensure_buildx_builder() {
   docker buildx inspect >/dev/null 2>&1 || docker buildx create --use --name check-vpn-builder >/dev/null 2>&1 || true
 }
 
+detect_host_arch() {
+  local machine
+  machine="$(uname -m 2>/dev/null || echo unknown)"
+  case "$machine" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) echo "$machine" ;;
+  esac
+}
+
+find_built_binary() {
+  local target_dir="$1"
+
+  if [ -f "${target_dir}/release/check_vpn" ]; then
+    echo "${target_dir}/release/check_vpn"
+  elif [ -f "${REPO_ROOT}/target/release/check_vpn" ]; then
+    echo "${REPO_ROOT}/target/release/check_vpn"
+  else
+    echo ""
+  fi
+}
+
 copy_unix_layout() {
   local arch="$1"
   local target_dir="$2"
@@ -84,12 +118,8 @@ copy_unix_layout() {
     "${OUTPUT_DIR}/unix/${arch}/lib/systemd/system" \
     "${OUTPUT_DIR}/unix/${arch}/etc/check_vpn"
 
-  local bin_source=""
-  if [ -f "${target_dir}/release/check_vpn" ]; then
-    bin_source="${target_dir}/release/check_vpn"
-  elif [ -f "${REPO_ROOT}/target/release/check_vpn" ]; then
-    bin_source="${REPO_ROOT}/target/release/check_vpn"
-  fi
+  local bin_source
+  bin_source=$(find_built_binary "$target_dir")
 
   if [ -n "$bin_source" ]; then
     cp -f "$bin_source" "${OUTPUT_DIR}/unix/${arch}/usr/bin/check_vpn"
@@ -111,6 +141,25 @@ copy_unix_layout() {
     mkdir -p "${OUTPUT_DIR}/unix/${arch}/etc/logrotate.d"
     cp -f "${REPO_ROOT}/contrib/logrotate.conf" "${OUTPUT_DIR}/unix/${arch}/etc/logrotate.d/check_vpn"
   fi
+}
+
+copy_binary_artifacts() {
+  local arch="$1"
+  local target_dir="$2"
+  local bin_source
+
+  bin_source=$(find_built_binary "$target_dir")
+  if [ -z "$bin_source" ]; then
+    echo "Warning: no built binary found for arch ${arch} to copy into release/bin" >&2
+    return
+  fi
+
+  local dest_dir="${OUTPUT_DIR}/bin/${arch}"
+  local tar_name="check_vpn-${VERSION_FILE_SAFE}-${arch}.tar.gz"
+
+  mkdir -p "$dest_dir"
+  cp -f "$bin_source" "${dest_dir}/check_vpn"
+  tar -czf "${dest_dir}/${tar_name}" -C "$(dirname "$bin_source")" "$(basename "$bin_source")"
 }
 
 copy_debs_from() {
@@ -150,6 +199,26 @@ copy_rpms_from_root() {
   done
 }
 
+normalize_release_filenames() {
+  # Debian: replace trailing _amd64.deb in arm64 dir to _arm64.deb
+  find "${OUTPUT_DIR}/debian" -type f -name '*_amd64.deb' 2>/dev/null | while read -r f; do
+    if [[ "$f" == *"/arm64/"* ]]; then
+      local new
+      new="${f%_amd64.deb}_arm64.deb"
+      mv -f "$f" "$new" || true
+    fi
+  done || true
+
+  # Fedora: for arm64 replace x86_64 -> aarch64
+  find "${OUTPUT_DIR}/fedora" -type f -name '*x86_64.rpm' 2>/dev/null | while read -r f; do
+    if [[ "$f" == *"/arm64/"* ]]; then
+      local new
+      new="${f%x86_64.rpm}aarch64.rpm"
+      mv -f "$f" "$new" || true
+    fi
+  done || true
+}
+
 run_debian() {
   echo "=== Debian packaging (docker=${USE_DOCKER}) ==="
   if [ "$USE_DOCKER" -eq 1 ]; then
@@ -171,10 +240,11 @@ run_debian() {
 
         echo "Running builder container to build binaries and create .deb for arch=${arch}"
         docker run --rm --platform "$plat" -e CARGO_TARGET_DIR=/workdir/target-"${arch}" -v "${REPO_ROOT}:/workdir" -w /workdir "${img_tag}-builder" \
-          sh -c "cargo build --release && CARGO_TARGET_DIR=/workdir/target-${arch} cargo deb --no-strip --no-build"
+          sh -c "cargo build --release && CARGO_TARGET_DIR=/workdir/target-${arch} cargo deb --no-strip --no-build --deb-version \"${DEB_VERSION_FULL}\""
 
         copy_debs_from "${REPO_ROOT}/target-${arch}/debian" "${OUTPUT_DIR}/debian/${arch}"
         copy_unix_layout "${arch}" "${REPO_ROOT}/target-${arch}"
+        copy_binary_artifacts "${arch}" "${REPO_ROOT}/target-${arch}"
       done
       return
     fi
@@ -184,14 +254,18 @@ run_debian() {
 
     echo "Running builder container to build binaries and create .deb"
     docker run --rm -e CARGO_TARGET_DIR=/workdir/target -v "${REPO_ROOT}:/workdir" -w /workdir "${DOCKER_DEBIAN_TAG}-builder" \
-      sh -c "cargo build --release && CARGO_TARGET_DIR=/workdir/target cargo deb --no-strip --no-build"
+      sh -c "cargo build --release && CARGO_TARGET_DIR=/workdir/target cargo deb --no-strip --no-build --deb-version \"${DEB_VERSION_FULL}\""
   else
     command -v cargo-deb >/dev/null 2>&1 || die "cargo-deb not found locally; install it or run with Docker"
-    (cd "${REPO_ROOT}" && ./contrib/cargo-deb.sh)
+    (cd "${REPO_ROOT}" && cargo build --release && cargo deb --no-strip --deb-version "${DEB_VERSION_FULL}")
   fi
 
+  local host_arch
+  host_arch="$(detect_host_arch)"
+
   copy_debs_from "${REPO_ROOT}/target/debian" "${OUTPUT_DIR}/debian"
-  copy_unix_layout "amd64" "${REPO_ROOT}/target"
+  copy_unix_layout "${host_arch}" "${REPO_ROOT}/target"
+  copy_binary_artifacts "${host_arch}" "${REPO_ROOT}/target"
 }
 
 run_fedora() {
@@ -215,10 +289,11 @@ run_fedora() {
 
         echo "Running builder container to build binaries and create .rpm for arch=${arch}"
         docker run --rm --platform "$plat" -e CARGO_TARGET_DIR=/workdir/target-"${arch}" -v "${REPO_ROOT}:/workdir" -w /workdir "${img_tag}-builder" \
-          sh -c "CARGO_TARGET_DIR=/workdir/target-${arch} cargo build --release && CARGO_TARGET_DIR=/workdir/target-${arch} ./contrib/fpm-build.sh \"${VERSION}\""
+          sh -c "CARGO_TARGET_DIR=/workdir/target-${arch} cargo build --release && CARGO_TARGET_DIR=/workdir/target-${arch} ./contrib/fpm-build.sh \"${VERSION_NORMALIZED}\""
 
         copy_rpms_from_root "${OUTPUT_DIR}/fedora/${arch}" true
         copy_unix_layout "${arch}" "${REPO_ROOT}/target-${arch}"
+        copy_binary_artifacts "${arch}" "${REPO_ROOT}/target-${arch}"
       done
       return
     fi
@@ -228,14 +303,18 @@ run_fedora() {
 
     echo "Running builder container to build binaries and create .rpm"
     docker run --rm -e CARGO_TARGET_DIR=/workdir/target -v "${REPO_ROOT}:/workdir" -w /workdir "${DOCKER_FEDORA_TAG}-builder" \
-      sh -c "CARGO_TARGET_DIR=/workdir/target cargo build --release && CARGO_TARGET_DIR=/workdir/target ./contrib/fpm-build.sh \"${VERSION}\""
+      sh -c "CARGO_TARGET_DIR=/workdir/target cargo build --release && CARGO_TARGET_DIR=/workdir/target ./contrib/fpm-build.sh \"${VERSION_NORMALIZED}\""
   else
     command -v fpm >/dev/null 2>&1 || die "fpm not found locally; install it (gem install fpm) or run with Docker"
-    (cd "${REPO_ROOT}" && ./contrib/fpm-build.sh "${VERSION}")
+    (cd "${REPO_ROOT}" && ./contrib/fpm-build.sh "${VERSION_NORMALIZED}")
   fi
 
+  local host_arch
+  host_arch="$(detect_host_arch)"
+
   copy_rpms_from_root "${OUTPUT_DIR}/fedora"
-  copy_unix_layout "amd64" "${REPO_ROOT}/target"
+  copy_unix_layout "${host_arch}" "${REPO_ROOT}/target"
+  copy_binary_artifacts "${host_arch}" "${REPO_ROOT}/target"
 }
 
 if [ "$SKIP_DEBIAN" -eq 0 ]; then
@@ -249,5 +328,7 @@ if [ "$SKIP_FEDORA" -eq 0 ]; then
 else
   echo "Skipping Fedora packaging"
 fi
+
+normalize_release_filenames
 
 echo "Done - artifacts are under: ${OUTPUT_DIR}"
