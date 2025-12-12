@@ -27,6 +27,8 @@
 ## Issue tracker
 
 - [ ] Build system on Windows does not detect WSL or build Windows binary (needs manual testing/automation).
+- [ ] No Packaging for Windows (e.g., MSI or ZIP with shortcuts); currently requires manual setup.
+- [ ] Some VPN providers may have intermittent failures; need more robust error handling and retries.
 
 ## Planned features beyond v1.0
 

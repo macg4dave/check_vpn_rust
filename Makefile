@@ -1,23 +1,40 @@
+SHELL := /bin/sh
 IMAGE_NAME := check_vpn_tests
 ARTIFACT_DIR := artifacts
-UNAME_S := $(shell uname -s)
+
+# Host OS detection that works under POSIX shells, MSYS, or WSL.
+IS_WSL := $(shell uname -r 2>/dev/null | grep -i microsoft >/dev/null && echo 1 || echo 0)
+ifeq ($(OS),Windows_NT)
+HOST_OS := Windows
+else ifeq ($(IS_WSL),1)
+HOST_OS := Windows_WSL
+else
+HOST_OS := $(shell uname -s 2>/dev/null || echo Unknown)
+endif
 
 # Default: build host, Debian, Fedora, and Windows artifacts. macOS build runs
 # only when on macOS. Windows build runs only on Windows.
-.PHONY: all _maybe-macos _maybe-windows
-all: release debian-build-release fedora-build-release _maybe-macos _maybe-windows
+.PHONY: all _maybe-macos _maybe-windows _maybe-windows-package
+all: release debian-build-release fedora-build-release _maybe-macos _maybe-windows _maybe-windows-package
 
 _maybe-macos:
-	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then $(MAKE) build-macos; else echo "Skipping macOS build (not on mac)"; fi'
+	@sh -c 'if [ "$(HOST_OS)" = "Darwin" ]; then $(MAKE) build-macos; else echo "Skipping macOS build (not on mac)"; fi'
 
-ifeq ($(OS),Windows_NT)
+ifeq ($(HOST_OS),Windows)
 _maybe-windows:
 		@echo "Skipping native Windows build in Makefile: run build steps inside WSL2 or use CI for Windows artifacts."
 		@echo "From Windows you can run WSL and then run make in the WSL shell, e.g. 'wsl make release' or run the POSIX helpers under ./scripts from WSL."
+else ifeq ($(HOST_OS),Windows_WSL)
+_maybe-windows:
+	@echo "Running under WSL - use 'make windows-package' to build a Windows zip via powershell.exe if available."
 else
 _maybe-windows:
 	@echo "Skipping Windows build: not on Windows. To build Windows artifacts, use CI or run builds inside WSL2 (from Windows: 'wsl make release' or open a WSL shell and run the POSIX helpers in ./scripts)."
 endif
+
+.PHONY: _maybe-windows-package
+_maybe-windows-package:
+	@if [ "$(HOST_OS)" = "Windows" ]; then $(MAKE) windows-package; else echo "Skipping windows-package: host is not Windows"; fi
 
 .PHONY: test-container test-container-ignored
 
@@ -27,7 +44,7 @@ test-all-docker:
 
 windows-test-all-docker:
 	# On Windows, invoke the POSIX test runner inside WSL (recommended) if available.
-	@sh -c 'if command -v wsl >/dev/null 2>&1; then wsl ./scripts/test-all-docker.sh; else echo "WSL not found — run ./scripts/test-all-docker.sh from a POSIX shell or install WSL2"; fi'
+	@sh -c 'if command -v wsl >/dev/null 2>&1; then wsl ./scripts/test-all-docker.sh; else echo "WSL not found - run ./scripts/test-all-docker.sh from a POSIX shell or install WSL2"; fi'
 
 # Build and run the test container (runs default tests)
 test-container:
@@ -123,21 +140,21 @@ package-all:
 	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		./scripts/build-all-packages.sh --version "$${VERSION:-}"; \
 	else \
-		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker"; \
+		echo "Docker not available - try ./scripts/build-all-packages.sh --no-docker"; \
 	fi'
 
 package-debian:
 	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		./scripts/build-all-packages.sh --skip-fedora --version "$${VERSION:-}"; \
 	else \
-		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker --skip-fedora"; \
+		echo "Docker not available - try ./scripts/build-all-packages.sh --no-docker --skip-fedora"; \
 	fi'
 
 package-fedora:
 	@sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then \
 		./scripts/build-all-packages.sh --skip-debian --version "$${VERSION:-}"; \
 	else \
-		echo "Docker not available — try ./scripts/build-all-packages.sh --no-docker --skip-debian"; \
+		echo "Docker not available - try ./scripts/build-all-packages.sh --no-docker --skip-debian"; \
 	fi'
 
 
@@ -149,15 +166,15 @@ dev:
 build:
 	cargo build
 	# Package debug build into artifacts
-	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)/debug
-	@cp -f target/debug/check_vpn $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)/check_vpn-debug || true
+	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(HOST_OS)" = "Darwin" ]; then echo macos; else echo linux; fi)/debug
+	@cp -f target/debug/check_vpn $(ARTIFACT_DIR)/$(shell if [ "$(HOST_OS)" = "Darwin" ]; then echo macos; else echo linux; fi)/check_vpn-debug || true
 
 release:
 	cargo build --release
 
 	# Place a packaged release into artifacts/<platform>
-	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(UNAME_S)" = "Darwin" ]; then echo macos; else echo linux; fi)
-	@if [ "$(UNAME_S)" = "Darwin" ]; then \
+	@mkdir -p $(ARTIFACT_DIR)/$(shell if [ "$(HOST_OS)" = "Darwin" ]; then echo macos; else echo linux; fi)
+	@if [ "$(HOST_OS)" = "Darwin" ]; then \
 		tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; \
 		cp -f target/release/check_vpn $(ARTIFACT_DIR)/macos/ || true; \
 	else \
@@ -166,13 +183,13 @@ release:
 	fi
 
 fmt:
-	## Debug target: run with backtraces and optional tracing (observability) enabled
-	.PHONY: debug
-	debug:
-		@echo "Run with backtrace enabled and tracing/structured logging (compile with --features observability)"
-		RUST_BACKTRACE=1 RUST_LOG=$${RUST_LOG:-trace} cargo run --features "observability" -- --run-once --dry-run -vv
-
 	cargo fmt --all
+
+.PHONY: debug
+## Debug target: run with backtraces and optional tracing (observability) enabled
+debug:
+	@echo "Run with backtrace enabled and tracing/structured logging (compile with --features observability)"
+	RUST_BACKTRACE=1 RUST_LOG=$${RUST_LOG:-trace} cargo run --features "observability" -- --run-once --dry-run -vv
 
 clippy:
 	cargo clippy --all-targets --all-features
@@ -185,19 +202,19 @@ clean:
 # Only attempt a macOS-native build when running on macOS. This keeps
 # CI and local Linux/Windows builds from failing when `uname` != Darwin.
 build-macos:
-	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then cargo build --release; else echo "Skipping macOS build: not on macOS"; fi'
+	@sh -c 'if [ "$(HOST_OS)" = "Darwin" ]; then cargo build --release; else echo "Skipping macOS build: not on macOS"; fi'
 	# When running on macOS also copy package to artifacts/macos
-	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then mkdir -p $(ARTIFACT_DIR)/macos && tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; fi'
+	@sh -c 'if [ "$(HOST_OS)" = "Darwin" ]; then mkdir -p $(ARTIFACT_DIR)/macos && tar -czf $(ARTIFACT_DIR)/macos/check_vpn-macos.tar.gz -C target/release check_vpn || true; fi'
 
 .PHONY: package-macos-local test-macos-pkg-local
 # Local-only macOS packaging helpers (run on a mac dev box)
 package-macos-local:
-	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then echo "Running local mac package builder"; bash ./scripts/build-macos-pkg.sh; else echo "Skipping mac packaging: not on macOS"; fi'
+	@sh -c 'if [ "$(HOST_OS)" = "Darwin" ]; then echo "Running local mac package builder"; bash ./scripts/build-macos-pkg.sh; else echo "Skipping mac packaging: not on macOS"; fi'
 
 test-macos-pkg-local:
-	@sh -c 'if [ "$$(uname)" = "Darwin" ]; then \
+	@sh -c 'if [ "$(HOST_OS)" = "Darwin" ]; then \
 		PKG_FILE=$$(ls -1 release/macos/*.pkg 2>/dev/null | head -n1 || true); \
-		if [ -z "$${PKG_FILE}" ]; then echo "No package found in release/macos — run make package-macos-local first"; exit 2; fi; \
+		if [ -z "$${PKG_FILE}" ]; then echo "No package found in release/macos - run make package-macos-local first"; exit 2; fi; \
 		echo "Inspecting $$PKG_FILE"; bash ./scripts/test-macos-pkg.sh inspect "$$PKG_FILE"; \
 		echo "Simulating install to disk image"; bash ./scripts/test-macos-pkg.sh simulate "$$PKG_FILE"; \
 	else echo "Skipping mac pkg tests: not on macOS"; fi'
@@ -205,3 +222,19 @@ test-macos-pkg-local:
 # Helper target to remind Windows users to run builds in WSL2 or the CI.
 windows-build:
 	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."
+
+.PHONY: windows-package
+# Windows-only packaging helper. Creates artifacts/windows/check_vpn-windows.zip with the exe and sample config.
+windows-package:
+	@if [ "$(HOST_OS)" = "Windows" ]; then \
+		powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "./scripts/build-windows-package.ps1" --Version "$${VERSION:-}"; \
+	elif [ "$(HOST_OS)" = "Windows_WSL" ]; then \
+		if command -v powershell.exe >/dev/null 2>&1; then \
+			WIN_SCRIPT=$$(wslpath -w "./scripts/build-windows-package.ps1"); \
+			powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "$$WIN_SCRIPT" --Version "$${VERSION:-}"; \
+		else \
+			echo "powershell.exe not found in WSL - install Windows PowerShell or run this target on Windows"; exit 1; \
+		fi; \
+	else \
+		echo "Skipping windows-package: host is not Windows"; \
+	fi

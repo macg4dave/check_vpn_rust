@@ -5,7 +5,7 @@ This file describes how to build and test this repository across supported OSes:
 Summary
 
 - Supported platforms: macOS, Debian, Fedora (packaged via Docker), Windows (native / WSL2)
-- CI: The historical GitHub Actions matrix workflow has been archived; the repository now uses two focused workflows: `docker-builds.yml` (push/PR Docker multi-arch builds) and `release-docker.yml` (tag-triggered release for v1.0.x).
+- CI: The historical GitHub Actions matrix workflow has been archived; the repository now uses two focused workflows: `docker-builds.yml` (push/PR Docker multi-arch builds) and `release-docker.yml` (tag-triggered release for v1.0.x). A Windows packaging helper (`make windows-package`) is available when running natively on Windows with PowerShell and cargo installed.
 
 Prerequisites
 
