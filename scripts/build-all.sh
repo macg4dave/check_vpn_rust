@@ -1,30 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Minimal POSIX helper to build host + Docker release artifacts (WSL-friendly).
-# Runs a local release build (host), and builds Debian/Fedora Docker release artifacts.
-
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/.." && pwd)"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
-
-echo "=== Host release build ==="
-cargo build --release
-
-echo "=== Debian Docker release build ==="
-if command -v docker >/dev/null 2>&1; then
-  ./scripts/docker-build.sh debian build-release
-else
-  echo "docker not available; skipping debian docker release build"
+if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
+  echo "Host, Debian, and Fedora builds require a working Docker daemon." >&2
+  exit 1
 fi
-
-echo "=== Fedora Docker release build ==="
-if command -v docker >/dev/null 2>&1; then
-  ./scripts/docker-build.sh fedora build-release
-else
-  echo "docker not available; skipping fedora docker release build"
-fi
-
-echo "Note: building Windows-packaged artifacts is not supported from WSL/posix directly in this helper; use CI or a native Windows build for a packaged .zip."
-
-echo "All builds complete. Check target/release and artifacts/ for outputs."
+cargo build --release --locked
+bash scripts/docker-build.sh debian build-release
+bash scripts/docker-build.sh fedora build-release
+echo "Built host target/release, target-debian/release, and target-fedora/release."

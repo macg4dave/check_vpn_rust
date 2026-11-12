@@ -4,7 +4,13 @@ set -euo pipefail
 # Build an RPM using fpm. Requires fpm to be installed (gem install fpm).
 # Usage: ./contrib/fpm-build.sh [version]
 
-VERSION=${1:-1.0.0}
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+VERSION="$(bash "$REPO_ROOT/scripts/package-version.sh" "${1:-}")"
+if ! command -v fpm >/dev/null 2>&1; then
+  echo "fpm not found. Install with: gem install --no-document fpm" >&2
+  exit 1
+fi
 TARGET_DIR=${CARGO_TARGET_DIR:-target}
 PKG_NAME=check_vpn
 BUILD_DIR=$(mktemp -d)
@@ -17,9 +23,9 @@ mkdir -p "$DESTDIR/usr/share/doc/check_vpn" "$DESTDIR/usr/bin" "$DESTDIR/etc/che
 
 echo "Building release (target dir: ${TARGET_DIR})"
 if [ -n "${CARGO_TARGET_DIR:-}" ]; then
-  CARGO_TARGET_DIR="${TARGET_DIR}" cargo build --release
+  CARGO_TARGET_DIR="${TARGET_DIR}" cargo build --release --locked
 else
-  cargo build --release
+  cargo build --release --locked
 fi
 
 echo "Copying files"
@@ -28,25 +34,14 @@ cp INSTALL.md "$DESTDIR/usr/share/doc/check_vpn/"
 cp contrib/config.xml "$DESTDIR/etc/check_vpn/config.xml"
 cp contrib/check_vpn.service "$DESTDIR/lib/systemd/system/check_vpn.service"
 
-# Copy systemd drop-in snippets if present
-if [ -d contrib/systemd/check_vpn.service.d ]; then
-  echo "Including systemd drop-ins"
-  mkdir -p "$DESTDIR/lib/systemd/system/check_vpn.service.d"
-  cp -r contrib/systemd/check_vpn.service.d/* "$DESTDIR/lib/systemd/system/check_vpn.service.d/" 2>/dev/null || true
-fi
-
-if ! command -v fpm >/dev/null 2>&1; then
-  echo "fpm not found. Install with: sudo gem install --no-document fpm" >&2
-  exit 1
-fi
-
-echo "Making maintainer scripts executable"
-chmod +x contrib/packaging/postinst || true
-chmod +x contrib/packaging/prerm || true
+mkdir -p "$DESTDIR/lib/systemd/system/check_vpn.service.d" "$DESTDIR/etc/logrotate.d"
+cp contrib/systemd/check_vpn.service.d/limits.conf "$DESTDIR/lib/systemd/system/check_vpn.service.d/"
+cp contrib/logrotate.conf "$DESTDIR/etc/logrotate.d/check_vpn"
 
 echo "Creating RPM via fpm (includes postinst/prerm scripts)"
 fpm -s dir -t rpm \
   -n "$PKG_NAME" -v "$VERSION" --iteration 1 \
+  --license MIT \
   --description "VPN monitoring and auto-reconnect" \
   --after-install contrib/packaging/postinst \
   --before-remove contrib/packaging/prerm \
@@ -54,6 +49,8 @@ fpm -s dir -t rpm \
   usr/share/doc/check_vpn/INSTALL.md \
   usr/bin/check_vpn \
   etc/check_vpn/config.xml \
-  lib/systemd/system/check_vpn.service
+  lib/systemd/system/check_vpn.service \
+  lib/systemd/system/check_vpn.service.d \
+  etc/logrotate.d/check_vpn
 
 echo "RPM created in current directory"

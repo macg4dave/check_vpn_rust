@@ -8,7 +8,7 @@ set -euo pipefail
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "This script must be run on macOS (Darwin)."
-  exit 0
+  exit 1
 fi
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -19,23 +19,16 @@ SCRIPTS_DIR="$(mktemp -d)"
 cleanup() { rm -rf "$PKGROOT" "$SCRIPTS_DIR"; }
 trap cleanup EXIT
 
-VERSION=${VERSION:-}
-if [ -z "$VERSION" ]; then
-  if git -C "$ROOT_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-    VERSION=$(git -C "$ROOT_DIR" describe --tags --always 2>/dev/null || true)
-  fi
-fi
-if [ -z "$VERSION" ]; then
-  VERSION=$(date -u +%Y%m%d%H%M%S)
-fi
+VERSION="$(bash "$ROOT_DIR/scripts/package-version.sh" "${VERSION:-}")"
+cd "$ROOT_DIR"
 
 echo "Building check_vpn macOS package - version: ${VERSION}"
 
 mkdir -p "$OUT_PKG_DIR"
 mkdir -p "$ARTIFACT_DIR"
 
-echo "Running cargo build --release"
-cargo build --release
+echo "Running cargo build --release --locked"
+cargo build --release --locked
 
 BIN_PATH="$ROOT_DIR/target/release/check_vpn"
 if [ ! -x "$BIN_PATH" ]; then
@@ -66,18 +59,21 @@ cat > "$POSTINSTALL" <<'POST'
 # Postinstall: set permissions and ownership for installed files.
 set -e
 
-echo "Setting ownership and permissions for check_vpn components"
-if [ -f "/usr/local/bin/check_vpn" ]; then
-  chown root:wheel /usr/local/bin/check_vpn || true
-  chmod 755 /usr/local/bin/check_vpn || true
+# Installer passes the target volume as argument 3. Never modify the host when
+# verifying a package against a mounted image.
+target_volume="${3:-/}"
+binary="$target_volume/usr/local/bin/check_vpn"
+plist="$target_volume/Library/LaunchDaemons/com.check_vpn.agent.plist"
+if [ -f "$binary" ]; then
+  chown root:wheel "$binary"
+  chmod 755 "$binary"
 fi
-if [ -f "/Library/LaunchDaemons/com.check_vpn.agent.plist" ]; then
-  chown root:wheel /Library/LaunchDaemons/com.check_vpn.agent.plist || true
-  chmod 644 /Library/LaunchDaemons/com.check_vpn.agent.plist || true
+if [ -f "$plist" ]; then
+  chown root:wheel "$plist"
+  chmod 644 "$plist"
 fi
+echo "Package installed. Configure /etc/check_vpn/config.xml before enabling the LaunchDaemon."
 
-echo "Package installation finished. To enable the agent run: sudo launchctl load /Library/LaunchDaemons/com.check_vpn.agent.plist"
-exit 0
 POST
 
 chmod +x "$POSTINSTALL"
@@ -87,9 +83,9 @@ if [ "${CHECK_VPN_PKG_AUTOLOAD:-false}" = "true" ]; then
   cat >> "$POSTINSTALL" <<'AUTO'
 
 # Auto-load launched at install time
-if [ -f "/Library/LaunchDaemons/com.check_vpn.agent.plist" ]; then
+if [ "$target_volume" = / ] && [ -f /etc/check_vpn/config.xml ] && [ -f "$plist" ]; then
   echo "Attempting to load LaunchDaemon (auto-load enabled during build)"
-  /bin/launchctl bootstrap system /Library/LaunchDaemons/com.check_vpn.agent.plist >/dev/null 2>&1 || true
+  /bin/launchctl bootstrap system "$plist"
 fi
 AUTO
 fi

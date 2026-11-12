@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run tests inside all Docker images (base, Debian, Fedora)
+# Run tests inside Debian and Fedora Docker images
 # Usage: ./scripts/test-all-docker.sh [--include-ignored]
 
 set -euo pipefail
@@ -24,13 +24,12 @@ if ! docker info >/dev/null 2>&1; then
 fi
 
 images=(
-  "check_vpn_tests:contrib/Dockerfile"
   "check_vpn_tests_debian:contrib/Dockerfile.debian"
   "check_vpn_tests_fedora:contrib/Dockerfile.fedora"
 )
 
 # Make paths robust — ensure we run from the repository root so relative
-# Dockerfile paths like `contrib/Dockerfile` resolve correctly when the
+# Dockerfile paths like `contrib/Dockerfile.debian` resolve correctly when the
 # script is executed from another working directory.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"

@@ -28,6 +28,7 @@ Options:
   --mode <mode>      Install mode: interactive|system|user|auto
   --yes              Accept prompts (non-interactive)
   --no-start         Install but do not start/enable the service
+  --dry-run          Print planned changes without modifying files or services
   -h, --help         Show this help
 
 Examples:
@@ -37,6 +38,13 @@ EOF
 }
 
 while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --binary|--config|--service|--mode)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+        echo "Missing value for $1" >&2
+        exit 2
+      fi ;;
+  esac
   case "$1" in
     --binary)
       shift; BINARY="$1"; shift;;
@@ -86,13 +94,22 @@ confirm() {
     else
       read -r -p "$prompt [y/n] " reply
     fi
-    case "${reply,,}" in
-      y|yes) return 0;;
-      n|no) return 1;;
+    case "$reply" in
+      [Yy]|[Yy][Ee][Ss]) return 0;;
+      [Nn]|[Nn][Oo]) return 1;;
       *) echo "Please answer yes or no.";;
     esac
   done
 }
+
+case "$MODE" in
+  interactive) if [ "$ASSUME_YES" -eq 1 ]; then MODE=auto; fi ;;
+  system|user|auto) ;;
+  *) err "Invalid install mode: $MODE"; exit 2 ;;
+esac
+if [ "$MODE" = auto ]; then
+  if [ "$(id -u)" -eq 0 ]; then MODE=system; else MODE=user; fi
+fi
 
 # Detect OS
 OS=$(uname -s)
@@ -151,6 +168,10 @@ install_binary() {
 # Helper: install config file to destination
 install_config() {
   local dest_dir="$1"
+  if [ -f "$dest_dir/config.xml" ]; then
+    log "Preserving existing config at $dest_dir/config.xml"
+    return
+  fi
   if [ -f "$CONFIG_SRC" ]; then
     run_cmd mkdir -p "$dest_dir"
     run_cmd cp "$CONFIG_SRC" "$dest_dir/config.xml"
@@ -312,7 +333,7 @@ elif [ "$PLATFORM" = "macos" ]; then
       run_cmd chmod 644 "$PLIST_DEST"
       log "Installed user launchd plist to $PLIST_DEST"
       if [ "$NO_START" -eq 0 ]; then
-        run_cmd launchctl bootstrap gui/$(id -u) "$PLIST_DEST" || run_cmd launchctl load "$PLIST_DEST"
+        run_cmd launchctl bootstrap "gui/$(id -u)" "$PLIST_DEST" || run_cmd launchctl load "$PLIST_DEST"
         log "Loaded user launchd plist"
       fi
     else

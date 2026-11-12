@@ -40,6 +40,13 @@ case "$DISTRO" in
     ;;
 esac
 
+case "$ACTION" in
+  build|build-release|test|test-ignored) ;;
+  *) echo "Unsupported action: $ACTION" >&2; usage; exit 2 ;;
+esac
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$script_dir/.."
+
 echo "Building image $IMAGE from $DOCKERFILE..."
 
 if [ "${DOCKER_BUILD_ALLOW_LARGE:-}" != "1" ]; then
@@ -64,10 +71,10 @@ CONTAINER_WD="/usr/src/check_vpn"
 
 case "$ACTION" in
   build)
-    docker run --rm -v "$HOST_PWD":"$CONTAINER_WD" -w "$CONTAINER_WD" "$IMAGE" sh -c "cargo build"
+    docker run --rm -e "CARGO_TARGET_DIR=$CONTAINER_WD/target-$DISTRO" -v "$HOST_PWD":"$CONTAINER_WD" -w "$CONTAINER_WD" "$IMAGE" cargo build --locked
     ;;
   build-release)
-    docker run --rm -v "$HOST_PWD":"$CONTAINER_WD" -w "$CONTAINER_WD" "$IMAGE" sh -c "cargo build --release"
+    docker run --rm -e "CARGO_TARGET_DIR=$CONTAINER_WD/target-$DISTRO" -v "$HOST_PWD":"$CONTAINER_WD" -w "$CONTAINER_WD" "$IMAGE" cargo build --release --locked
     ;;
   test)
     docker run --rm "$IMAGE"

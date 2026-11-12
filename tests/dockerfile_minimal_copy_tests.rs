@@ -69,11 +69,7 @@ fn check_minimal_copy(path: &str) {
 
 #[test]
 fn dockerfiles_use_minimal_copy() {
-    let files = [
-        "contrib/Dockerfile",
-        "contrib/Dockerfile.debian",
-        "contrib/Dockerfile.fedora",
-    ];
+    let files = ["contrib/Dockerfile.debian", "contrib/Dockerfile.fedora"];
 
     for f in files.iter() {
         check_minimal_copy(f);

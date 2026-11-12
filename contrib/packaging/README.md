@@ -53,7 +53,7 @@ Packagers may wish to place their configuration under `/etc` as a template and d
 
 	```sh
 	sudo gem install --no-document fpm
-	./contrib/fpm-build.sh 1.0.0
+	./contrib/fpm-build.sh 1.1.0
 	# resulting .rpm will be created in the current directory
 	```
 

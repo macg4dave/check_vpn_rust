@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## v1.1.0 - 12 November 2026
+
+- Add ShellCheck and Bash syntax validation to local checks and the pre-commit hook.
+- Remove corrupted filename normalization, an unfinished RPM spec, and an obsolete
+  acceptance helper; packaging no longer relabels package architectures.
+- Derive default package versions from Cargo and fail on missing build artifacts.
+- Make the default Make target a host build; request Docker builds explicitly.
+- Consolidate development guides and Debian test images; remove the unused alternate
+  user installer. Keep native and container build directories separate.
+- Preserve configuration on reinstall, validate installer arguments, and retain custom
+  Git hooks unless replacement is explicitly requested.
+- Keep Windows ZIP payloads explicit. Correct the macOS system config path and make
+  generated postinstall scripts respect the installer target volume. Ensure RPMs
+  include the service limits drop-in and log rotation configuration.
 
 - Upgrade direct dependencies to current stable releases and refresh Cargo.lock;
   the development/test toolchain now requires Rust 1.93.1 or newer. Keep native TLS

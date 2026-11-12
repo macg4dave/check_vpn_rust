@@ -174,6 +174,10 @@ git diff --check
   automatic fixes or dependency updates without reviewing the resulting diff.
 - Store local build, lint, test, and audit logs under `logs/`, never in the
   repository root. Create the directory when needed; it is ignored by Git and Docker.
+- For shell changes, run `bash scripts/check-shell.sh` (or `make scriptcheck`)
+  and `bash tests/shell_regressions.sh`. Fix ShellCheck findings instead of adding
+  blanket suppressions. Keep Bash syntax compatible with the macOS system Bash
+  where macOS scripts are supported; package lifecycle scripts use POSIX sh.
 
 Cargo.toml enforces warnings and selected lints; `.cargo/config.toml` supplies
 local check aliases. These instructions do not install CI enforcement. Do not claim that

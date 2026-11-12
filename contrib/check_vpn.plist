@@ -8,7 +8,7 @@
   <array>
     <string>/usr/local/bin/check_vpn</string>
     <string>--config</string>
-    <string>/Users/USERNAME/Library/Preferences/check_vpn/config.xml</string>
+    <string>/etc/check_vpn/config.xml</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

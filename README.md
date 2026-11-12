@@ -11,6 +11,8 @@ Small, fast, and reliable VPN connection monitor written in Rust. It checks your
 - Provider fallback, configuration reloads and bounded recovery commands
 - Testable design and packaging-friendly layout
 
+Version **1.1.0** requires Rust **1.93.1+** to build. See [DEVELOPING.md](DEVELOPING.md) for checks and packaging.
+
 ## Quick start
 
 Install a pre-built binary (releases page):

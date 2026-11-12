@@ -4,7 +4,13 @@
 
 # Rust build artifacts
 target/
+target-*/
+artifacts/
+release/
 logs/
+*.log
+*.deb
+*.rpm
 
 # Git metadata
 .git

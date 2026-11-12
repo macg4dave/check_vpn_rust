@@ -11,6 +11,7 @@ RUN dnf -y update \
     && dnf install -y \
        gcc \
        make \
+       ShellCheck \
        openssl-devel \
        pkgconfig \
        ca-certificates \
@@ -44,10 +45,13 @@ COPY scripts ./scripts
 COPY contrib ./contrib
 COPY .dockerignore ./
 COPY examples ./examples
+COPY .githooks ./.githooks
+COPY .cargo ./.cargo
+COPY README.md INSTALL.md LICENSE ./
 
 RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
     cargo build --release --locked
 
-CMD ["cargo", "test", "--verbose"]
+CMD ["bash", "-c", "bash scripts/check-shell.sh && cargo test --workspace --locked"]

@@ -14,7 +14,9 @@ if ! su -l vagrant -c 'command -v cargo' >/dev/null 2>&1; then
 fi
 
 # Build project as vagrant user
-su -l vagrant -c 'source $HOME/.cargo/env && cd /vagrant && cargo build --release'
+# HOME is expanded by the vagrant user's login shell, not the root provisioner.
+# shellcheck disable=SC2016
+su -l vagrant -c '. "$HOME/.cargo/env" && cd /vagrant && cargo build --release --locked'
 
 # Run the install script as root (non-interactive path will pick the bundled sample config)
 if [ -f /vagrant/target/release/check_vpn ]; then

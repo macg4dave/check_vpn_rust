@@ -1,132 +1,99 @@
-# Developing and building check_vpn (platform guide)
+# Developing check_vpn
 
-This file describes how to build and test this repository across supported OSes: macOS, Debian/Fedora (via Docker), and Windows. It also describes the CI approach used by the project.
+Version 1.1.0 supports native Windows, Linux and macOS builds. Rust 1.93.1 or
+newer is required. Use rustup with rustfmt and Clippy. Linux builds use native
+TLS and need pkg-config and OpenSSL development headers; Windows needs the
+Visual Studio C++ build tools. Bash scripts require Bash and ShellCheck
+(`apt install shellcheck`, `dnf install ShellCheck`, or `brew install shellcheck`).
 
-Summary
+## Local checks
 
-- Supported platforms: macOS, Debian, Fedora (packaged via Docker), Windows (native / WSL2)
-- CI: Old workflows have been removed. Run checks locally; see `AGENTS.md`.
+Run from the repository root:
 
-Prerequisites
-
-- Rust 1.93.1 or newer is required for the current dependency and test toolchain.
-
-- Rust toolchain: install rustup from <https://rustup.rs>
-- Docker Desktop (for Docker-based Debian/Fedora builds)
-- (Windows native) Visual Studio Build Tools (C++ workload) if using the MSVC toolchain
-- WSL2 (optional, recommended for parity with Linux)
-
-Quick local commands
-
-Native development (macOS/Windows/Linux)
-
-From the repository root:
-
-```bash
-# Run the program during development
-cargo run
-
-# Build debug
-cargo build
-
-# Build release
-cargo build --release
-
-# Run tests
-cargo test
-
-### Debug / tracing
-
-For deeper troubleshooting during development you can build and run with backtraces and the optional `observability` feature which enables `tracing` and structured logs:
-
-```bash
-# Quick helper (runs with RUST_BACKTRACE=1 and RUST_LOG=trace)
-make debug
-
-# Or run directly:
-RUST_BACKTRACE=1 RUST_LOG=trace cargo run --features "observability" -- --run-once --dry-run -vv
-```
-
-Testing notes
-----------------
-
-- The repository includes lightweight integration test helpers in `tests/support/mod.rs`.
-  Use `support::ScopedEnv::set_str(key, value)` in integration tests to temporarily set
-  environment variables and automatically restore the previous state when the guard
-  is dropped. This avoids unsafe env mutation blocks and reduces flakiness in parallel
-  test runs.
-
-- For unit tests that mutate global state (for example, `RUST_LOG`), prefer serializing
-   tests with `serial_test::serial` or use a local RAII guard to restore the environment.
-
-- Provider/command regressions worth running before PRs:
-  - `cargo test providers_tests` (covers provider response caps and provider-chain validation)
-  - `cargo test command_parses_quoted_arguments`
-
-# Format and lint
-
-cargo fmt --all
+```sh
+cargo fmt --all -- --check
+cargo lint
 cargo lint-all
-
+cargo lint-minimal
+cargo test --workspace --locked
+cargo test-all --locked
+cargo test-minimal --locked
+cargo test --workspace --doc --all-features --locked
+bash scripts/check-shell.sh
 ```
 
-Windows / WSL2
+`make check` runs formatting, all-feature Clippy, shell checks and regressions, and default Rust
+tests. `make scriptcheck` runs Bash syntax checks and ShellCheck over scripts,
+package lifecycle scripts, and Git hooks. It fails if ShellCheck is unavailable;
+it does not silently skip findings. `bash tests/shell_regressions.sh` checks the
+packaging and hook behaviors with isolated fixtures.
 
-If you are developing on Windows we recommend using WSL2 for parity with the Debian/Fedora build environments and for compatibility with the POSIX helpers in `./scripts`.
+Store captured output under `logs/`, which is ignored by Git and Docker:
 
-- To use WSL2 from Windows: `wsl make release` or `wsl ./scripts/docker-build.sh debian build-release`
-- You can also open a WSL shell and run the POSIX scripts directly: `./scripts/test-all-docker.sh`, `./scripts/docker-build.sh` or `./scripts/build-all.sh`.
-
-Docker-based Debian/Fedora builds (recommended for reproducible Linux artifacts)
-
-These use the Dockerfiles under `contrib/`.
-
-From a POSIX shell (WSL or native):
-
-```bash
-# Debian
-./scripts/docker-build.sh debian build-release
-
-# Fedora
-./scripts/docker-build.sh fedora build-release
+```sh
+mkdir -p logs
+cargo test --workspace --locked > logs/tests.log 2>&1
 ```
 
-From a Linux shell (WSL or native):
+Use local mock servers and injected action runners for tests. Real-network tests
+are ignored by default; select them explicitly only in a suitable environment.
+Serialize tests that mutate shared environment variables and restore the previous
+values. A restoration guard alone does not prevent concurrent access.
 
-```bash
-# Debian
-docker build -t check_vpn_debian -f contrib/Dockerfile.debian .
-docker run --rm -v "$PWD":/work -w /work check_vpn_debian \
-  bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-debian.tar.gz -C target/release check_vpn* || true"
+To enable the optional pre-commit hook, run `bash scripts/install-hooks.sh`.
+The hook scans staged files for credentials, checks shell scripts, and runs Rust
+checks without staging or modifying files. Do not overwrite a custom hook without
+reviewing it.
 
-Note: The Dockerfile and helper scripts send the repository as the build context (COPY . .). If your workspace contains large build artifacts like `target/` the build context size can exceed 20GB and Docker BuildKit or the daemon may fail. To avoid this:
+## Build and package
 
-- Ensure a `.dockerignore` exists at the repository root which excludes `target/` and other large directories.
-- If for some reason you need to include large files, you can bypass the safety check by setting `DOCKER_BUILD_ALLOW_LARGE=1` in your environment before running the helper scripts.
-
-# Fedora
-docker build -t check_vpn_fedora -f contrib/Dockerfile.fedora .
-docker run --rm -v "$PWD":/work -w /work check_vpn_fedora \
-  bash -lc "cargo build --release && tar -czf /work/target/release/checkvpn-fedora.tar.gz -C target/release check_vpn* || true"
+```sh
+cargo build --release --locked
+./target/release/check_vpn --version
+bash scripts/build-all-packages.sh --help
 ```
 
-macOS builds
+The Cargo package version is the default for Debian, RPM, macOS, and Windows
+artifacts. A stable `X.Y.Z` override can be supplied where documented. Package
+architecture comes from the build and package tooling; renaming an artifact must
+never be used to change its architecture.
 
-- Build natively on a Mac using `cargo build --release`.
-- Cross-compiling to macOS (from Linux/Windows) is not recommended unless you have an Apple SDK and osxcross; Apple SDKs are restricted by licensing and not bundled.
+Debian and Fedora packages use Docker and the helpers in `contrib/packaging/`.
+`make package-all`, `make package-debian`, and `make package-fedora` run the
+packaging orchestrator. Outputs go under `release/`. Local packaging without
+Docker requires cargo-deb or fpm (`--no-docker`). Multi-architecture builds need
+a working Docker buildx builder and emulation for non-native architectures.
 
-Local verification
+On Windows, run `scripts/build-windows-package.ps1` in PowerShell. It builds the
+release binary and puts a versioned ZIP under `artifacts/windows/`, containing
+only the executable, sample configuration, and README. On macOS,
+`make package-macos-local` creates a `.pkg` and tarball; loading the LaunchDaemon
+is an explicit build-time opt-in using `CHECK_VPN_PKG_AUTOLOAD=true`.
 
-Run `cargo fmt --all -- --check`, `cargo lint-all`, and `cargo test-all`.
-See `AGENTS.md` for the default and no-default-feature matrix.
+Use `scripts/test-macos-pkg.sh inspect <package>` to inspect macOS packages.
+The `simulate` mode runs the macOS installer against a mounted disk image and
+may require sudo; use a disposable machine for install testing.
 
-Troubleshooting
+## Containers and virtual machines
 
-- If builds fail due to missing native dependencies (libssl, curl system libs), make sure those are installed in the Dockerfiles or on the host. The `contrib/Dockerfile.*` files should already install system deps — inspect them and add missing packages if needed.
-- On Windows, prefer MSVC toolchain: `rustup default stable-x86_64-pc-windows-msvc` and install Visual Studio Build Tools.
-- If you need to test Debian packaging or systemd integration, run inside the Debian Docker image so the environment matches the target.
+```sh
+make debian-test
+make fedora-test
+bash scripts/test-all-docker.sh
+bash scripts/docker-build.sh debian build-release
+```
 
-Cleaning and packaging
+The test images contain integration tests and their fixtures. The Debian image
+uses a pinned official Rust image; the Fedora image installs stable Rust.
+`docker-build.sh` stores mounted Linux build output in `target-debian/` or
+`target-fedora/`, separately from the native host's `target/` directory.
+The `.dockerignore` excludes generated artifacts from the build context.
 
-- Use `cargo clean` to remove build artifacts.
-- The helper scripts and Docker wrapper steps produce `.tar.gz` or `.zip` artifacts under `target/release/`.
+For systemd integration, `bash contrib/run_systemd_container.sh` creates a
+privileged, systemd-capable test container. Use it only for system integration
+on a disposable host. Alternatively, `vagrant up` provisions the Debian VM in
+`Vagrantfile`, builds the release, and installs it inside that VM.
+
+Installation and recovery permissions are documented in [INSTALL.md](INSTALL.md).
+No GitHub Actions workflows are installed; run and review checks locally before
+preparing a release. See [AGENTS.md](AGENTS.md) for the full Rust engineering policy.

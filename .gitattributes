@@ -1,7 +1,11 @@
 *.sh text eol=lf
+.githooks/* text eol=lf
 contrib/packaging/postinst text eol=lf
 contrib/packaging/prerm text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.md text eol=lf
 *.ps1 text eol=crlf
+Makefile text eol=lf
+contrib/Dockerfile* text eol=lf
+.gitattributes text eol=lf
