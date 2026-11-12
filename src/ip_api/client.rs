@@ -1,145 +1,24 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use reqwest::blocking::Client;
-use reqwest::header::RETRY_AFTER;
-use serde::Deserialize;
-use std::io::Read;
-use std::thread::sleep;
-use std::time::Duration;
-
-/// Default ip-api endpoint (HTTPS).
 pub const DEFAULT_IP_API_URL: &str = "https://ip-api.com/json";
 
-/// Default maximum response body size in bytes before we reject the response.
-const DEFAULT_MAX_RESPONSE_BYTES: usize = 5 * 1024 * 1024; // 5MB
-/// Maximum Retry-After seconds to respect (clamp large values)
-const MAX_RETRY_AFTER_SECS: u64 = 60;
-
-#[derive(Deserialize, Debug)]
-struct IpApiResponse {
-    isp: Option<String>,
-}
-
-/// Query ip-api.com for the current public ISP using a provided blocking HTTP client.
-///
-/// This function is test-friendly because callers can inject a client and URL.
 pub fn get_isp_with_client_and_url(client: &Client, url: &str, retries: usize) -> Result<String> {
-    let retries = std::cmp::max(1, retries);
-
-    // Allow tests to override max response bytes via env var
-    let max_bytes: usize = std::env::var("CHECK_VPN_MAX_RESPONSE_BYTES")
-        .ok()
-        .and_then(|s| s.parse::<usize>().ok())
-        .unwrap_or(DEFAULT_MAX_RESPONSE_BYTES);
-
-    let mut last_err: Option<anyhow::Error> = None;
-
-    for attempt in 0..retries {
-        let resp = client.get(url).send();
-
-        match resp {
-            Ok(r) => {
-                let status = r.status();
-                // debug prints removed; keep logic compact
-                if !status.is_success() {
-                    // Special handling for 429 Too Many Requests where Retry-After may help
-                    if status.as_u16() == 429 {
-                        last_err = Some(anyhow::anyhow!("non-success status: {}", status));
-                        if attempt + 1 < retries {
-                            if let Some(secs) = parse_retry_after_secs(&r) {
-                                let secs = std::cmp::min(secs, MAX_RETRY_AFTER_SECS);
-                                sleep(Duration::from_secs(secs));
-                                continue;
-                            }
-                            sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
-                            continue;
-                        }
-                        // Exhausted retries — fall through to final unified error return
-                        break;
-                    }
-
-                    // Retry on server errors
-                    if status.is_server_error() {
-                        last_err = Some(anyhow::anyhow!("non-success status: {}", status));
-                        if attempt + 1 < retries {
-                            sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
-                            continue;
-                        }
-                        // Exhausted retries — fall through to final unified error return
-                        break;
-                    }
-
-                    return Err(anyhow::anyhow!("non-success status: {}", status));
-                }
-
-                // Enforce max content-length when provided
-                match r.content_length() {
-                    Some(len) if (len as usize) > max_bytes => {
-                        return Err(anyhow::anyhow!("response too large: {} bytes", len));
-                    }
-                    _ => {}
-                }
-
-                // Read response body with a cap to avoid unbounded allocations
-                let mut buf: Vec<u8> = Vec::new();
-                let mut reader = r.take((max_bytes as u64) + 1);
-                reader
-                    .read_to_end(&mut buf)
-                    .context("failed to read response body")?;
-                if buf.len() > max_bytes {
-                    return Err(anyhow::anyhow!("response too large (>{} bytes)", max_bytes));
-                }
-
-                let parsed: IpApiResponse =
-                    serde_json::from_slice(&buf).context("failed to parse json")?;
-                return parsed
-                    .isp
-                    .ok_or_else(|| anyhow::anyhow!("isp field missing in response"));
-            }
-            Err(e) => {
-                last_err = Some(anyhow::anyhow!("http request failed: {}", e));
-                if attempt + 1 < retries {
-                    sleep(Duration::from_millis(500 * (attempt as u64 + 1)));
-                    continue;
-                }
-            }
-        }
-    }
-
-    // Return the last recorded error (with added context) if present, otherwise
-    // return a generic error describing the failure to query the service.
-    if let Some(e) = last_err {
-        // Preserve the original error and add contextual information.
-        Err(e.context(format!("failed to query ip api after {} attempt(s)", retries)))
-    } else {
-        Err(anyhow::anyhow!("failed to query ip api: no attempts performed"))
-    }
+    let value = crate::providers::http::get_json(
+        client,
+        url,
+        retries,
+        None,
+        std::time::Duration::from_secs(65),
+    )?;
+    crate::providers::http::identity(&value, &["isp"])
 }
-
-fn parse_retry_after_secs(resp: &reqwest::blocking::Response) -> Option<u64> {
-    resp.headers()
-        .get(RETRY_AFTER)
-        .and_then(|h| h.to_str().ok())
-        .and_then(|s| s.parse::<u64>().ok())
-}
-
-/// Backwards-compatible helper: build a client and use env vars like before.
 pub fn get_isp() -> Result<String> {
-    // Allow tests to override the endpoint via environment variable.
-    let url = std::env::var("CHECK_VPN_TEST_URL")
-        .unwrap_or_else(|_| DEFAULT_IP_API_URL.to_string());
-    // Simple configurable retry policy via env var CHECK_VPN_RETRY_COUNT (default 1)
-    let retries: usize = std::env::var("CHECK_VPN_RETRY_COUNT")
+    let url = std::env::var("CHECK_VPN_TEST_URL").unwrap_or_else(|_| DEFAULT_IP_API_URL.into());
+    let retries = std::env::var("CHECK_VPN_RETRY_COUNT")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1);
-
-    let client = Client::builder()
-        .user_agent("check_vpn/0.1")
-        .timeout(Duration::from_secs(5))
-        .build()
-        .context("failed to build http client")?;
-
-    get_isp_with_client_and_url(&client, &url, retries)
+    get_isp_with_client_and_url(&crate::providers::http::client()?, &url, retries)
 }
 
 #[cfg(test)]
@@ -147,6 +26,7 @@ mod tests {
     use super::*;
     use httpmock::Method::GET;
     use httpmock::MockServer;
+    use std::time::Duration;
 
     // A tiny RAII guard local to these tests to avoid leaving env vars set.
     struct TestScopedEnv {
@@ -208,7 +88,7 @@ mod tests {
         let big_body = "x".repeat(2048);
         let _m = server.mock(|when, then| {
             when.method(GET).path("/json");
-                then.status(200)
+            then.status(200)
                 .header("content-type", "application/json")
                 .header("content-length", "2048")
                 .body(big_body.as_str());
@@ -285,7 +165,11 @@ mod tests {
         let err = res.unwrap_err();
         let s = format!("{}", err);
         // Ensure our added context is present in the returned error
-        assert!(s.contains("failed to query ip api"), "error missing context: {}", s);
+        assert!(
+            s.contains("failed to query ip api"),
+            "error missing context: {}",
+            s
+        );
         assert!(s.contains("2"), "error should mention attempts in: {}", s);
     }
 

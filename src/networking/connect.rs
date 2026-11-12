@@ -7,19 +7,57 @@ use std::time::Duration;
 /// each address with the provided `timeout`. Returns Ok(true) if any address
 /// connects successfully, Ok(false) if none connect, or Err on name-resolution
 /// failure.
+#[cfg(test)]
 pub fn try_connect(addr: &str, timeout: Duration) -> Result<bool, NetworkingError> {
-    match addr.to_socket_addrs() {
-        Ok(addrs) => {
-            for socket in addrs {
-                trace!("Resolved {} -> {}", addr, socket);
-                if try_connect_addr(&socket, timeout) {
-                    return Ok(true);
-                }
-            }
-            Ok(false)
+    try_connect_with_cancel(addr, timeout, None)
+}
+
+pub fn try_connect_with_cancel(
+    addr: &str,
+    timeout: Duration,
+    cancel: Option<&std::sync::atomic::AtomicBool>,
+) -> Result<bool, NetworkingError> {
+    let start = std::time::Instant::now();
+    let (tx, rx) = std::sync::mpsc::sync_channel(1);
+    let addr = addr.to_owned();
+    // The OS resolver cannot be cancelled. Its worker owns only the address;
+    // callers stop waiting at the deadline and it can never perform recovery.
+    std::thread::spawn(move || {
+        let resolved = addr
+            .to_socket_addrs()
+            .map(|items| items.collect::<Vec<_>>());
+        let _ = tx.send(resolved);
+    });
+    let addrs = loop {
+        if crate::providers::http::cancelled(cancel) {
+            return Ok(false);
         }
-        Err(e) => Err(NetworkingError::DnsResolve(e.to_string())),
+        let remaining = timeout.saturating_sub(start.elapsed());
+        if remaining.is_zero() {
+            return Err(NetworkingError::DnsResolve(
+                "name resolution timed out".into(),
+            ));
+        }
+        match rx.recv_timeout(remaining.min(Duration::from_millis(50))) {
+            Ok(Ok(addrs)) => break addrs,
+            Ok(Err(error)) => return Err(NetworkingError::DnsResolve(error.to_string())),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(error) => return Err(NetworkingError::DnsResolve(error.to_string())),
+        }
+    };
+    for socket in addrs {
+        if crate::providers::http::cancelled(cancel) {
+            return Ok(false);
+        }
+        let remaining = timeout.saturating_sub(start.elapsed());
+        if remaining.is_zero() {
+            return Ok(false);
+        }
+        if try_connect_addr(&socket, remaining) {
+            return Ok(true);
+        }
     }
+    Ok(false)
 }
 
 fn try_connect_addr(socket: &SocketAddr, timeout: Duration) -> bool {

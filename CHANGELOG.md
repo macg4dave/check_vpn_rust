@@ -22,3 +22,16 @@
 - Improve provider chain diagnostics by logging provider construction failures.
 - Gate systemd/D-Bus actions to Linux, add safer cross-platform fallbacks, and make non-Linux builds avoid systemd dependencies.
 - Clean up documentation (ASCII headings, release process now semver starting at v1.0.0) and remove outdated cleanup summary.
+
+## Logic review fixes (12 November 2026)
+
+- Repair packaged XML lists; pin reloads to the resolved file and validate replacements before applying.
+- Preserve exact normal-ISP matching; add explicit aliases and reject empty provider identities.
+- Query providers before connectivity diagnostics; continue past individual DNS failures.
+- Apply one daemon error policy to lookup and action failures; add recovery cooldown and command timeout.
+- Use a portable log-only default and narrowly scoped recovery permission instructions.
+- Share HTTP transport and persistent clients; prepare action arguments on configuration changes.
+- Remove unused metrics, timer and JSON filesystem library modules, their tests, and the alternate XML serializer. The `json_pretty` and `xml_serde` Cargo features are removed. This changes the library API; use the remaining application/provider APIs.
+- Correct installer flags, service paths and documentation; retain legacy provider configuration fields as aliases.
+
+Unused wiremock and direct Tokio test dependencies and the unused reqwest JSON convenience feature were also removed.

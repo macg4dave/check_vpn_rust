@@ -6,9 +6,9 @@
   <!-- ISP string indicating VPN is lost (match exact ISP string returned by ip-api.com over HTTPS) -->
   <isp_to_check>Hutchison 3G UK Ltd</isp_to_check>
 
-  <!-- Action to perform when VPN is lost: default is a harmless command -->
-  <vpn_lost_action_type>command</vpn_lost_action_type>
-  <vpn_lost_action_arg>echo "vpn lost"</vpn_lost_action_arg>
+  <!-- Action to perform when VPN is lost: default is a portable log message -->
+  <vpn_lost_action_type>log</vpn_lost_action_type>
+  <vpn_lost_action_arg></vpn_lost_action_arg>
 
   <!-- If true, don't actually execute actions (useful for testing) -->
   <dry_run>true</dry_run>
@@ -18,7 +18,7 @@
   <enable_ifconfig_co>true</enable_ifconfig_co>
 
   <!-- Optional: custom provider URLs to query before built-ins -->
-  <!-- Example: <provider_urls><url>https://ifconfig.co/json</url><url>https://ipinfo.io/json</url></provider_urls> -->
+  <!-- Example: <provider_urls>https://ifconfig.co/json</provider_urls> -->
   <!-- This element is optional; leave it out for defaults. -->
 
   <!-- Single custom JSON server and key override (queried first if present) -->

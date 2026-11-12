@@ -58,6 +58,9 @@ fn try_run_with_args_handles_non_utf8_config_paths() {
         init_no_fetch: false,
         generate_completions: None,
         completions_output: None,
+        isp_aliases: None,
+        recovery_cooldown_secs: None,
+        action_timeout_secs: None,
     };
 
     let res = check_vpn::try_run_with_args(args);

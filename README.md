@@ -8,7 +8,7 @@ Small, fast, and reliable VPN connection monitor written in Rust. It checks your
 - Flexible responses: restart a systemd unit, run a command, or reboot
 - Built-in providers default to HTTPS for ISP lookups (ip-api.com) with override hooks
 - Config validation ensures at least one provider is enabled/configured to avoid silent failures
-- Small, dependency-minimal metrics endpoint for simple health checks
+- Provider fallback, configuration reloads and bounded recovery commands
 - Testable design, CI, and packaging-friendly layout
 
 ## Quick start
@@ -51,13 +51,13 @@ Edit `/etc/check_vpn/config.xml` to match your environment. Minimal example:
 Run once (dry-run, no actions taken):
 
 ```sh
-check_vpn --config-file /etc/check_vpn/config.xml --dry-run --run-once
+check_vpn --config /etc/check_vpn/config.xml --dry-run --run-once
 ```
 
 Run continuously:
 
 ```sh
-check_vpn --config-file /etc/check_vpn/config.xml
+check_vpn --config /etc/check_vpn/config.xml
 ```
 
 Restart a systemd unit when ISP is detected:
@@ -80,6 +80,38 @@ check_vpn -t command -a '/usr/local/bin/reconnect_vpn.sh --reason "vpn lost"'
 
 Provider configuration: ensure at least one provider is enabled (default ip-api + ifconfig.co, or custom URLs). Validation fails fast if all providers are disabled or missing to avoid silent loops.
 
+## Monitoring behaviour
+
+An exact match to `isp_to_check` or any explicitly configured `isp_aliases` means the VPN is lost. Any other nonempty ISP means VPN active; the VPN provider's ISP does not need to be known. Failed or blank lookups are errors, not active-VPN results. Different services may name your normal ISP differently: add each exact name as an alias (`--isp-alias "Normal ASN Organisation"`).
+
+Providers run before TCP connectivity diagnostics. A failed TCP probe never prevents a working provider from detecting your normal ISP. No recovery action is taken solely because the connection is offline.
+
+The default action is `log`, a portable log message. Configure `restart-unit`, `command` or `reboot` explicitly when recovery is wanted. Recovery attempts have a 60-second cooldown after completion, including failed attempts (`--recovery-cooldown`). Commands have a 30-second timeout (`--action-timeout`). Checks wait the configured interval after completing; work duration adds to the start-to-start interval.
+
+Daemon mode logs lookup and recovery errors and continues unless `--exit-on-error` is set. `--run-once` always reports these failures through its exit status. Exit codes: 0 success, 1 lookup/runtime failure, 2 invalid configuration or CLI usage, 3 recovery action failure. A successful run-once recovery still exits 0.
+
+The configuration source is resolved once at startup. Reloads use that same file; missing or invalid replacements retain the previous settings, or exit with code 2 under `--strict-config`. Starting without a file uses defaults until restart. No configuration is automatically written during discovery; use `--init` to create one.
+
+List items in XML use repeated field tags, matching generated configuration:
+
+```xml
+<isp_aliases>Normal ISP alternate name</isp_aliases>
+<connectivity_endpoints>8.8.8.8</connectivity_endpoints>
+<connectivity_endpoints>1.1.1.1</connectivity_endpoints>
+<connectivity_ports>443</connectivity_ports>
+<connectivity_ports>53</connectivity_ports>
+<recovery_cooldown_secs>60</recovery_cooldown_secs>
+<action_timeout_secs>30</action_timeout_secs>
+```
+
+For ordered custom JSON providers, repeat `<providers>` entries containing `<url>` and optional `<key>`:
+
+```xml
+<providers><url>https://example.com/identity</url><key>org</key></providers>
+```
+
+Legacy `custom_json_server` (first) and `provider_urls` remain supported. The complete order is custom server, `providers`, legacy URLs, ip-api, ifconfig.co. HTTP clients are reused across checks. Provider lookup has a total 30-second budget and a 10-second budget per provider, each HTTP request is bounded by 5 seconds, and failure diagnostics have a separate 5-second budget. Shutdown stops retries and prevents later actions; an in-flight HTTP request may take up to its timeout to finish.
+
 ## System service (systemd)
 
 Create a service user and copy the example systemd units from `contrib/`.
@@ -98,7 +130,9 @@ sudo systemctl enable --now check_vpn.service
 sudo systemctl status check_vpn
 ```
 
-For desktop/personal runs, you can use a user unit instead of a system unit.
+For desktop/personal runs, use the dedicated user unit in `contrib/check_vpn-user.service`.
+
+The service account needs explicit authorization to restart a system VPN unit. Follow [Recovery permissions](docs/RECOVERY_PERMISSIONS.md); the example rule allows only restarting one named VPN unit. Packages default to log-only recovery and do not install a privilege-granting rule automatically.
 
 ## Troubleshooting
 
@@ -130,11 +164,8 @@ For more examples and advanced configuration, consult the repository `contrib/` 
 
 ## CI and releases
 
-This repository uses a simplified CI pipeline. Pull requests and main-branch
-pushes build multi-architecture Docker images only. Full test and linting
-checks are expected to be run locally by contributors before pushing. Releases
-are produced from the single canonical tag `v0.5b` which generates multi-arch
-packages via Docker and uploads them to GitHub Releases.
+CI runs formatting, Clippy and tests, including all supported features.
+Additional workflows build container images and release packages.
 
 Local macOS package (developer):
 

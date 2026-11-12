@@ -1,3 +1,8 @@
+pub const EXIT_RUNTIME_ERROR: u8 = 1;
+pub const EXIT_INVALID_CONFIG: i32 = 2;
+pub const EXIT_ACTION_FAILED: u8 = 3;
+pub const EXIT_ARGUMENT_ERROR: u8 = 2;
+
 use crate::config::validation::ValidationErrors;
 use anyhow::Error as AnyhowError;
 use std::process::ExitCode;
@@ -49,11 +54,11 @@ impl From<&AppError> for ExitReason {
 pub fn exit_code_for_reason(r: ExitReason) -> ExitCode {
     match r {
         ExitReason::Success => ExitCode::SUCCESS,
-        ExitReason::ConfigError => ExitCode::from(crate::config::EXIT_INVALID_CONFIG as u8),
-        ExitReason::RuntimeError => ExitCode::from(1),
-        ExitReason::ActionFailed => ExitCode::from(3),
-        ExitReason::ArgsError => ExitCode::from(4),
-        ExitReason::Other => ExitCode::from(1),
+        ExitReason::ConfigError => ExitCode::from(EXIT_INVALID_CONFIG as u8),
+        ExitReason::RuntimeError => ExitCode::from(EXIT_RUNTIME_ERROR),
+        ExitReason::ActionFailed => ExitCode::from(EXIT_ACTION_FAILED),
+        ExitReason::ArgsError => ExitCode::from(EXIT_ARGUMENT_ERROR),
+        ExitReason::Other => ExitCode::from(EXIT_RUNTIME_ERROR),
     }
 }
 

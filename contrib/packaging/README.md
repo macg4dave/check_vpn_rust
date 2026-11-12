@@ -11,16 +11,14 @@ Files
 Systemd drop-ins
 -----------------
 
-This repo now includes a recommended systemd drop-in directory at
-`contrib/systemd/check_vpn.service.d/` with two snippets:
+Shared hardening and runtime-directory settings live in the main
+`contrib/check_vpn.service` unit. The drop-in directory
+`contrib/systemd/check_vpn.service.d/` contains `limits.conf` for resource limits
+(`LimitNOFILE` and `LimitNPROC`).
 
-- `hardening.conf` — extra security directives (NoNewPrivileges, ProtectSystem, MemoryDenyWriteExecute, etc.)
-- `limits.conf` — runtime directory mode and resource limits (LimitNOFILE, LimitNPROC)
-
-When packaging, include these files alongside the main unit under
-`/lib/systemd/system/check_vpn.service.d/` so distributions get the hardening
-settings by default. The `cargo-deb` metadata and `contrib/fpm-build.sh` have
-been updated to include these files.
+Package the drop-in under `/lib/systemd/system/check_vpn.service.d/`.
+Recovery authorization is deliberately opt-in; see
+[Recovery permissions](../../docs/RECOVERY_PERMISSIONS.md).
 
 Usage notes
 

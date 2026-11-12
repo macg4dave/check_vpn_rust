@@ -30,6 +30,10 @@ fn validate_good_values() {
         provider_urls: vec![],
         custom_json_server: None,
         custom_json_key: None,
+        isp_aliases: vec![],
+        providers: vec![],
+        recovery_cooldown_secs: 60,
+        action_timeout_secs: 30,
     };
     let res = Config::validate_values(&eff);
     assert!(res.is_ok());
@@ -56,6 +60,10 @@ fn validate_zero_interval() {
         provider_urls: vec![],
         custom_json_server: None,
         custom_json_key: None,
+        isp_aliases: vec![],
+        providers: vec![],
+        recovery_cooldown_secs: 60,
+        action_timeout_secs: 30,
     };
     let res = Config::validate_values(&eff);
     assert!(res.is_err());
@@ -84,6 +92,10 @@ fn validate_empty_isp() {
         provider_urls: vec![],
         custom_json_server: None,
         custom_json_key: None,
+        isp_aliases: vec![],
+        providers: vec![],
+        recovery_cooldown_secs: 60,
+        action_timeout_secs: 30,
     };
     let res = Config::validate_values(&eff);
     assert!(res.is_err());
@@ -114,6 +126,10 @@ fn validate_bad_action_type() {
         provider_urls: vec![],
         custom_json_server: None,
         custom_json_key: None,
+        isp_aliases: vec![],
+        providers: vec![],
+        recovery_cooldown_secs: 60,
+        action_timeout_secs: 30,
     };
     let res = Config::validate_values(&eff);
     assert!(res.is_err());
@@ -144,6 +160,10 @@ fn validate_missing_arg_for_restart() {
         provider_urls: vec![],
         custom_json_server: None,
         custom_json_key: None,
+        isp_aliases: vec![],
+        providers: vec![],
+        recovery_cooldown_secs: 60,
+        action_timeout_secs: 30,
     };
     let res = Config::validate_values(&eff);
     assert!(res.is_err());

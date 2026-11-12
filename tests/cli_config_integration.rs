@@ -27,11 +27,18 @@ fn binary_accepts_config_flag() {
     });
 
     // Run binary with --config and --run-once --dry-run so it exits quickly
+    let server = support::start_http_server(r#"{"isp":"Other ISP"}"#, 200);
     let mut cmd = Command::new(bin);
     cmd.arg("--config")
         .arg(&path_str)
         .arg("--run-once")
-        .arg("--dry-run");
+        .arg("--dry-run")
+        .args([
+            "--disable-ip-api",
+            "--disable-ifconfig-co",
+            "--provider-url",
+            &server.url(),
+        ]);
     cmd.stderr(Stdio::inherit());
     cmd.stdout(Stdio::piped());
 

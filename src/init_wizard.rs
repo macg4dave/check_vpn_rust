@@ -3,11 +3,9 @@ use std::io::IsTerminal;
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-// std::fs not needed; writing via xml_io
 
 use crate::config::Config;
 use crate::providers;
-use crate::providers::VpnInfoProvider;
 
 // Test-only override: when set to true, disable prompts regardless of TTY/env.
 static NO_PROMPT_OVERRIDE: AtomicBool = AtomicBool::new(false);
@@ -34,16 +32,7 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
     // Determine ISP via providers unless skipped
     let mut detected_isp = String::from("Your ISP Here");
     if !no_fetch {
-        let mut chain: Vec<Box<dyn VpnInfoProvider>> = Vec::new();
-        if let Ok(p) = providers::ip_api_provider::IpApiProvider::new_default() {
-            chain.push(Box::new(p));
-        }
-        if let Ok(p) = providers::ifconfig_co_provider::IfconfigCoProvider::new_default() {
-            chain.push(Box::new(p));
-        }
-        // Apply a hard timeout (20s) around provider querying so tests / CI never hang indefinitely.
-        // Move chain into closure to satisfy 'static requirement.
-        let chain_for_closure = chain;
+        let chain_for_closure = providers::build_chain(&crate::config::EffectiveConfig::default())?;
         match run_with_timeout(
             move |cancel| providers::query_first_success_with_cancel(&chain_for_closure, &cancel),
             std::time::Duration::from_secs(20),
@@ -56,34 +45,25 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
 
     // Prompt minimal fields
     let isp = prompt_default(interactive, "ISP to watch for (vpn lost)", &detected_isp)?;
-    let interval_str = prompt_default(interactive, "Interval seconds", "60")?;
+    let interval_str = prompt_default(
+        interactive,
+        "Interval seconds",
+        &crate::config::EffectiveConfig::default()
+            .interval
+            .to_string(),
+    )?;
     let interval: u64 = interval_str
         .parse()
         .map_err(|e| anyhow!("invalid interval '{}': {}", interval_str, e))?;
     if interval == 0 {
         return Err(anyhow!("interval must be greater than zero"));
     }
-    // Action selection is out of scope for the wizard; rely on runtime defaults
-    // (command + echo "vpn lost") to avoid dangerous reboot actions on platforms
-    // where they may fail or be unavailable.
+    // The default log action is portable and safe.
 
-    // Build Config
     let cfg = Config {
         interval: Some(interval),
         isp_to_check: Some(isp),
-        vpn_lost_action_type: Some("command".to_string()),
-        vpn_lost_action_arg: Some(r#"echo "vpn lost""#.to_string()),
-        dry_run: Some(false),
-        exit_on_error: Some(false),
-        connectivity_endpoints: Some(vec!["8.8.8.8".to_string(), "google.com".to_string()]),
-        connectivity_ports: Some(vec![443, 53]),
-        connectivity_timeout_secs: Some(crate::networking::DEFAULT_TIMEOUT_SECS),
-        connectivity_retries: Some(crate::networking::DEFAULT_RETRIES),
-        enable_ip_api: Some(true),
-        enable_ifconfig_co: Some(true),
-        provider_urls: Some(vec![]),
-        custom_json_server: None,
-        custom_json_key: None,
+        ..Config::default()
     };
 
     // Validate the generated config so the user sees failures immediately.
@@ -117,8 +97,6 @@ pub fn run_init(output: Option<&str>, no_fetch: bool) -> Result<()> {
     let out_path: String = output
         .map(|s| s.to_string())
         .unwrap_or_else(|| default_path.clone());
-    crate::fs_ops::ensure_parent_dir_exists(&out_path, "config")
-        .context("failed to create parent directory for generated config")?;
     crate::xml_io::write_xml(&cfg, &out_path)
         .with_context(|| format!("failed to write generated config to {}", out_path))?;
     println!("Wrote {}", out_path);
@@ -141,8 +119,12 @@ fn prompt_default(interactive: bool, label: &str, default: &str) -> Result<Strin
     })
 }
 
-// Simple timeout helper: executes closure on a thread and joins with timeout.
-pub fn run_with_timeout<F, R>(f: F, dur: std::time::Duration) -> Result<R, ()>
+#[derive(Debug, thiserror::Error)]
+#[error("initialization worker timed out or disconnected")]
+pub struct InitTimeout;
+
+// Bound the caller's wait; cancellation stops provider retries between requests.
+pub fn run_with_timeout<F, R>(f: F, dur: std::time::Duration) -> Result<R, InitTimeout>
 where
     F: FnOnce(Arc<AtomicBool>) -> R + Send + 'static,
     R: Send + 'static,
@@ -163,11 +145,9 @@ where
         }
         Err(_) => {
             cancel.store(true, Ordering::Relaxed);
-            // Join the worker on a background thread so the caller returns promptly.
-            thread::spawn(move || {
-                let _ = handle.join();
-            });
-            Err(())
+            // Dropping the handle detaches the owned, cancellable worker.
+            drop(handle);
+            Err(InitTimeout)
         }
     }
 }

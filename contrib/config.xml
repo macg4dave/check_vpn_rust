@@ -7,21 +7,17 @@
   <!-- ISP string observed when VPN is lost -->
   <isp_to_check>YourISP</isp_to_check>
 
-  <!-- Action: one of reboot, restart-unit, command -->
-  <vpn_lost_action_type>restart-unit</vpn_lost_action_type>
+  <!-- Action: log (default), reboot, restart-unit, command -->
+  <vpn_lost_action_type>log</vpn_lost_action_type>
 
   <!-- For restart-unit put the systemd unit name; for command put the full command -->
-  <vpn_lost_action_arg>openvpn-client@myvpn.service</vpn_lost_action_arg>
+  <vpn_lost_action_arg></vpn_lost_action_arg>
 
   <!-- Connectivity probes -->
-  <connectivity_endpoints>
-    <endpoint>8.8.8.8</endpoint>
-    <endpoint>1.1.1.1</endpoint>
-  </connectivity_endpoints>
-  <connectivity_ports>
-    <port>443</port>
-    <port>53</port>
-  </connectivity_ports>
+  <connectivity_endpoints>8.8.8.8</connectivity_endpoints>
+  <connectivity_endpoints>1.1.1.1</connectivity_endpoints>
+  <connectivity_ports>443</connectivity_ports>
+  <connectivity_ports>53</connectivity_ports>
 
   <connectivity_timeout_secs>2</connectivity_timeout_secs>
   <connectivity_retries>1</connectivity_retries>
@@ -31,8 +27,6 @@
   <enable_ifconfig_co>true</enable_ifconfig_co>
   <!-- Optional: custom providers -->
   <!--
-  <provider_urls>
-    <url>https://example.com/ipinfo.json</url>
-  </provider_urls>
+  <provider_urls>https://example.com/ipinfo.json</provider_urls>
   -->
 </config>

@@ -31,10 +31,10 @@ fn exit_code_mapping_for_app_errors() {
     let c = check_vpn::error_types::exit_code_for_error(&e);
     assert_eq!(c, ExitCode::from(3));
 
-    // Args error -> mapping 4
+    // Argument errors agree with clap usage errors (2)
     let e = AppError::ArgsError(anyhow::anyhow!("arg"));
     let c = check_vpn::error_types::exit_code_for_error(&e);
-    assert_eq!(c, ExitCode::from(4));
+    assert_eq!(c, ExitCode::from(2));
 
     // Other -> falls back to 1
     let e = AppError::Other(anyhow::anyhow!("other"));

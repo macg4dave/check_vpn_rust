@@ -9,8 +9,8 @@ PREFIX=${PREFIX:-/usr/local}
 BINARY=${BINARY:-target/release/check_vpn}
 DEST_BIN=${DEST_BIN:-"${PREFIX}/bin/check_vpn"}
 SYSTEMD_UNIT_DEST=${SYSTEMD_UNIT_DEST:-/etc/systemd/system/check_vpn.service}
-USER=${USER:-checkvpn}
-GROUP=${GROUP:-checkvpn}
+SERVICE_USER=${SERVICE_USER:-checkvpn}
+SERVICE_GROUP=${SERVICE_GROUP:-checkvpn}
 
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be run as root" >&2
@@ -22,13 +22,11 @@ if [ ! -f "$BINARY" ]; then
   exit 1
 fi
 
-echo "Creating service user/group if missing: $USER"
-if ! id -u "$USER" >/dev/null 2>&1; then
+echo "Creating service user/group if missing: $SERVICE_USER"
+if ! id -u "$SERVICE_USER" >/dev/null 2>&1; then
   # create system user without home and without login shell
-  useradd --system --no-create-home --group nogroup --shell /usr/sbin/nologin "$USER" 2>/dev/null || {
-    # fallback if group nogroup doesn't exist
-    useradd --system --no-create-home --shell /usr/sbin/nologin "$USER"
-  }
+  getent group "$SERVICE_GROUP" >/dev/null || groupadd --system "$SERVICE_GROUP"
+  useradd --system --no-create-home --gid "$SERVICE_GROUP" --shell /usr/sbin/nologin "$SERVICE_USER"
 fi
 
 echo "Installing binary to $DEST_BIN"
@@ -68,11 +66,13 @@ echo "Note: the runtime config file can be overridden by passing -c/--config to 
 
 echo "Creating runtime dirs and logdir"
 mkdir -p /var/log/check_vpn
-chown -R "$USER":"$GROUP" /etc/check_vpn || true
-chown -R "$USER":"$GROUP" /var/log/check_vpn || true
+chown -R "$SERVICE_USER":"$SERVICE_GROUP" /etc/check_vpn || true
+chown -R "$SERVICE_USER":"$SERVICE_GROUP" /var/log/check_vpn || true
 
 echo "Installing systemd unit to $SYSTEMD_UNIT_DEST"
 install -m 0644 contrib/check_vpn.service "$SYSTEMD_UNIT_DEST"
+sed -i -e "s|^ExecStart=.*|ExecStart=$DEST_BIN --config /etc/check_vpn/config.xml --exit-on-error|" \
+  -e "s/^User=.*/User=$SERVICE_USER/" -e "s/^Group=.*/Group=$SERVICE_GROUP/" "$SYSTEMD_UNIT_DEST"
 
 echo "Reloading systemd and enabling service"
 systemctl daemon-reload
@@ -92,3 +92,5 @@ if command -v selinuxenabled >/dev/null 2>&1 && selinuxenabled; then
 fi
 
 echo "Install complete. Monitor logs with: journalctl -u check_vpn -f"
+
+printf '%s\n' 'Recovery permissions: the default log action needs no privileges. For restart-unit, authorize only the configured VPN unit; see docs/RECOVERY_PERMISSIONS.md (packaged under /usr/share/doc/check_vpn/).'

@@ -1,10 +1,11 @@
-use log::{error, warn};
+use log::warn;
 
 pub mod runner;
 use runner::{ActionRunner, RealActionRunner};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
+    Log,
     Reboot,
     RestartUnit(String),
     Command(String), // fallback: executes an external command
@@ -13,12 +14,14 @@ pub enum Action {
 /// Parse an action type and argument into an `Action` enum.
 ///
 /// Accepted `action_type` values:
+/// - "log" -> `Action::Log`
 /// - "reboot" -> `Action::Reboot`
 /// - "restart-unit" -> `Action::RestartUnit(arg)`
 /// - "command" -> `Action::Command(arg)`
 ///   Any other value will be logged as a warning and treated as a `Command` fallback.
 pub fn parse_action(action_type: &str, arg: &str) -> Action {
     match action_type {
+        "log" => Action::Log,
         "reboot" => Action::Reboot,
         "restart-unit" => Action::RestartUnit(arg.to_string()),
         "command" => Action::Command(arg.to_string()),
@@ -32,18 +35,46 @@ pub fn parse_action(action_type: &str, arg: &str) -> Action {
     }
 }
 
-/// Convenience function that mirrors the previous public API: execute the action and swallow errors.
-///
-/// This preserves compatibility with existing call sites which expect `run_action(&Action, bool)`.
-pub fn run_action(action: &Action, dry_run: bool) -> anyhow::Result<()> {
-    let runner = RealActionRunner::new();
-    match runner.execute(action, dry_run) {
-        Ok(()) => Ok(()),
-        Err(e) => {
-            error!("Action execution failed: {:?}", e);
-            Err(e)
-        }
+/// Parse a command once, preserving quoted executable paths and arguments.
+pub fn command_parts(command: &str) -> anyhow::Result<Vec<String>> {
+    anyhow::ensure!(
+        crate::config::validation::is_safe_command_string(command),
+        "command contains forbidden shell meta-characters or is empty"
+    );
+    let parts = shell_words::split(command)?;
+    anyhow::ensure!(
+        parts.first().is_some_and(|part| !part.trim().is_empty()),
+        "empty executable"
+    );
+    Ok(parts)
+}
+
+/// Validated action with command arguments prepared at configuration time.
+pub struct PreparedAction {
+    pub(crate) action: Action,
+    pub(crate) command: Option<Vec<String>>,
+}
+impl PreparedAction {
+    pub fn action(&self) -> &Action {
+        &self.action
     }
+    pub fn new(action: Action) -> anyhow::Result<Self> {
+        let command = match &action {
+            Action::Command(s) => Some(command_parts(s)?),
+            _ => None,
+        };
+        if let Action::RestartUnit(unit) = &action {
+            anyhow::ensure!(
+                crate::config::validation::is_valid_unit_name(unit),
+                "invalid systemd unit name"
+            );
+        }
+        Ok(Self { action, command })
+    }
+}
+
+pub fn run_action(action: &Action, dry_run: bool) -> anyhow::Result<()> {
+    RealActionRunner::new().execute(action, dry_run)
 }
 
 // Small unit tests that exercise parsing and the dry-run paths of the real runner.

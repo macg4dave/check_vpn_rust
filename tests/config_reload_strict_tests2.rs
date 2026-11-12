@@ -132,6 +132,15 @@ fn reload_continues_without_strict_flag() {
 
 #[test]
 fn reload_exits_with_strict_flag() {
+    strict_reload_failure("<bad>");
+}
+
+#[test]
+fn reload_exits_on_semantic_error_with_strict_flag() {
+    strict_reload_failure("<config><interval>0</interval></config>");
+}
+
+fn strict_reload_failure(replacement: &str) {
     let (_listener, port) = support::tcp_listener_and_port();
     let _server = support::start_http_server(r#"{"isp":"TestISP"}"#, 200);
 
@@ -146,8 +155,6 @@ fn reload_exits_with_strict_flag() {
     let mut child = spawn_binary_with_config(&[
         "--config",
         &path_str,
-        "--interval",
-        "1",
         "--dry-run",
         "--connectivity-endpoint",
         "127.0.0.1",
@@ -167,7 +174,7 @@ fn reload_exits_with_strict_flag() {
     );
     thread::sleep(Duration::from_secs(2));
 
-    fs::write(&path_str, "<bad>").expect("corrupt file");
+    fs::write(&path_str, replacement).expect("corrupt file");
 
     // Wait for the strict-config message and for the process to exit
     if !wait_for_collector_contains(&rx, "--strict-config is set", Duration::from_secs(20)) {

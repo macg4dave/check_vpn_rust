@@ -5,7 +5,7 @@ use check_vpn::actions::{
 
 #[test]
 fn runner_rejects_command_with_shell_meta() {
-    let runner = RealActionRunner::default();
+    let runner = RealActionRunner::new();
     let bad = Action::Command("rm -rf /; echo hacked".into());
     let res = runner.execute(&bad, false);
     assert!(res.is_err());
@@ -21,7 +21,7 @@ fn runner_rejects_restart_unit_with_injection() {
 #[test]
 fn runner_allows_safe_command_in_dry_run() {
     // dry-run should not attempt execution and should be OK even with 'weaker' inputs
-    let runner = RealActionRunner::default();
+    let runner = RealActionRunner::new();
     let ok = Action::Command("rm -rf /; echo hacked".into());
     assert!(runner.execute(&ok, true).is_ok());
 }

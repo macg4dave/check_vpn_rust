@@ -32,14 +32,14 @@ else
 fi
 
 # Create a simple systemd --user unit that points to the per-user config
-cat > "$SYSTEMD_UNIT_DEST" <<'UNIT'
+cat > "$SYSTEMD_UNIT_DEST" <<UNIT
 [Unit]
 Description=check_vpn (per-user)
 After=network-online.target
 
 [Service]
 Type=simple
-ExecStart=${HOME}/.local/bin/check_vpn --config-file ${HOME}/.config/check_vpn/config.xml --enable-metrics --metrics-addr 127.0.0.1:9090
+ExecStart="$DEST_BIN" --config "$CONFIG_DEST"
 Restart=on-failure
 RestartSec=10
 

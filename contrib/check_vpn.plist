@@ -7,9 +7,8 @@
   <key>ProgramArguments</key>
   <array>
     <string>/usr/local/bin/check_vpn</string>
-    <string>--config-file</string>
+    <string>--config</string>
     <string>/Users/USERNAME/Library/Preferences/check_vpn/config.xml</string>
-    <string>--enable-metrics</string>
   </array>
   <key>RunAtLoad</key>
   <true/>

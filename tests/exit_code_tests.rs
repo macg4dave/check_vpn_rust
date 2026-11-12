@@ -36,6 +36,13 @@ fn binary_exit_code_on_connectivity_failure() {
     });
 
     let mut cmd = Command::new(bin);
+    // Force an unavailable provider; TCP probes no longer gate successful identity queries.
+    cmd.args([
+        "--disable-ip-api",
+        "--disable-ifconfig-co",
+        "--provider-url",
+        "http://127.0.0.1:1/json",
+    ]);
     // use run-once + exit-on-error and an unlikely open port on localhost to force failure
     cmd.arg("--run-once")
         .arg("--exit-on-error")

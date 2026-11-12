@@ -7,39 +7,31 @@ description = "VPN monitoring and automatic reconnect"
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
 clap_complete = "4.3"
-reqwest = { version = "0.12.24", features = ["blocking", "json"] }
+reqwest = { version = "0.12.24", features = ["blocking"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 log = "0.4"
 env_logger = "0.11.8"
-ctrlc = "3.2"
+ctrlc = { version = "3.2", features = ["termination"] }
 anyhow = "1.0"
 thiserror = "1.0"
 shell-words = "1.1"
 
 # XML backends (optional, selected via features)
 quick-xml = { version = "0.38.3", features = ["serialize"], optional = true }
-serde-xml-rs = { version = "0.8.1", optional = true }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["fmt", "env-filter"] }
 tracing-log = { version = "0.2", optional = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-zbus = { version = "5.12.0", features = ["blocking"] }
-
 [dev-dependencies]
 httpmock = "0.8.2"
-wiremock = "0.6"
-tokio = { version = "1", features = ["macros", "rt"] }
 serial_test = "3.2.0"
 tempfile = "3"
 
 [features]
-default = ["xml_quick", "json_pretty", "xml_pretty"]
+default = ["xml_quick", "xml_pretty"]
 # Use quick-xml for fast serde-based XML de/ser
 xml_quick = ["dep:quick-xml"]
-# Use serde-xml-rs as the backend instead (slower, but sometimes more lenient)
-xml_serde = ["dep:serde-xml-rs"]
 # Deny unknown fields when deserializing Config and other structs
 xml_strict = []
 # Pretty-print XML output when writing files (best-effort)
@@ -49,16 +41,14 @@ xml_tracing = ["dep:tracing"]
 # Enable structured/tracing-based logging and spans at compile time.
 # This is an opt-in feature which bundles `tracing` and `tracing-subscriber`.
 observability = ["dep:tracing", "dep:tracing-subscriber", "dep:tracing-log"]
-# Pretty-print JSON output when writing files (optional)
-json_pretty = []
 
 [package.metadata.deb]
 maintainer = "packager@example.com"
 assets = [
+	["docs/RECOVERY_PERMISSIONS.md", "/usr/share/doc/check_vpn/RECOVERY_PERMISSIONS.md", "0644"],
 	["target/release/check_vpn", "/usr/bin/check_vpn", "0755"],
 	["contrib/config.xml", "/etc/check_vpn/config.xml", "0644"],
 	["contrib/check_vpn.service", "/lib/systemd/system/check_vpn.service", "0644"],
-	["contrib/systemd/check_vpn.service.d/hardening.conf", "/lib/systemd/system/check_vpn.service.d/hardening.conf", "0644"],
 	["contrib/systemd/check_vpn.service.d/limits.conf", "/lib/systemd/system/check_vpn.service.d/limits.conf", "0644"],
 	["contrib/logrotate.conf", "/etc/logrotate.d/check_vpn", "0644"]
 ]

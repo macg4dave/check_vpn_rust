@@ -122,7 +122,36 @@ pub fn is_online_with_retries<S: AsRef<str>>(
     ports: &[u16],
     retries: usize,
 ) -> Result<bool, NetworkingError> {
+    is_online_inner(endpoints, timeout_secs, ports, retries, None)
+}
+
+/// Bounded, cancellable diagnostics used after provider failure.
+pub fn is_online_with_cancel<S: AsRef<str>>(
+    endpoints: &[S],
+    timeout_secs: u64,
+    ports: &[u16],
+    retries: usize,
+    cancel: &std::sync::atomic::AtomicBool,
+    budget: Duration,
+) -> Result<bool, NetworkingError> {
+    is_online_inner(
+        endpoints,
+        timeout_secs,
+        ports,
+        retries,
+        Some((cancel, std::time::Instant::now(), budget)),
+    )
+}
+
+fn is_online_inner<S: AsRef<str>>(
+    endpoints: &[S],
+    timeout_secs: u64,
+    ports: &[u16],
+    retries: usize,
+    control: Option<(&std::sync::atomic::AtomicBool, std::time::Instant, Duration)>,
+) -> Result<bool, NetworkingError> {
     let timeout = Duration::from_secs(timeout_secs);
+    let mut last_error = None;
     // Ensure at least one attempt is performed; keeps loop logic simple.
     let attempts = retries.max(1);
 
@@ -145,30 +174,49 @@ pub fn is_online_with_retries<S: AsRef<str>>(
                     "Attempting connect to {} (attempt {}/{})",
                     addr, attempt, attempts
                 );
-                match connect::try_connect(&addr, timeout) {
+                let mut remaining = timeout;
+                if let Some((cancel, start, budget)) = control {
+                    if cancel.load(std::sync::atomic::Ordering::Relaxed)
+                        || start.elapsed() >= budget
+                    {
+                        return Ok(false);
+                    }
+                    remaining = remaining.min(budget.saturating_sub(start.elapsed()));
+                }
+                match connect::try_connect_with_cancel(&addr, remaining, control.map(|c| c.0)) {
                     Ok(true) => return Ok(true),
                     Ok(false) => {
                         // not reachable right now; try again if attempts remain
                     }
                     Err(e) => {
-                        // Name resolution or other networking error: treat as an
-                        // immediate failure per crate semantics (bubble up).
-                        return Err(e);
+                        // Keep trying independent endpoints; report DNS failure only if none succeeds.
+                        last_error = Some(e);
                     }
                 }
 
                 if attempt < attempts {
                     // Linear backoff: 200ms * attempt_index (1-based)
-                    let backoff_ms = 200u64 * (attempt as u64);
+                    let backoff_ms = 200u64.saturating_mul(attempt as u64);
                     trace!("backoff {}ms before next attempt", backoff_ms);
-                    sleep(Duration::from_millis(backoff_ms));
+                    let delay = Duration::from_millis(backoff_ms);
+                    if let Some((cancel, start, budget)) = control {
+                        let _ = crate::providers::http::wait(
+                            delay.min(budget.saturating_sub(start.elapsed())),
+                            Some(cancel),
+                        );
+                    } else {
+                        sleep(delay);
+                    }
                 }
             }
         }
     }
 
     // No endpoint accepted a connection within given attempts/timeouts.
-    Ok(false)
+    match last_error {
+        Some(error) => Err(error),
+        None => Ok(false),
+    }
 }
 
 #[cfg(test)]
@@ -186,7 +234,7 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         let endpoints = vec!["::1".to_string()];
         let res = is_online_with_retries(&endpoints, 1, &[port], 1);
-        assert_eq!(res.unwrap_or(false), true);
+        assert!(res.unwrap_or(false));
     }
 
     #[test]
@@ -198,7 +246,7 @@ mod tests {
         let port = listener.local_addr().unwrap().port();
         let endpoints = vec!["[::1]".to_string()];
         let res = is_online_with_retries(&endpoints, 1, &[port], 1);
-        assert_eq!(res.unwrap_or(false), true);
+        assert!(res.unwrap_or(false));
     }
 
     #[test]
@@ -211,6 +259,6 @@ mod tests {
         let endpoints = vec![format!("[::1]:{}", port)];
         let alt_port = port.saturating_add(1);
         let res = is_online_with_retries(&endpoints, 1, &[alt_port], 1);
-        assert_eq!(res.unwrap_or(false), true);
+        assert!(res.unwrap_or(false));
     }
 }

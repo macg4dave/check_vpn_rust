@@ -1,60 +1,82 @@
-//! Provider abstraction layer for obtaining ISP / network identity information.
-//!
-//! This module introduces a `VpnInfoProvider` trait allowing multiple upstream
-//! services to be queried in sequence (fallback). Existing ip-api logic is
-//! adapted via a thin wrapper; new providers (e.g. ifconfig.co) implement the
-//! same interface. Custom JSON endpoints can also be configured via CLI / XML.
-use anyhow::Result;
-use std::sync::atomic::{AtomicBool, Ordering};
-
-/// Resulting minimal info we care about for VPN loss detection. Extendable.
+//! Ordered provider fallback with shared HTTP transport and a total budget.
+use anyhow::{bail, Result};
+use std::sync::atomic::AtomicBool;
+use std::time::{Duration, Instant};
+pub mod generic_json_provider;
+pub mod http;
+pub mod ifconfig_co_provider;
+pub mod ip_api_provider;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VpnIdentity {
     pub isp: String,
 }
-
-/// Trait implemented by all provider clients.
 pub trait VpnInfoProvider: Send + Sync {
     fn name(&self) -> &str;
     fn query(&self) -> Result<VpnIdentity>;
-}
-
-/// Helper to iterate through providers in order and return the first success.
-pub fn query_first_success(providers: &[Box<dyn VpnInfoProvider>]) -> Result<VpnIdentity> {
-    let mut last_err: Option<anyhow::Error> = None;
-    for p in providers {
-        match p.query() {
-            Ok(id) => return Ok(id),
-            Err(e) => {
-                last_err = Some(anyhow::anyhow!("{}: {}", p.name(), e));
-                continue;
-            }
-        }
+    fn query_with_cancel(
+        &self,
+        _cancel: Option<&AtomicBool>,
+        _budget: Duration,
+    ) -> Result<VpnIdentity> {
+        self.query()
     }
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no providers configured")))
 }
-
-/// Variant of `query_first_success` that bails out early when `cancel` is set.
+pub fn build_chain(eff: &crate::config::EffectiveConfig) -> Result<Vec<Box<dyn VpnInfoProvider>>> {
+    let client = http::client()?;
+    let mut chain: Vec<Box<dyn VpnInfoProvider>> = Vec::new();
+    for spec in eff.provider_specs() {
+        chain.push(Box::new(
+            generic_json_provider::GenericJsonProvider::with_client(&spec.url, client.clone())?
+                .with_key(spec.key.as_deref()),
+        ));
+    }
+    if eff.enable_ip_api {
+        chain.push(Box::new(ip_api_provider::IpApiProvider::with_client(
+            client.clone(),
+        )?));
+    }
+    if eff.enable_ifconfig_co {
+        chain.push(Box::new(
+            ifconfig_co_provider::IfconfigCoProvider::with_client(client)?,
+        ));
+    }
+    if chain.is_empty() {
+        bail!("no providers configured");
+    }
+    Ok(chain)
+}
+pub fn query_first_success(providers: &[Box<dyn VpnInfoProvider>]) -> Result<VpnIdentity> {
+    query(providers, None)
+}
 pub fn query_first_success_with_cancel(
     providers: &[Box<dyn VpnInfoProvider>],
     cancel: &AtomicBool,
 ) -> Result<VpnIdentity> {
-    let mut last_err: Option<anyhow::Error> = None;
-    for p in providers {
-        if cancel.load(Ordering::Relaxed) {
-            return Err(anyhow::anyhow!("provider query cancelled"));
+    query(providers, Some(cancel))
+}
+fn query(
+    providers: &[Box<dyn VpnInfoProvider>],
+    cancel: Option<&AtomicBool>,
+) -> Result<VpnIdentity> {
+    let start = Instant::now();
+    let mut errors = Vec::new();
+    for provider in providers {
+        if http::cancelled(cancel) {
+            bail!("provider query cancelled");
         }
-        match p.query() {
-            Ok(id) => return Ok(id),
-            Err(e) => {
-                last_err = Some(anyhow::anyhow!("{}: {}", p.name(), e));
-                continue;
-            }
+        let remaining = http::QUERY_BUDGET.saturating_sub(start.elapsed());
+        if remaining.is_zero() {
+            errors.push("provider query deadline exceeded".into());
+            break;
+        }
+        match provider.query_with_cancel(cancel, remaining.min(Duration::from_secs(10))) {
+            Ok(id) if !id.isp.trim().is_empty() => return Ok(id),
+            Ok(_) => errors.push(format!("{}: empty ISP identity", provider.name())),
+            Err(error) => errors.push(format!("{}: {error:#}", provider.name())),
         }
     }
-    Err(last_err.unwrap_or_else(|| anyhow::anyhow!("no providers configured")))
+    if errors.is_empty() {
+        bail!("no providers configured");
+    }
+    bail!("provider lookup failed: {}", errors.join("; "))
 }
-
-pub mod generic_json_provider;
-pub mod ifconfig_co_provider;
-pub mod ip_api_provider;

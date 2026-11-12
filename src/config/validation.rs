@@ -23,7 +23,7 @@ pub fn validate_values(
         errors.push("isp_to_check must be a non-empty string".to_string());
     }
 
-    let allowed = ["reboot", "restart-unit", "command"];
+    let allowed = ["log", "reboot", "restart-unit", "command"];
     if !allowed.contains(&eff.action_type.as_str()) {
         errors.push(format!(
             "vpn_lost_action_type must be one of: {}",
@@ -45,15 +45,6 @@ pub fn validate_values(
     // restart-unit must be a single unit name (no whitespace, no shell metacharacters).
     if eff.action_type == "restart-unit" && !is_valid_unit_name(&eff.action_arg) {
         errors.push("vpn_lost_action_arg for restart-unit contains invalid characters".to_string());
-    }
-
-    // command args must not contain obvious shell meta-characters; the runner
-    // executes commands directly without a shell trampoline, so we reject
-    // inputs that look like shell pipelines, redirections, or multiple commands.
-    if eff.action_type == "command" && !is_safe_command_string(&eff.action_arg) {
-        errors.push(
-            "vpn_lost_action_arg for command contains forbidden shell meta-characters".to_string(),
-        );
     }
 
     // Connectivity checks: endpoints and ports must be present and timeout/retries sensible
@@ -82,6 +73,7 @@ pub fn validate_values(
     // Provider availability: require at least one provider to be enabled/configured.
     if !eff.enable_ip_api
         && !eff.enable_ifconfig_co
+        && eff.providers.is_empty()
         && eff.provider_urls.is_empty()
         && eff.custom_json_server.is_none()
     {
@@ -89,6 +81,33 @@ pub fn validate_values(
             "at least one provider must be enabled or configured (ip-api, ifconfig.co, provider_urls, or custom_json_server)"
                 .to_string(),
         );
+    }
+
+    if eff.isp_aliases.iter().any(|alias| alias.trim().is_empty()) {
+        errors.push("isp_aliases must contain nonempty exact ISP names".into());
+    }
+    if eff.action_timeout_secs == 0 {
+        errors.push("action_timeout_secs must be greater than zero".into());
+    }
+    #[cfg(not(target_os = "linux"))]
+    if eff.action_type == "restart-unit" && !eff.dry_run {
+        errors.push("restart-unit is only supported on Linux (use command or log)".into());
+    }
+    if eff.custom_json_key.is_some() && eff.custom_json_server.is_none() {
+        errors.push("custom_json_key requires custom_json_server".into());
+    }
+    for spec in eff.provider_specs() {
+        if let Err(error) = crate::providers::http::validate_url(&spec.url) {
+            errors.push(format!("invalid provider URL '{}': {error:#}", spec.url));
+        }
+        if spec.key.as_ref().is_some_and(|key| key.trim().is_empty()) {
+            errors.push("provider JSON key must not be empty".into());
+        }
+    }
+    if eff.action_type == "command" && !eff.action_arg.trim().is_empty() {
+        if let Err(error) = crate::actions::command_parts(&eff.action_arg) {
+            errors.push(format!("invalid command: {error:#}"));
+        }
     }
 
     if errors.is_empty() {
@@ -103,15 +122,14 @@ pub fn validate_values(
 /// The function is exported for use by other modules so they can perform the
 /// same conservative validation rules used by config parsing.
 pub(crate) fn is_valid_unit_name(s: &str) -> bool {
-    let s = s.trim();
-    if s.is_empty() || s.len() > 255 {
+    if s.is_empty() || s.starts_with('-') || s.len() > 255 {
         return false;
     }
     // disallow whitespace or control characters
     if s.chars().any(|c| c.is_whitespace() || c.is_control()) {
         return false;
     }
-    // allow alphanumeric plus these characters: . _ - @ /
+    // allow alphanumeric plus these characters: . _ - @
     for c in s.chars() {
         match c {
             'A'..='Z' | 'a'..='z' | '0'..='9' | '.' | '-' | '_' | '@' => {}
@@ -134,15 +152,7 @@ pub(crate) fn is_safe_command_string(s: &str) -> bool {
     if s.chars().any(|c| forbidden.contains(&c)) {
         return false;
     }
-    // Basic program token check: ensure first token (program) does not contain
-    // whitespace or control chars.
-    if let Some(first) = s.split_whitespace().next() {
-        if first.chars().any(|c| c.is_control() || c.is_whitespace()) {
-            return false;
-        }
-    } else {
-        return false;
-    }
+
     true
 }
 
@@ -179,6 +189,10 @@ mod tests {
             provider_urls: Vec::new(),
             custom_json_server: None,
             custom_json_key: None,
+            isp_aliases: vec![],
+            providers: vec![],
+            recovery_cooldown_secs: 60,
+            action_timeout_secs: 30,
         }
     }
     #[test]
@@ -327,7 +341,7 @@ mod tests {
         assert!(res
             .unwrap_err()
             .to_string()
-            .contains("vpn_lost_action_arg for command contains forbidden shell meta-characters"));
+            .contains("forbidden shell meta-characters"));
     }
 
     #[test]

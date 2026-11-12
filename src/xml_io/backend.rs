@@ -56,26 +56,12 @@ fn pretty_print_xml(s: &str) -> String {
         }
         out.push_str(l);
         out.push('\n');
-        if l.starts_with('<')
-            && !l.starts_with("</")
-            && !l.ends_with("/>")
-            && !l.contains("</")
-        {
+        if l.starts_with('<') && !l.starts_with("</") && !l.ends_with("/>") && !l.contains("</") {
             indent += 1;
         }
     }
     out.trim_end().to_string()
 }
 
-#[cfg(all(feature = "xml_serde", not(feature = "xml_quick")))]
-pub fn deserialize_xml<T: DeserializeOwned>(s: &str) -> Result<T> {
-    Ok(serde_xml_rs::from_str::<T>(s)?)
-}
-
-#[cfg(all(feature = "xml_serde", not(feature = "xml_quick")))]
-pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
-    Ok(serde_xml_rs::to_string(value)?)
-}
-
-#[cfg(all(not(feature = "xml_quick"), not(feature = "xml_serde")))]
-compile_error!("Enable at least one XML backend feature: `xml_quick` (default) or `xml_serde`.");
+#[cfg(not(feature = "xml_quick"))]
+compile_error!("Enable the XML backend feature: xml_quick (default).");

@@ -1,6 +1,6 @@
 /// XML I/O helpers.
 /// This module provides a small set of helpers for reading and writing XML
-/// using one of the selectable backends (`xml_quick` or `xml_serde`). The
+/// using quick-xml. The
 /// implementation is split so that backend selection and tests are isolated.
 pub mod backend;
 pub mod fs;

@@ -1,196 +1,213 @@
+use crate::actions::{self, runner::RealActionRunner, PreparedAction};
+use crate::cli::Args;
+use crate::config::{Config, ConfigSource, EffectiveConfig};
 use crate::error_types::AppError;
-use std::result::Result;
-use log::{debug, error, info, warn};
+use crate::providers::{self, VpnInfoProvider};
+use log::{debug, info, warn};
+use std::cell::Cell;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::thread::sleep;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use crate::actions;
-use crate::cli::Args;
-use crate::config::Config;
-use crate::providers::{self, VpnInfoProvider};
-// TcpStream previously used to wake a metrics listener; no longer required here.
+mod check;
+pub use check::{check_identity, perform_check, CheckOutcome};
 
-mod check {
-    include!("app/check.rs");
+struct PreparedConfig {
+    eff: EffectiveConfig,
+    action: PreparedAction,
+    providers: Vec<Box<dyn VpnInfoProvider>>,
+}
+impl PreparedConfig {
+    fn new(eff: EffectiveConfig) -> Result<Self, AppError> {
+        Config::validate_values(&eff)?;
+        let action = PreparedAction::new(actions::parse_action(&eff.action_type, &eff.action_arg))
+            .map_err(AppError::ConfigLoadError)?;
+        let providers = providers::build_chain(&eff).map_err(AppError::ConfigLoadError)?;
+        Ok(Self {
+            eff,
+            action,
+            providers,
+        })
+    }
 }
 
-pub use check::perform_check;
-
-/// Run the main application logic. Returns Ok(()) on clean shutdown, or Err on fatal error.
+/// Library entry point. The binary passes its already-resolved source instead.
 pub fn run(args: Args, cfg: Config) -> Result<(), AppError> {
-    info!("Starting check_vpn run()");
-    debug!(
-        "Starting run with config override={}",
-        args.config
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "(none)".to_string())
-    );
+    let source =
+        ConfigSource::resolve(args.config.as_deref()).map_err(AppError::ConfigLoadError)?;
+    run_with_source(args, cfg, source)
+}
 
-    // Start with the provided config merged with CLI args.
-    let mut current_cfg = cfg;
-    let mut eff = current_cfg.merge_with_args(&args);
-
-    // Validate merged configuration before we start the main loop.
-    if let Err(e) = crate::config::Config::validate_values(&eff) {
-        error!("Configuration validation failed: {:?}", e);
-        for part in (e.0).iter() {
-            error!("  - {}", part.trim());
-        }
-        return Err(AppError::ConfigError(e));
-    }
-
-    let action = actions::parse_action(&eff.action_type, &eff.action_arg);
-    debug!("Configured action: {:?}", action);
-
-    // If run_once requested, perform single check and exit. Use perform_check directly (testable).
-    if eff.run_once {
-        let get_isp_closure = build_provider_chain_getter(&eff);
-        perform_check(&eff, get_isp_closure, actions::run_action)?;
+fn reload(
+    args: &Args,
+    source: &ConfigSource,
+    current: &mut Config,
+    prepared: &mut PreparedConfig,
+) -> Result<(), AppError> {
+    if matches!(source, ConfigSource::Defaults) {
         return Ok(());
     }
-
-    let keep_running = Arc::new(AtomicBool::new(true));
-    let kr = Arc::clone(&keep_running);
-    ctrlc::set_handler(move || {
-        kr.store(false, Ordering::SeqCst);
-        info!("Received termination signal, shutting down...");
-    })
-    .map_err(|e| AppError::RuntimeError(anyhow::anyhow!("failed to set ctrlc handler: {:?}", e)))?;
-
-    // Metrics server is optional; CLI flags are not present in this build,
-    // so keep a placeholder handle for symmetry with earlier implementations.
-    let metrics_handle: Option<std::thread::JoinHandle<()>> = None;
-
-    // Main loop: cross-platform timer/polling. On each iteration we attempt to reload
-    // the XML config and merge with CLI args so users can change timing/config without
-    // restarting the service. This is simpler and portable across Linux/Windows.
-    while keep_running.load(Ordering::SeqCst) {
-        debug!("Running vpn check iteration");
-
-        // Try to reload config from disk; if successful and changed, merge and validate.
-        // Prefer the explicit CLI --config path (if provided) so reloads use the
-        // same file that was used at startup.
-        let loaded = if let Some(path) = &args.config {
-            crate::config::Config::load_from_path(path.as_path())
+    let next = source.load().map_err(AppError::ConfigLoadError)?;
+    if next != *current {
+        let eff = next.merge_with_args(args);
+        // Timing/action-only edits reuse the existing connections.
+        if eff == prepared.eff {
+            *current = next;
+            return Ok(());
+        }
+        Config::validate_values(&eff)?;
+        let action = PreparedAction::new(actions::parse_action(&eff.action_type, &eff.action_arg))
+            .map_err(AppError::ConfigLoadError)?;
+        let providers_changed = eff.provider_specs() != prepared.eff.provider_specs()
+            || eff.enable_ip_api != prepared.eff.enable_ip_api
+            || eff.enable_ifconfig_co != prepared.eff.enable_ifconfig_co;
+        let replacement = if providers_changed {
+            Some(providers::build_chain(&eff).map_err(AppError::ConfigLoadError)?)
         } else {
-            crate::config::Config::load()
+            None
         };
-        match loaded {
-            Ok(new_cfg) => {
-                if new_cfg != current_cfg {
-                    debug!("Config file changed on disk, merging new values");
-                    let new_eff = new_cfg.merge_with_args(&args);
-                    match crate::config::Config::validate_values(&new_eff) {
-                        Ok(()) => {
-                            current_cfg = new_cfg;
-                            eff = new_eff;
-                            debug!("Applied new effective config: interval={}", eff.interval);
-                        }
-                        Err(errs) => {
-                            error!("New configuration is invalid, keeping previous config:");
-                            for part in (errs.0).iter() {
-                                error!("  - {}", part.trim());
-                            }
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                if args.strict_config {
-                    // Emit a clear marker on stderr so external test harnesses can
-                    // reliably detect the strict-config exit condition, then exit
-                    // early with a non-zero status (mapped by main/bin).
-                    eprintln!("--strict-config is set");
-                    eprintln!("Failed to reload config from disk and --strict-config is set; exiting: {:?}", e);
-                    return Err(AppError::ConfigLoadError(e));
-                }
-                debug!(
-                    "Failed to reload config from disk (path = {}, will continue with previous): {:?}; to fail on reload problems, start with --strict-config",
-                    args.config
-                        .as_ref()
-                        .map(|p| p.display().to_string())
-                        .or_else(|| std::env::var("CHECK_VPN_CONFIG").ok())
-                        .unwrap_or_else(|| "(no explicit config path set; looked up defaults)".to_string()),
-                    e
-                );
-            }
+        // Commit only once all replacements are ready.
+        if let Some(chain) = replacement {
+            prepared.providers = chain;
         }
-
-        // Execute the single check using the current effective configuration.
-        let get_isp_closure = build_provider_chain_getter(&eff);
-        perform_check(&eff, get_isp_closure, actions::run_action)?;
-
-        // Sleep but wake earlier if we are asked to stop; use the possibly-updated interval.
-        let mut slept = 0u64;
-        while slept < eff.interval && keep_running.load(Ordering::SeqCst) {
-            // Sleep in one-second slices to remain responsive to stop signals without overflowing.
-            let to_sleep = std::cmp::min(1u64, eff.interval);
-            sleep(Duration::from_secs(to_sleep));
-            slept += to_sleep;
-        }
-    }
-
-    info!("Exiting check_vpn run loop");
-
-    // Ensure metrics server exits cleanly if present.
-    if let Some(h) = metrics_handle {
-        let _ = h.join();
+        prepared.eff = eff;
+        prepared.action = action;
+        *current = next;
+        debug!("Applied reloaded configuration");
     }
     Ok(())
 }
 
-// perform_check has been moved to `src/app_check.rs` and is re-exported above.
-
-/// Build a closure `Fn() -> Result<String>` that queries the configured providers
-/// in order and returns the first successful ISP string.
-fn build_provider_chain_getter(eff: &crate::config::EffectiveConfig) -> impl Fn() -> anyhow::Result<String> + Send + Sync + 'static {
-    let mut chain: Vec<Box<dyn VpnInfoProvider>> = Vec::new();
-
-    // Custom provider URLs first, in specified order
-    for url in &eff.provider_urls {
-        match providers::generic_json_provider::GenericJsonProvider::new(url) {
-            Ok(p) => chain.push(Box::new(p)),
-            Err(e) => warn!("Failed to configure custom provider '{}': {:?}", url, e),
-        };
+pub(crate) fn run_with_source(
+    args: Args,
+    mut cfg: Config,
+    source: ConfigSource,
+) -> Result<(), AppError> {
+    info!("Starting check_vpn run()");
+    let mut prepared = PreparedConfig::new(cfg.merge_with_args(&args))?;
+    let cancel = Arc::new(AtomicBool::new(false));
+    if !prepared.eff.run_once {
+        let signal_cancel = Arc::clone(&cancel);
+        ctrlc::set_handler(move || {
+            signal_cancel.store(true, Ordering::Relaxed);
+        })
+        .map_err(|e| AppError::RuntimeError(e.into()))?;
     }
-
-    // Single custom JSON server with optional key override before others.
-    if let Some(ref url) = eff.custom_json_server {
-        match providers::generic_json_provider::GenericJsonProvider::new(url)
-            .map(|gp| gp.with_key(eff.custom_json_key.as_deref()))
-        {
-            Ok(p) => chain.insert(0, Box::new(p)),
-            Err(e) => warn!(
-                "Failed to configure custom JSON server '{}': {:?}",
-                url, e
-            ),
-        };
-    }
-
-    // Built-ins
-    if eff.enable_ip_api {
-        match providers::ip_api_provider::IpApiProvider::new_default() {
-            Ok(p) => chain.push(Box::new(p)),
-            Err(e) => warn!("Failed to initialize ip-api provider: {:?}", e),
-        };
-    }
-    if eff.enable_ifconfig_co {
-        match providers::ifconfig_co_provider::IfconfigCoProvider::new_default() {
-            Ok(p) => chain.push(Box::new(p)),
-            Err(e) => warn!("Failed to initialize ifconfig.co provider: {:?}", e),
-        };
-    }
-
-    move || {
-        if chain.is_empty() {
-            return Err(anyhow::anyhow!(
-                "no providers configured after validation; enable at least one provider"
-            ));
+    let runner = RealActionRunner::new();
+    let last_attempt = Cell::new(None::<Instant>);
+    while !cancel.load(Ordering::Relaxed) {
+        if !prepared.eff.run_once {
+            if let Err(error) = reload(&args, &source, &mut cfg, &mut prepared) {
+                if args.strict_config {
+                    return Err(AppError::ConfigLoadError(
+                        anyhow::Error::new(error).context("--strict-config is set"),
+                    ));
+                }
+                warn!("Config reload failed; keeping previous configuration: {error:#}");
+            }
         }
-        let id = providers::query_first_success(&chain)?;
-        Ok(id.isp)
+        let allowed = last_attempt.get().is_none_or(|last| {
+            last.elapsed() >= Duration::from_secs(prepared.eff.recovery_cooldown_secs)
+        });
+        let result = check_identity(
+            &prepared.eff,
+            &prepared.action.action,
+            allowed,
+            || {
+                providers::query_first_success_with_cancel(&prepared.providers, &cancel)
+                    .map(|id| id.isp)
+            },
+            |_, dry_run| {
+                // Charge failed attempts too, so a broken recovery command cannot spin.
+                let result = runner.execute_prepared(
+                    &prepared.action,
+                    dry_run,
+                    Duration::from_secs(prepared.eff.action_timeout_secs),
+                    &cancel,
+                );
+                last_attempt.set(Some(Instant::now()));
+                result
+            },
+        );
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        let result = result.map(|_| ());
+        // TCP probes are diagnostics only and never gate identity lookup/recovery.
+        if matches!(result, Err(AppError::RuntimeError(_))) {
+            let online = crate::networking::is_online_with_cancel(
+                &prepared.eff.connectivity_endpoints,
+                prepared.eff.connectivity_timeout_secs,
+                &prepared.eff.connectivity_ports,
+                prepared.eff.connectivity_retries,
+                &cancel,
+                Duration::from_secs(5),
+            );
+            debug!("Connectivity diagnostics after lookup failure: {online:?}");
+        }
+        if cancel.load(Ordering::Relaxed) {
+            break;
+        }
+        check::handle_error(&prepared.eff, result)?;
+        if prepared.eff.run_once {
+            return Ok(());
+        }
+        // The interval remains a delay after each completed check.
+        let _ = providers::http::wait(Duration::from_secs(prepared.eff.interval), Some(&cancel));
+    }
+    info!("Exiting check_vpn run loop");
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rejected_reloads_leave_all_runtime_state_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.xml");
+        let source = ConfigSource::File(path.clone());
+        let args = Args::default();
+        let mut current = Config::default();
+        let mut prepared = PreparedConfig::new(current.merge_with_args(&args)).unwrap();
+        let before = prepared.eff.clone();
+        let clients = prepared.providers.as_ptr();
+        for xml in [
+            "<bad>",
+            "<config><interval>0</interval></config>",
+            "<config><provider_urls>bad URL</provider_urls></config>",
+        ] {
+            std::fs::write(&path, xml).unwrap();
+            assert!(reload(&args, &source, &mut current, &mut prepared).is_err());
+            assert_eq!(prepared.eff, before);
+            assert_eq!(prepared.providers.as_ptr(), clients);
+        }
+        std::fs::remove_file(&path).unwrap();
+        assert!(reload(&args, &source, &mut current, &mut prepared).is_err());
+        assert_eq!(prepared.eff, before);
+    }
+
+    #[test]
+    fn timing_reload_reuses_clients_and_cli_overrides_survive() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.xml");
+        let source = ConfigSource::File(path.clone());
+        let args = Args {
+            isp_to_check: Some("CLI normal ISP".into()),
+            ..Default::default()
+        };
+        let mut current = Config::default();
+        let mut prepared = PreparedConfig::new(current.merge_with_args(&args)).unwrap();
+        let clients = prepared.providers.as_ptr();
+        std::fs::write(
+            path,
+            "<config><interval>7</interval><isp_to_check>File ISP</isp_to_check></config>",
+        )
+        .unwrap();
+        reload(&args, &source, &mut current, &mut prepared).unwrap();
+        assert_eq!(prepared.eff.interval, 7);
+        assert_eq!(prepared.eff.isp_to_check, "CLI normal ISP");
+        assert_eq!(prepared.providers.as_ptr(), clients);
     }
 }

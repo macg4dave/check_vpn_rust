@@ -5,16 +5,17 @@ use std::time::Instant;
 
 /// Read a generic struct from an XML file at `path` using the selected XML backend.
 /// Provides helpful error context and debug logging.
-pub fn read_xml<T: DeserializeOwned>(path: &str) -> Result<T> {
+pub fn read_xml<T: DeserializeOwned>(path: impl AsRef<std::path::Path>) -> Result<T> {
+    let path = path.as_ref();
     let started = Instant::now();
     let contents = crate::fs_ops::read_to_string(path, "xml")?;
     log::debug!(
         "xml_io::read_xml reading path={}, bytes={}",
-        path,
+        path.display(),
         contents.len()
     );
     #[cfg(feature = "xml_tracing")]
-    let span = tracing::info_span!("xml_read", path, size = contents.len());
+    let span = tracing::info_span!("xml_read", path = %path.display(), size = contents.len());
     #[cfg(feature = "xml_tracing")]
     let _enter = span.enter();
 
@@ -23,7 +24,7 @@ pub fn read_xml<T: DeserializeOwned>(path: &str) -> Result<T> {
         Err(e) => {
             return Err(e.context(format!(
                 "failed to parse xml; file='{}' ({} bytes). Ensure the document is well-formed and matches the expected schema.",
-                path,
+                path.display(),
                 contents.len()
             )));
         }
@@ -31,17 +32,18 @@ pub fn read_xml<T: DeserializeOwned>(path: &str) -> Result<T> {
 
     log::debug!(
         "xml_io::read_xml parsed OK path={} in {:?}",
-        path,
+        path.display(),
         started.elapsed()
     );
     Ok(parsed)
 }
 
 /// Serialize `value` to XML and write to `path` (overwrites existing file).
-pub fn write_xml<T: Serialize>(value: &T, path: &str) -> Result<()> {
+pub fn write_xml<T: Serialize>(value: &T, path: impl AsRef<std::path::Path>) -> Result<()> {
+    let path = path.as_ref();
     let started = Instant::now();
     #[cfg(feature = "xml_tracing")]
-    let span = tracing::info_span!("xml_write", path);
+    let span = tracing::info_span!("xml_write", path = %path.display());
     #[cfg(feature = "xml_tracing")]
     let _enter = span.enter();
 
@@ -51,7 +53,7 @@ pub fn write_xml<T: Serialize>(value: &T, path: &str) -> Result<()> {
     crate::fs_ops::write_string(path, &xml, "xml")?;
     log::debug!(
         "xml_io::write_xml wrote path={} bytes={} in {:?}",
-        path,
+        path.display(),
         xml.len(),
         started.elapsed()
     );

@@ -1,0 +1,12 @@
+[Unit]
+Description=check_vpn (per-user VPN monitor)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/check_vpn --config %h/.config/check_vpn/config.xml
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

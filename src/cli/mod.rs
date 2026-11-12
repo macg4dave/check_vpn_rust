@@ -12,9 +12,18 @@ use std::path::PathBuf;
 /// This struct is intentionally lean: it only represents the raw CLI values as
 /// parsed by `clap`. Higher-level merging with XML config and validation is
 /// performed in `crate::config` so the responsibilities remain separated.
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[command(author, version, about = "VPN checker (Rust port)")]
 pub struct Args {
+    /// Additional exact normal-ISP names reported by fallback providers
+    #[arg(long = "isp-alias", value_delimiter = ',')]
+    pub isp_aliases: Option<Vec<String>>,
+    /// Minimum seconds between recovery attempts (including failed attempts)
+    #[arg(long = "recovery-cooldown")]
+    pub recovery_cooldown_secs: Option<u64>,
+    /// Maximum seconds to wait for a recovery process
+    #[arg(long = "action-timeout")]
+    pub action_timeout_secs: Option<u64>,
     /// Seconds between checks (overrides config)
     ///
     /// Long flag is `--interval`. Short flag was removed to avoid a collision
@@ -22,11 +31,11 @@ pub struct Args {
     #[arg(long = "interval")]
     pub interval: Option<u64>,
 
-    /// ISP string that indicates VPN is lost (overrides config)
+    /// Exact normal-ISP string that indicates VPN is lost (overrides config)
     #[arg(short = 'i', long)]
     pub isp_to_check: Option<String>,
 
-    /// Action type to run when VPN is lost. One of: reboot, restart-unit, command
+    /// Action type to run when VPN is lost. One of: log, reboot, restart-unit, command
     #[arg(short = 't', long)]
     pub vpn_lost_action_type: Option<String>,
 
@@ -39,7 +48,7 @@ pub struct Args {
     #[arg(long, action = clap::ArgAction::SetTrue)]
     pub dry_run: bool,
 
-    /// Connectivity endpoints to check (can be repeated). Example:
+    /// Connectivity diagnostics after provider failure (can be repeated). Example:
     /// `--connectivity-endpoint 8.8.8.8 --connectivity-endpoint google.com`.
     ///
     /// Comma-delimited values are also supported when passed in a single flag.
@@ -55,7 +64,7 @@ pub struct Args {
     #[arg(long = "connectivity-timeout")]
     pub connectivity_timeout_secs: Option<u64>,
 
-    /// Number of retries for connectivity checks (overrides config)
+    /// Number of attempts per connectivity candidate (overrides config)
     #[arg(long = "connectivity-retries")]
     pub connectivity_retries: Option<usize>,
 
@@ -76,7 +85,7 @@ pub struct Args {
     #[arg(long = "exit-on-error", action = clap::ArgAction::SetTrue)]
     pub exit_on_error: bool,
 
-    /// Fail the process (non-zero exit) if a config load/reload fails.
+    /// Fail the process if reading, parsing or validating a config reload fails.
     /// When enabled, a failed hot-reload will cause the daemon to exit instead
     /// of silently keeping the previous configuration.
     #[arg(long = "strict-config", action = clap::ArgAction::SetTrue)]
@@ -134,37 +143,6 @@ impl Args {
     }
 }
 
-impl Default for Args {
-    fn default() -> Self {
-        Self {
-            interval: None,
-            isp_to_check: None,
-            vpn_lost_action_type: None,
-            vpn_lost_action_arg: None,
-            dry_run: false,
-            connectivity_endpoints: None,
-            connectivity_ports: None,
-            connectivity_timeout_secs: None,
-            connectivity_retries: None,
-            run_once: false,
-            verbose: 0,
-            config: None,
-            exit_on_error: false,
-            strict_config: false,
-            disable_ip_api: false,
-            disable_ifconfig_co: false,
-            provider_urls: None,
-            custom_json_server: None,
-            custom_json_key: None,
-            init: false,
-            init_output: None,
-            init_no_fetch: false,
-            generate_completions: None,
-            completions_output: None,
-        }
-    }
-}
-
 // Unit tests for CLI parsing. These are intentionally small and focused on
 // ensuring that argument parsing and attribute wiring behave as expected.
 #[cfg(test)]
@@ -205,7 +183,7 @@ mod tests {
     }
 
     #[test]
-    fn defaults_and_metrics_addr() {
+    fn defaults() {
         let argv = vec!["check_vpn"];
         let args = Args::parse_from(argv);
         // defaults for booleans are false

@@ -8,9 +8,9 @@ set -euo pipefail
 # - Non-interactive: --mode system|user|auto and --yes to accept defaults
 
 BINARY="target/release/check_vpn"
-CONFIG_SRC="./check_vpn.xml"
-SERVICE_SRC="./check_vpn.service"
-PLIST_SRC="../contrib/check_vpn.plist"
+CONFIG_SRC="contrib/config.xml"
+SERVICE_SRC="contrib/check_vpn.service"
+PLIST_SRC="contrib/check_vpn.plist"
 
 MODE="interactive" # interactive | system | user | auto
 ASSUME_YES=0
@@ -23,8 +23,8 @@ Usage: $0 [options]
 
 Options:
   --binary <path>    Path to built binary (default: target/release/check_vpn)
-  --config <path>    Path to config xml (default: ./check_vpn.xml)
-  --service <path>   Path to systemd service file (default: ./check_vpn.service)
+  --config <path>    Path to config xml (default: contrib/config.xml)
+  --service <path>   Path to systemd service file (default: contrib/check_vpn.service)
   --mode <mode>      Install mode: interactive|system|user|auto
   --yes              Accept prompts (non-interactive)
   --no-start         Install but do not start/enable the service
@@ -171,6 +171,9 @@ if [ "$PLATFORM" = "linux" ]; then
     BIN_DIR="/usr/local/bin"
     install_binary "$BIN_DIR"
     install_config "/etc/check_vpn"
+    if ! id -u checkvpn >/dev/null 2>&1; then
+      run_cmd useradd --system --user-group --no-create-home --shell /usr/sbin/nologin checkvpn
+    fi
 
     # service: prefer user-specified, else use contrib/service src if exists
     if [ -f "$SERVICE_SRC" ]; then
@@ -184,6 +187,9 @@ if [ "$PLATFORM" = "linux" ]; then
     if [ -n "$SERVICE_SRC_PATH" ]; then
       SERVICE_DEST="/etc/systemd/system/check_vpn.service"
       run_cmd cp "$SERVICE_SRC_PATH" "$SERVICE_DEST"
+      if [ "$DRY_RUN" -eq 0 ]; then
+        sed -i "s|^ExecStart=.*|ExecStart=$BIN_DIR/check_vpn --config /etc/check_vpn/config.xml --exit-on-error|" "$SERVICE_DEST"
+      fi
       run_cmd chmod 644 "$SERVICE_DEST"
       log "Installed systemd unit to $SERVICE_DEST"
       run_cmd systemctl daemon-reload
@@ -215,6 +221,13 @@ if [ "$PLATFORM" = "linux" ]; then
       else
         log "No systemd unit file found for user install; skipping.";
       fi
+      if [ "$DRY_RUN" -eq 1 ]; then
+        log "DRY-RUN: configure user unit for $HOME_BIN/check_vpn --config $CONFIG_DIR/config.xml"
+      elif [ -f "$UNIT_DIR/check_vpn.service" ]; then
+        sed -i -e '/^User=/d' -e '/^Group=/d' -e '/^ProtectHome=/d' -e '/^RuntimeDirectory/d' \
+          -e "s|^ExecStart=.*|ExecStart=$HOME_BIN/check_vpn --config $CONFIG_DIR/config.xml|" \
+          -e 's/^WantedBy=.*/WantedBy=default.target/' "$UNIT_DIR/check_vpn.service"
+      fi
       if [ -f "$UNIT_DIR/check_vpn.service" ]; then
         run_cmd chmod 644 "$UNIT_DIR/check_vpn.service"
         log "Installed user systemd unit to $UNIT_DIR/check_vpn.service"
@@ -242,8 +255,8 @@ elif [ "$PLATFORM" = "macos" ]; then
     install_config "/etc/check_vpn"
 
     # plist -> /Library/LaunchDaemons
-    if [ -f "../contrib/check_vpn.plist" ]; then
-      PLIST_SRC_PATH="../contrib/check_vpn.plist"
+    if [ -f "$PLIST_SRC" ]; then
+      PLIST_SRC_PATH="$PLIST_SRC"
     elif [ -f "./check_vpn.plist" ]; then
       PLIST_SRC_PATH="./check_vpn.plist"
     else
@@ -252,6 +265,10 @@ elif [ "$PLATFORM" = "macos" ]; then
     if [ -n "$PLIST_SRC_PATH" ]; then
       PLIST_DEST="/Library/LaunchDaemons/com.check_vpn.plist"
       run_cmd cp "$PLIST_SRC_PATH" "$PLIST_DEST"
+      if [ "$DRY_RUN" -eq 0 ]; then
+        /usr/libexec/PlistBuddy -c "Set :ProgramArguments:0 $BIN_DIR/check_vpn" "$PLIST_DEST"
+        /usr/libexec/PlistBuddy -c "Set :ProgramArguments:2 /etc/check_vpn/config.xml" "$PLIST_DEST"
+      fi
       run_cmd chmod 644 "$PLIST_DEST"
       log "Installed launchd plist to $PLIST_DEST"
       if [ "$NO_START" -eq 0 ]; then
@@ -273,8 +290,8 @@ elif [ "$PLATFORM" = "macos" ]; then
     CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/check_vpn"
     install_config "$CONFIG_DIR"
 
-    if [ -f "../contrib/check_vpn.plist" ]; then
-      PLIST_SRC_PATH="../contrib/check_vpn.plist"
+    if [ -f "$PLIST_SRC" ]; then
+      PLIST_SRC_PATH="$PLIST_SRC"
     elif [ -f "./check_vpn.plist" ]; then
       PLIST_SRC_PATH="./check_vpn.plist"
     else
@@ -285,6 +302,13 @@ elif [ "$PLATFORM" = "macos" ]; then
       run_cmd mkdir -p "$LAUNCH_DIR"
       PLIST_DEST="$LAUNCH_DIR/com.check_vpn.plist"
       run_cmd cp "$PLIST_SRC_PATH" "$PLIST_DEST"
+      if [ "$DRY_RUN" -eq 0 ]; then
+        /usr/libexec/PlistBuddy -c "Set :ProgramArguments:0 $HOME_BIN/check_vpn" "$PLIST_DEST"
+        /usr/libexec/PlistBuddy -c "Set :ProgramArguments:2 $CONFIG_DIR/config.xml" "$PLIST_DEST"
+        /usr/libexec/PlistBuddy -c "Set :StandardOutPath $HOME/Library/Logs/check_vpn.out.log" "$PLIST_DEST"
+        /usr/libexec/PlistBuddy -c "Set :StandardErrorPath $HOME/Library/Logs/check_vpn.err.log" "$PLIST_DEST"
+        mkdir -p "$HOME/Library/Logs"
+      fi
       run_cmd chmod 644 "$PLIST_DEST"
       log "Installed user launchd plist to $PLIST_DEST"
       if [ "$NO_START" -eq 0 ]; then
@@ -302,3 +326,5 @@ else
 fi
 
 log "Installation complete."
+
+printf '%s\n' 'Recovery permissions: the default log action needs no privileges. For restart-unit, authorize only the configured VPN unit; see docs/RECOVERY_PERMISSIONS.md (packaged under /usr/share/doc/check_vpn/).'

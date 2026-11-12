@@ -13,7 +13,7 @@ cleanup() { rm -rf "$BUILD_DIR"; }
 trap cleanup EXIT
 
 echo "Preparing layout in $DESTDIR"
-mkdir -p "$DESTDIR/usr/bin" "$DESTDIR/etc/check_vpn" "$DESTDIR/lib/systemd/system"
+mkdir -p "$DESTDIR/usr/share/doc/check_vpn" "$DESTDIR/usr/bin" "$DESTDIR/etc/check_vpn" "$DESTDIR/lib/systemd/system"
 
 echo "Building release (target dir: ${TARGET_DIR})"
 if [ -n "${CARGO_TARGET_DIR:-}" ]; then
@@ -24,6 +24,7 @@ fi
 
 echo "Copying files"
 cp "${TARGET_DIR}/release/check_vpn" "$DESTDIR/usr/bin/"
+cp docs/RECOVERY_PERMISSIONS.md "$DESTDIR/usr/share/doc/check_vpn/"
 cp contrib/config.xml "$DESTDIR/etc/check_vpn/config.xml"
 cp contrib/check_vpn.service "$DESTDIR/lib/systemd/system/check_vpn.service"
 
@@ -50,6 +51,7 @@ fpm -s dir -t rpm \
   --after-install contrib/packaging/postinst \
   --before-remove contrib/packaging/prerm \
   -C "$DESTDIR" \
+  usr/share/doc/check_vpn/RECOVERY_PERMISSIONS.md \
   usr/bin/check_vpn \
   etc/check_vpn/config.xml \
   lib/systemd/system/check_vpn.service
