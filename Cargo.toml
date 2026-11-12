@@ -4,6 +4,19 @@ version = "1.0.0"
 edition = "2021"
 description = "VPN monitoring and automatic reconnect"
 
+[lints.rust]
+warnings = "deny"
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+# Production unwrap/expect restrictions live in src/lib.rs so test setup can
+# continue to use explicit assertions and descriptive expect messages.
+
 [dependencies]
 clap = { version = "4.3", features = ["derive"] }
 clap_complete = "4.3"
@@ -17,8 +30,8 @@ anyhow = "1.0"
 thiserror = "1.0"
 shell-words = "1.1"
 
-# XML backends (optional, selected via features)
-quick-xml = { version = "0.38.3", features = ["serialize"], optional = true }
+# XML configuration support is always available.
+quick-xml = { version = "0.38.3", features = ["serialize"] }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["fmt", "env-filter"] }
 tracing-log = { version = "0.2", optional = true }
@@ -29,9 +42,9 @@ serial_test = "3.2.0"
 tempfile = "3"
 
 [features]
-default = ["xml_quick", "xml_pretty"]
-# Use quick-xml for fast serde-based XML de/ser
-xml_quick = ["dep:quick-xml"]
+default = ["xml_pretty"]
+# Compatibility flag: XML support no longer requires feature selection.
+xml_quick = []
 # Deny unknown fields when deserializing Config and other structs
 xml_strict = []
 # Pretty-print XML output when writing files (best-effort)

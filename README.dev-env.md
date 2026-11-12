@@ -1,6 +1,6 @@
 Dev environment and testing guide
 
-This repository includes helpers to test the full install experience on Debian-like systems and to run smoke tests in CI.
+This repository includes helpers to test the full install experience on Debian-like systems and to run smoke tests locally.
 
 1) Systemd-enabled Docker container (fast, repeatable)
 
@@ -35,9 +35,10 @@ vagrant ssh -c "systemctl status check_vpn --no-pager || journalctl -u check_vpn
 
 The provisioner uses `scripts/vagrant_provision.sh` and is idempotent.
 
-3) CI job (GitHub Actions)
+3) Local checks
 
-- A workflow `.github/workflows/build_deb.yml` builds a `.deb` package using `cargo-deb` and performs a smoke test by installing the package and running the binary's `--help`/`--version`.
+The old CI workflows have been removed. Run `cargo lint-all` and
+`cargo test-all` locally; see `AGENTS.md` for the full verification matrix.
 
 4) Quick local package test (no systemd)
 

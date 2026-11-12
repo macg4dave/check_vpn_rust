@@ -2,9 +2,8 @@ use anyhow::{anyhow, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-// Backend implementations selected by cargo feature flags.
+// XML support is unconditional; formatting remains feature-controlled.
 
-#[cfg(feature = "xml_quick")]
 pub fn deserialize_xml<T: DeserializeOwned>(s: &str) -> Result<T> {
     match quick_xml::de::from_str::<T>(s) {
         Ok(v) => Ok(v),
@@ -21,18 +20,17 @@ pub fn deserialize_xml<T: DeserializeOwned>(s: &str) -> Result<T> {
     }
 }
 
-#[cfg(all(feature = "xml_quick", not(feature = "xml_pretty")))]
+#[cfg(not(feature = "xml_pretty"))]
 pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
     Ok(quick_xml::se::to_string(value)?)
 }
 
-#[cfg(all(feature = "xml_quick", feature = "xml_pretty"))]
+#[cfg(feature = "xml_pretty")]
 pub fn serialize_xml<T: Serialize>(value: &T) -> Result<String> {
     let compact = quick_xml::se::to_string(value)?;
     Ok(pretty_print_xml(&compact))
 }
 
-#[cfg(feature = "xml_quick")]
 fn extract_line_col(_err_msg: &str, doc: &str) -> Option<(usize, usize)> {
     if !doc.trim_end().ends_with('>') {
         return Some((doc.lines().count(), 1));
@@ -40,7 +38,7 @@ fn extract_line_col(_err_msg: &str, doc: &str) -> Option<(usize, usize)> {
     None
 }
 
-#[cfg(all(feature = "xml_quick", feature = "xml_pretty"))]
+#[cfg(feature = "xml_pretty")]
 fn pretty_print_xml(s: &str) -> String {
     // Lightweight formatter for simple config XML (best-effort indentation).
     let mut out = String::new();
@@ -62,6 +60,3 @@ fn pretty_print_xml(s: &str) -> String {
     }
     out.trim_end().to_string()
 }
-
-#[cfg(not(feature = "xml_quick"))]
-compile_error!("Enable the XML backend feature: xml_quick (default).");

@@ -9,7 +9,7 @@ Small, fast, and reliable VPN connection monitor written in Rust. It checks your
 - Built-in providers default to HTTPS for ISP lookups (ip-api.com) with override hooks
 - Config validation ensures at least one provider is enabled/configured to avoid silent failures
 - Provider fallback, configuration reloads and bounded recovery commands
-- Testable design, CI, and packaging-friendly layout
+- Testable design and packaging-friendly layout
 
 ## Quick start
 
@@ -164,8 +164,10 @@ For more examples and advanced configuration, consult the repository `contrib/` 
 
 ## CI and releases
 
-CI runs formatting, Clippy and tests, including all supported features.
-Additional workflows build container images and release packages.
+The old GitHub Actions workflows have been removed. Run checks locally:
+`cargo fmt --all -- --check`, `cargo lint-all`, and `cargo test-all`.
+See `AGENTS.md` for default and minimal-feature checks. Packaging helpers remain
+available for local builds.
 
 Local macOS package (developer):
 

@@ -22,14 +22,14 @@ _maybe-macos:
 
 ifeq ($(HOST_OS),Windows)
 _maybe-windows:
-		@echo "Skipping native Windows build in Makefile: run build steps inside WSL2 or use CI for Windows artifacts."
+		@echo "Skipping native Windows build in Makefile: run build steps inside WSL2 or build natively on Windows."
 		@echo "From Windows you can run WSL and then run make in the WSL shell, e.g. 'wsl make release' or run the POSIX helpers under ./scripts from WSL."
 else ifeq ($(HOST_OS),Windows_WSL)
 _maybe-windows:
 	@echo "Running under WSL - use 'make windows-package' to build a Windows zip via powershell.exe if available."
 else
 _maybe-windows:
-	@echo "Skipping Windows build: not on Windows. To build Windows artifacts, use CI or run builds inside WSL2 (from Windows: 'wsl make release' or open a WSL shell and run the POSIX helpers in ./scripts)."
+	@echo "Skipping Windows build: not on Windows. To build Windows artifacts, build natively or run builds inside WSL2 (from Windows: 'wsl make release' or open a WSL shell and run the POSIX helpers in ./scripts)."
 endif
 
 .PHONY: _maybe-windows-package
@@ -192,7 +192,7 @@ debug:
 	RUST_BACKTRACE=1 RUST_LOG=$${RUST_LOG:-trace} cargo run --features "observability" -- --run-once --dry-run -vv
 
 clippy:
-	cargo clippy --all-targets --all-features
+	cargo lint-all
 
 clean:
 	cargo clean
@@ -219,7 +219,7 @@ test-macos-pkg-local:
 		echo "Simulating install to disk image"; bash ./scripts/test-macos-pkg.sh simulate "$$PKG_FILE"; \
 	else echo "Skipping mac pkg tests: not on macOS"; fi'
 
-# Helper target to remind Windows users to run builds in WSL2 or the CI.
+# Helper target to remind Windows users to run builds in WSL2 or a native Windows toolchain.
 windows-build:
 	@echo "To build on Windows we recommend using WSL2. From Windows run: 'wsl make release' or open a WSL shell and run the POSIX build helpers under ./scripts/ or use cargo directly inside WSL."
 

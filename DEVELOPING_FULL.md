@@ -11,7 +11,7 @@ If you need a short summary, use `DEVELOPING.md` top-level commands. This file e
 - Native dependencies (OpenSSL, libcurl, etc.)
 - Building locally (per OS)
 - Docker-based reproducible builds (Debian/Fedora)
-- CI notes (GitHub Actions)
+- Local verification
 - Troubleshooting and common errors
 
 ## System requirements (per OS)
@@ -125,7 +125,7 @@ cargo test
 
 # Format and lint
 cargo fmt --all
-cargo clippy --all-targets --all-features
+cargo lint-all
 ```
 
 ### macOS (native)
@@ -133,7 +133,7 @@ cargo clippy --all-targets --all-features
 - Ensure Xcode Command Line Tools and Homebrew deps installed. Then run `cargo build --release`.
 
 -### Windows (native)
-Note: we have removed PowerShell-specific helper scripts from the repository. To produce Windows artifacts you can either use the CI on `windows-latest` or build on a native Windows machine using the Visual Studio toolchain. If you prefer a POSIX workflow, use WSL2 and run the normal POSIX helpers from a WSL shell (see "Windows (WSL2)" below).
+Note: we have removed PowerShell-specific helper scripts from the repository. To produce Windows artifacts build on a native Windows machine using the Visual Studio toolchain. If you prefer a POSIX workflow, use WSL2 and run the normal POSIX helpers from a WSL shell (see "Windows (WSL2)" below).
 
 ### Windows (WSL2)
 
@@ -154,30 +154,12 @@ docker run --rm -v "$PWD":/work -w /work check_vpn_debian bash -lc "cargo build 
 
 If Docker is installed but the daemon is not running, start Docker Desktop (Windows/macOS) or `sudo systemctl start docker` on Linux.
 
-## CI notes (GitHub Actions)
+## Local verification
 
-The previous CI matrix workflow (`ci-matrix.yml`) has been archived. The
-repository now uses simplified CI focused on Docker-based multi-architecture
-builds and a single release workflow. Active workflows in `.github/workflows/`
-include `docker-builds.yml` (push/PR builder) and `release-docker.yml` (tag
-triggered release for v1.0.x).
-
-- On `ubuntu-latest` the workflow uses Docker to produce Debian/Fedora artifacts.
-- On `macos-latest` the workflow runs a native `cargo build --release`.
-- On `windows-latest` the CI workflow runs Windows-native packaging steps to prepare Windows artifacts; local contributors should prefer WSL2 or CI for producing packaged Windows binaries.
-
-The workflow uploads the built artifacts as release-ready tarballs or zip files.
-
-### Running long/ignored tests in CI
-
-The repository exposes a dedicated reproducible workflow that runs long or network-facing tests inside the Debian-based test container (`.github/workflows/integration-long.yml`). This workflow can be triggered manually and also runs on a weekly schedule; by default it will only run when a PR is labeled with `run-long-tests` (to avoid accidental long runs from every PR).
-
-If you have a self-hosted runner prepared to run longer tests (for example, with elevated network access or more CPU), you can also drive a self-hosted job by either:
-
-- Adding the `self-hosted-tests` label to the PR — the workflow will detect the label and run `long-integration-self-hosted` on a `self-hosted` runner (if available).
-- Or manually dispatch the workflow with the `run_self_hosted=true` input via the Actions UI to run the self-hosted job explicitly.
-
-This allows maintainers to run full-network and longer integration tests in a reproducible runtime while avoiding accidental, unnecessary long runs for routine PRs.
+The old GitHub Actions workflows and `contrib/ci` runner have been removed.
+Run `cargo fmt --all -- --check`, `cargo lint-all`, and `cargo test-all`.
+Use `AGENTS.md` for the full feature matrix. Ignored network tests require
+a suitable environment and must be selected explicitly.
 
 ## Troubleshooting and common errors
 
@@ -190,13 +172,6 @@ This allows maintainers to run full-network and longer integration tests in a re
 cargo test -- --ignored
 ```
 
-Alternatively the repo includes a helper script to run the full test-suite (including ignored tests) inside the same reproducible Debian container used by CI:
-
-```bash
-# Build the test image and run ignored tests inside it
-./contrib/ci docker
-```
-
 ## Make and script shortcuts
 
 - Use `make` on Unix or WSL to run targets defined in `Makefile` (requires GNU make).
@@ -207,7 +182,6 @@ Alternatively the repo includes a helper script to run the full test-suite (incl
 - `Makefile` — convenience tasks for local dev and Docker builds (targets: `all`, `release`, `debian-build-release`, `fedora-build-release`, `test-all-docker`, `windows-test-all-docker`).
 - `scripts/*.sh` — POSIX shell helpers for builds and Docker operations (recommended). WSL2 users can run these from a WSL shell or via `wsl` from a Windows shell.
 - `scripts/*.sh` — POSIX shell counterparts for WSL/Linux/macOS.
-- `.github/workflows/ci-matrix.yml` — archived; prefer `docker-builds.yml` and `release-docker.yml` for the current CI flow.
 
 ---
 

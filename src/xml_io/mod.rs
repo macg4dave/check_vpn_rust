@@ -1,7 +1,7 @@
 /// XML I/O helpers.
 /// This module provides a small set of helpers for reading and writing XML
-/// using quick-xml. The
-/// implementation is split so that backend selection and tests are isolated.
+/// using quick-xml in every feature configuration. Backend serialization is
+/// separated from filesystem operations so each can be tested independently.
 pub mod backend;
 pub mod fs;
 

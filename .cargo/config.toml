@@ -1,0 +1,7 @@
+# Local checks; no GitHub Actions workflow is required.
+[alias]
+lint = "clippy --workspace --all-targets -- -D warnings"
+lint-all = "clippy --workspace --all-targets --all-features -- -D warnings"
+lint-minimal = "clippy --workspace --all-targets --no-default-features -- -D warnings"
+test-all = "test --workspace --all-features"
+test-minimal = "test --workspace --no-default-features"
