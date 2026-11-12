@@ -4,6 +4,7 @@
 
 # Rust build artifacts
 target/
+logs/
 
 # Git metadata
 .git

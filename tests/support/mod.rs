@@ -4,8 +4,7 @@
 
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::sync::mpsc::{channel, Sender};
-use std::sync::Arc;
+use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
@@ -49,13 +48,22 @@ impl TestHttpServer {
 
     /// Stop the server and wait for the thread to exit.
     pub fn stop(mut self) {
+        self.shutdown();
+    }
+
+    fn shutdown(&mut self) {
         if let Some(tx) = self.shutdown.take() {
-            // best-effort shutdown
             let _ = tx.send(());
         }
-        if let Some(h) = self.handle.take() {
-            let _ = h.join();
+        if let Some(handle) = self.handle.take() {
+            handle.join().expect("HTTP test server panicked");
         }
+    }
+}
+
+impl Drop for TestHttpServer {
+    fn drop(&mut self) {
+        self.shutdown();
     }
 }
 
@@ -66,8 +74,6 @@ pub fn start_http_server(body: &'static str, status: u16) -> TestHttpServer {
     let addr = listener.local_addr().expect("local addr").to_string();
 
     let (tx, rx) = channel::<()>();
-    // Use an Arc<Mutex<..>> for the body so it's cheaply shareable if handlers read it
-    let body_arc = Arc::new(body.to_string());
 
     // Set non-blocking accept so shutdown signals are seen promptly
     listener
@@ -76,20 +82,24 @@ pub fn start_http_server(body: &'static str, status: u16) -> TestHttpServer {
     let handle = thread::spawn(move || {
         // Run until shutdown is requested via rx; use non-blocking accept in a loop
         loop {
-            if rx.try_recv().is_ok() {
+            if !matches!(rx.try_recv(), Err(TryRecvError::Empty)) {
                 break;
             }
             match listener.accept() {
                 Ok((mut s, _)) => {
-                    // Read the request (rudimentary) until blank line
+                    // Bound reads so a stalled client cannot prevent server shutdown.
+                    s.set_read_timeout(Some(Duration::from_millis(200)))
+                        .expect("set read timeout");
+                    s.set_write_timeout(Some(Duration::from_millis(200)))
+                        .expect("set write timeout");
                     let mut buf = [0u8; 1024];
                     match s.read(&mut buf) {
+                        Ok(0) => continue,
                         Ok(_) => {}
                         Err(_) => continue,
                     }
 
                     // Construct a simple HTTP response
-                    let body = body_arc.as_str();
                     let resp = format!(
                         "HTTP/1.1 {} OK\r\nContent-Length: {}\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\n{}",
                         status,
@@ -104,7 +114,7 @@ pub fn start_http_server(body: &'static str, status: u16) -> TestHttpServer {
                     thread::sleep(Duration::from_millis(20));
                     continue;
                 }
-                Err(_) => continue,
+                Err(_) => break,
             }
         }
     });

@@ -182,7 +182,3 @@ cargo test -- --ignored
 - `Makefile` — convenience tasks for local dev and Docker builds (targets: `all`, `release`, `debian-build-release`, `fedora-build-release`, `test-all-docker`, `windows-test-all-docker`).
 - `scripts/*.sh` — POSIX shell helpers for builds and Docker operations (recommended). WSL2 users can run these from a WSL shell or via `wsl` from a Windows shell.
 - `scripts/*.sh` — POSIX shell counterparts for WSL/Linux/macOS.
-
----
-
-If you want I can further tighten this document: produce a checklist for each OS, or add one-line install snippets for popular package managers (apt, dnf, brew, choco). Which would you prefer?

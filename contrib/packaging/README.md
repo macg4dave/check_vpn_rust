@@ -18,7 +18,7 @@ Shared hardening and runtime-directory settings live in the main
 
 Package the drop-in under `/lib/systemd/system/check_vpn.service.d/`.
 Recovery authorization is deliberately opt-in; see
-[Recovery permissions](../../docs/RECOVERY_PERMISSIONS.md).
+[Recovery permissions](../../INSTALL.md#recovery-permissions).
 
 Usage notes
 

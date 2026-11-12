@@ -172,6 +172,8 @@ git diff --check
 - Before finishing, inspect `git diff` and `git status --short`: no accidental files,
   debug output, disabled checks, stale references, or unrelated changes. Do not run
   automatic fixes or dependency updates without reviewing the resulting diff.
+- Store local build, lint, test, and audit logs under `logs/`, never in the
+  repository root. Create the directory when needed; it is ignored by Git and Docker.
 
 Cargo.toml enforces warnings and selected lints; `.cargo/config.toml` supplies
 local check aliases. These instructions do not install CI enforcement. Do not claim that

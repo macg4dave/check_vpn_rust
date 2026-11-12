@@ -24,7 +24,7 @@ fi
 
 echo "Copying files"
 cp "${TARGET_DIR}/release/check_vpn" "$DESTDIR/usr/bin/"
-cp docs/RECOVERY_PERMISSIONS.md "$DESTDIR/usr/share/doc/check_vpn/"
+cp INSTALL.md "$DESTDIR/usr/share/doc/check_vpn/"
 cp contrib/config.xml "$DESTDIR/etc/check_vpn/config.xml"
 cp contrib/check_vpn.service "$DESTDIR/lib/systemd/system/check_vpn.service"
 
@@ -51,7 +51,7 @@ fpm -s dir -t rpm \
   --after-install contrib/packaging/postinst \
   --before-remove contrib/packaging/prerm \
   -C "$DESTDIR" \
-  usr/share/doc/check_vpn/RECOVERY_PERMISSIONS.md \
+  usr/share/doc/check_vpn/INSTALL.md \
   usr/bin/check_vpn \
   etc/check_vpn/config.xml \
   lib/systemd/system/check_vpn.service

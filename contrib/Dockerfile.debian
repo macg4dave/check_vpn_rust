@@ -21,7 +21,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rustup (non-interactive) and the stable toolchain
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
     && /root/.cargo/bin/rustc --version
 
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -36,11 +36,14 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
     mkdir -p src && printf 'fn main() { println!("build-cache"); }\n' > src/main.rs \
-    && cargo build --release || true
+    && cargo build --release --locked
 
 # Copy full project and run tests by default.
 COPY src ./src
-COPY tests/support ./tests/support
+COPY tests ./tests
+COPY scripts ./scripts
+COPY contrib ./contrib
+COPY .dockerignore ./
 COPY examples ./examples
 
 # Final build step uses cache mounts to avoid re-downloading; this also
@@ -48,6 +51,6 @@ COPY examples ./examples
 RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
-    cargo build --release
+    cargo build --release --locked
 
 CMD ["cargo", "test", "--verbose"]

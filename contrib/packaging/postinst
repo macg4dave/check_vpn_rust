@@ -44,5 +44,5 @@ if command -v check_vpn >/dev/null 2>&1; then
   fi
 fi
 
-printf '%s\n' 'check_vpn defaults to log-only recovery. To restart a VPN unit as checkvpn, configure a narrowly scoped polkit rule; see /usr/share/doc/check_vpn/RECOVERY_PERMISSIONS.md.'
+printf '%s\n' 'check_vpn defaults to log-only recovery. To restart a VPN unit as checkvpn, configure a narrowly scoped polkit rule; see /usr/share/doc/check_vpn/INSTALL.md.'
 exit 0

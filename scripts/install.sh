@@ -327,4 +327,4 @@ fi
 
 log "Installation complete."
 
-printf '%s\n' 'Recovery permissions: the default log action needs no privileges. For restart-unit, authorize only the configured VPN unit; see docs/RECOVERY_PERMISSIONS.md (packaged under /usr/share/doc/check_vpn/).'
+printf '%s\n' 'Recovery permissions: the default log action needs no privileges. For restart-unit, authorize only the configured VPN unit; see INSTALL.md (packaged under /usr/share/doc/check_vpn/).'

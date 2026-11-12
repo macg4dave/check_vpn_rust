@@ -2,6 +2,7 @@
 name = "check_vpn"
 version = "1.0.0"
 edition = "2021"
+rust-version = "1.93.1"
 description = "VPN monitoring and automatic reconnect"
 
 [lints.rust]
@@ -18,28 +19,28 @@ unimplemented = "deny"
 # continue to use explicit assertions and descriptive expect messages.
 
 [dependencies]
-clap = { version = "4.3", features = ["derive"] }
-clap_complete = "4.3"
-reqwest = { version = "0.12.24", features = ["blocking"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-log = "0.4"
-env_logger = "0.11.8"
-ctrlc = { version = "3.2", features = ["termination"] }
-anyhow = "1.0"
-thiserror = "1.0"
-shell-words = "1.1"
+clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = "4.6.11"
+# Keep the existing OS-native TLS backend across the reqwest 0.13 upgrade.
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "native-tls", "charset", "http2", "system-proxy"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+log = "0.4.35"
+env_logger = "0.11.11"
+ctrlc = { version = "3.5.2", features = ["termination"] }
+anyhow = "1.0.104"
+thiserror = "2.0.21"
+shell-words = "1.1.1"
 
 # XML configuration support is always available.
-quick-xml = { version = "0.38.3", features = ["serialize"] }
-tracing = { version = "0.1", optional = true }
-tracing-subscriber = { version = "0.3", optional = true, features = ["fmt", "env-filter"] }
-tracing-log = { version = "0.2", optional = true }
+quick-xml = { version = "0.42.0", features = ["serialize"] }
+tracing = { version = "0.1.44", optional = true }
+tracing-subscriber = { version = "0.3.23", optional = true, features = ["fmt", "env-filter"] }
 
 [dev-dependencies]
-httpmock = "0.8.2"
-serial_test = "3.2.0"
-tempfile = "3"
+httpmock = "0.9.0"
+serial_test = "4.0.1"
+tempfile = "3.27.0"
 
 [features]
 default = ["xml_pretty"]
@@ -53,12 +54,12 @@ xml_pretty = []
 xml_tracing = ["dep:tracing"]
 # Enable structured/tracing-based logging and spans at compile time.
 # This is an opt-in feature which bundles `tracing` and `tracing-subscriber`.
-observability = ["dep:tracing", "dep:tracing-subscriber", "dep:tracing-log"]
+observability = ["dep:tracing", "dep:tracing-subscriber"]
 
 [package.metadata.deb]
 maintainer = "packager@example.com"
 assets = [
-	["docs/RECOVERY_PERMISSIONS.md", "/usr/share/doc/check_vpn/RECOVERY_PERMISSIONS.md", "0644"],
+	["INSTALL.md", "/usr/share/doc/check_vpn/INSTALL.md", "0644"],
 	["target/release/check_vpn", "/usr/bin/check_vpn", "0755"],
 	["contrib/config.xml", "/etc/check_vpn/config.xml", "0644"],
 	["contrib/check_vpn.service", "/lib/systemd/system/check_vpn.service", "0644"],

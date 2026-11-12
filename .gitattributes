@@ -1,4 +1,6 @@
 *.sh text eol=lf
+contrib/packaging/postinst text eol=lf
+contrib/packaging/prerm text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.md text eol=lf

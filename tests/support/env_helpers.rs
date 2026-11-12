@@ -5,7 +5,6 @@ use std::ffi::OsString;
 pub struct ScopedEnv {
     key: String,
     prev: Option<OsString>,
-    removed: bool,
 }
 
 impl ScopedEnv {
@@ -18,11 +17,7 @@ impl ScopedEnv {
             Some(v) => std::env::set_var(&key_s, &v),
             None => std::env::remove_var(&key_s),
         }
-        ScopedEnv {
-            key: key_s,
-            prev,
-            removed: false,
-        }
+        ScopedEnv { key: key_s, prev }
     }
 
     /// Convenience to set a string value.
@@ -35,7 +30,7 @@ impl Drop for ScopedEnv {
     fn drop(&mut self) {
         if let Some(prev) = self.prev.take() {
             std::env::set_var(&self.key, prev);
-        } else if !self.removed {
+        } else {
             // No previous value: remove it if still present
             std::env::remove_var(&self.key);
         }

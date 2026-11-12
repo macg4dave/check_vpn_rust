@@ -127,9 +127,10 @@ fn malformed_xml_errors_gracefully() {
         "error should include context prefix: {}",
         msg
     );
-    // Position hints are best-effort; ensure message doesn't panic
-    // (Line/column may or may not appear depending on backend; just ensure non-empty)
-    assert!(!msg.trim().is_empty(), "error message should not be empty");
+    assert!(
+        err.chain().count() > 1,
+        "the original parser error must be retained"
+    );
 }
 
 // Strict unknown field handling when xml_strict feature is enabled
@@ -149,4 +150,23 @@ fn strict_unknown_field_errors() {
         "strict mode should error on unknown field: {}",
         msg
     );
+}
+
+#[test]
+fn xml_roundtrip_preserves_whitespace_and_escaped_text() {
+    #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+    struct Document {
+        #[serde(rename = "@name")]
+        name: String,
+        text: String,
+        empty: String,
+    }
+    let expected = Document {
+        name: "a & b".into(),
+        text: "  caf\u{e9} <vpn> & \"quoted\"  ".into(),
+        empty: String::new(),
+    };
+    let xml = check_vpn::xml_io::backend::serialize_xml(&expected).expect("serialize XML");
+    let actual: Document = check_vpn::xml_io::backend::deserialize_xml(&xml).expect("parse XML");
+    assert_eq!(actual, expected);
 }

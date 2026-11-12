@@ -61,10 +61,6 @@ docker run --rm -it -v "$(pwd)/target/debian":/pkgs debian:bookworm-slim /bin/ba
 - `contrib/install.sh` must be run as root and will try to enable/start the systemd unit. In non-interactive installs it will install the bundled sample config.
 - For SELinux-aware testing use a Fedora VM (Vagrant box or cloud image) to exercise `semanage`/restorecon behavior.
 
-If you want, I can now:
-- Run a quick smoke test in a Debian container to build the .deb inside this workspace and verify the smoke-test step locally (needs docker available here), or
-- Provision a Vagrant VM and run the full install (requires Vagrant + provider on your machine).
-
 6) Local macOS package and safe test (developer)
 
 If you're on macOS you can build a local system-level package (.pkg) and test it safely without modifying the host system permanently.
@@ -84,5 +80,3 @@ make test-macos-pkg-local
 ```
 
 Note: by default the package will NOT auto-load the LaunchDaemon. To include an auto-load step in the package's postinstall, set `CHECK_VPN_PKG_AUTOLOAD=true` when invoking the package builder (not recommended unless you know what you're doing).
-
-Tell me which run you'd like me to execute now.

@@ -1,6 +1,6 @@
 /* Optional example. Install manually after setting the allowed unit name.
  * Grants only restart of this exact unit, never arbitrary unit management/reboot.
- * See docs/RECOVERY_PERMISSIONS.md. Not installed automatically by packages.
+ * See INSTALL.md. Not installed automatically by packages.
  */
 polkit.addRule(function(action, subject) {
     if (subject.user == 'checkvpn' &&

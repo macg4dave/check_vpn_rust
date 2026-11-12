@@ -19,7 +19,7 @@ RUN apt-get update \
 
 # Install rustup and the stable toolchain so this image supports the lockfile
 # and recent Cargo features used by CI/tests.
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable \
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal \
     && /root/.cargo/bin/rustc --version
 
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -30,7 +30,7 @@ WORKDIR /usr/src/check_vpn
 # caches dependencies and the build context doesn't need to include the
 # whole repo for dependency resolution. We create a tiny dummy `src`
 # file so `cargo build` can run and populate the cargo cache layer.
-# This allows subsequent COPY . . to be much faster.
+# The later source copy reuses the dependency cache.
 COPY Cargo.toml Cargo.lock ./
 
 # Dummy build step to populate the cargo cache (safe if the real source
@@ -41,14 +41,17 @@ RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
     mkdir -p src && printf 'fn main() { println!("build-cache"); }\n' > src/main.rs \
-    && cargo build --release || true
+    && cargo build --release --locked
 
 # Now copy the full repo and build the real release.
 ## Selectively copy only the source, tests and examples so the build
 ## context remains small and Docker layer cache is effective. Avoid
 ## sending unrelated top-level files that increase build context size.
 COPY src ./src
-COPY tests/support ./tests/support
+COPY tests ./tests
+COPY scripts ./scripts
+COPY contrib ./contrib
+COPY .dockerignore ./
 COPY examples ./examples
 
 # Build the real project (now that full source exists). Use the same cache
@@ -57,7 +60,7 @@ COPY examples ./examples
 RUN --mount=type=cache,id=cargo-registry,target=/root/.cargo/registry \
     --mount=type=cache,id=cargo-git,target=/root/.cargo/git \
     --mount=type=cache,id=target,target=/usr/src/check_vpn/target \
-    cargo build --release
+    cargo build --release --locked
 
 # Run tests by default
 CMD ["/bin/sh", "-c", "cargo test --verbose"]

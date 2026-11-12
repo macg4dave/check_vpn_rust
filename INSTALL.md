@@ -124,11 +124,21 @@ Security and safety notes
 - The script attempts to avoid surprises: files are copied with safe permissions and the `--dry-run` option is available for verification.
 - System installs modify privileged locations and start services; only run them on systems you control.
 
-Support & next steps
---------------------
-If you'd like, I can add:
-- A `--prefix` to control install root (for cross-platform packaging).
-- A `--summary` dry-run output that prints only the file changes planned.
-- More tests to cover system-mode errors (e.g., expected failure when not run as root).
+## Recovery permissions
 
-Thanks — if you'd like a specific CI snippet for a runner (GitLab, CircleCI, etc.), tell me which one and I will add it.
+The default `log` recovery action needs no elevated privileges. The systemd
+service runs as `checkvpn`; it must not be granted unrestricted sudo or systemd
+management rights.
+
+For `restart-unit`, first select the exact VPN unit on the target machine. Review
+`contrib/polkit/50-check_vpn.rules` and replace its example unit with that name.
+An administrator can install the reviewed rule in `/etc/polkit-1/rules.d/` where
+polkit is available. The rule must allow only the `checkvpn` account, the
+`org.freedesktop.systemd1.manage-units` action, the `restart` verb, and that unit.
+Packages do not install this authorization automatically.
+
+Keep the configuration and any recovery executables owned by an administrator;
+the monitoring account must not be able to replace privileged commands. Preserve
+the service's hardening settings. Verify configuration with `--dry-run` before
+using recovery on the target system. Reboot authorization is separate and is not
+granted by the example restart rule.

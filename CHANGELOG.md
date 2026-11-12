@@ -2,7 +2,20 @@
 
 ## Unreleased
 
-- No unreleased changes yet.
+- Upgrade direct dependencies to current stable releases and refresh Cargo.lock;
+  the development/test toolchain now requires Rust 1.93.1 or newer. Keep native TLS
+  explicitly enabled when upgrading reqwest to 0.13.
+- Replace handwritten XML formatting and guessed error locations with quick-xml's
+  serializer and original error chain; preserve whitespace and escaped text.
+- Stop logging initialization from mutating RUST_LOG or replacing panic hooks;
+  remove redundant tracing-log initialization and its direct dependency.
+- Shut down HTTP test servers on drop, fix binary lookup in CLI tests, replace the
+  ignored documentation sketch with a runnable example, and remove a remote timeout
+  placeholder already covered by local tests.
+- Include integration tests and required fixtures in Docker test images; stop
+  swallowing dependency-build errors and stop pre-commit from staging user changes.
+- Remove the obsolete v0.5b release cleanup script and conversational documentation;
+  move recovery permissions into INSTALL.md and repair packaging references.
 
 ## v1.0.0
 

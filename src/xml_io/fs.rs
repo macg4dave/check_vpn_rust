@@ -3,7 +3,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::time::Instant;
 
-/// Read a generic struct from an XML file at `path` using the selected XML backend.
+/// Read a generic struct from an XML file at `path` using quick-xml.
 /// Provides helpful error context and debug logging.
 pub fn read_xml<T: DeserializeOwned>(path: impl AsRef<std::path::Path>) -> Result<T> {
     let path = path.as_ref();

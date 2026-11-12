@@ -9,14 +9,16 @@
 //! - `check_vpn::config::Config` - load/merge/validate configuration
 //! - `check_vpn::actions` - action parsing and execution helpers
 //!
-//! Example (ignored):
-//! ```ignore
-//! // The primary workflow is exercised in the tests; this example is for
-//! // documentation only and is not compiled as a doctest.
-//! use check_vpn::{app::perform_check, ip_api::get_isp, actions::run_action};
-//! // Construct an `EffectiveConfig` via merging CLI args and `Config` in real
-//! // programs. For docs we only show the call site:
-//! // perform_check(&effective_config, get_isp, run_action).unwrap();
+//! Example with injected identity lookup and a dry-run recovery action:
+//! ```
+//! use check_vpn::{app::perform_check, config::EffectiveConfig};
+//!
+//! let config = EffectiveConfig { dry_run: true, ..Default::default() };
+//! perform_check(&config, || Ok("Example VPN ISP".into()), |_, dry_run| {
+//!     assert!(dry_run);
+//!     Ok(())
+//! })?;
+//! # Ok::<(), check_vpn::error_types::AppError>(())
 //! ```
 
 pub mod actions;

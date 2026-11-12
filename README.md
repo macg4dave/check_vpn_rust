@@ -132,7 +132,7 @@ sudo systemctl status check_vpn
 
 For desktop/personal runs, use the dedicated user unit in `contrib/check_vpn-user.service`.
 
-The service account needs explicit authorization to restart a system VPN unit. Follow [Recovery permissions](docs/RECOVERY_PERMISSIONS.md); the example rule allows only restarting one named VPN unit. Packages default to log-only recovery and do not install a privilege-granting rule automatically.
+The service account needs explicit authorization to restart a system VPN unit. Follow [Recovery permissions](INSTALL.md#recovery-permissions); the example rule allows only restarting one named VPN unit. Packages default to log-only recovery and do not install a privilege-granting rule automatically.
 
 ## Troubleshooting
 

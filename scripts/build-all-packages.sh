@@ -118,7 +118,7 @@ copy_unix_layout() {
     "${OUTPUT_DIR}/unix/${arch}/lib/systemd/system" \
     "${OUTPUT_DIR}/unix/${arch}/etc/check_vpn" \
     "${OUTPUT_DIR}/unix/${arch}/usr/share/doc/check_vpn"
-  cp "${REPO_ROOT}/docs/RECOVERY_PERMISSIONS.md" "${OUTPUT_DIR}/unix/${arch}/usr/share/doc/check_vpn/"
+  cp "${REPO_ROOT}/INSTALL.md" "${OUTPUT_DIR}/unix/${arch}/usr/share/doc/check_vpn/"
 
   local bin_source
   bin_source=$(find_built_binary "$target_dir")

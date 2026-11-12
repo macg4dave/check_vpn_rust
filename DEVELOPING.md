@@ -9,6 +9,8 @@ Summary
 
 Prerequisites
 
+- Rust 1.93.1 or newer is required for the current dependency and test toolchain.
+
 - Rust toolchain: install rustup from <https://rustup.rs>
 - Docker Desktop (for Docker-based Debian/Fedora builds)
 - (Windows native) Visual Studio Build Tools (C++ workload) if using the MSVC toolchain

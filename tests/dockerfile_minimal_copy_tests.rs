@@ -47,12 +47,15 @@ fn check_minimal_copy(path: &str) {
         path
     );
 
-    // Ensure we copy tests/support rather than the entire tests/ tree
-    assert!(
-        s.contains("COPY tests/support"),
-        "{} should copy tests/support instead of the whole tests/ tree",
-        path
-    );
+    // Container test runs need integration tests and their repository fixtures.
+    for instruction in [
+        "COPY tests ./tests",
+        "COPY scripts ./scripts",
+        "COPY contrib ./contrib",
+        "COPY .dockerignore ./",
+    ] {
+        assert!(s.contains(instruction), "{path} is missing {instruction}");
+    }
 
     // Ensure the Dockerfile does NOT use `COPY . .` which would send the
     // whole repository into the build context. We want selective copies.
